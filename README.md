@@ -181,6 +181,26 @@ pnpm check         # facts, recipes, typecheck, tests
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Run `pnpm check` before you open a pull request.
 
+## Thanks
+
+Several templates started from ideas in these open source projects:
+
+| Template | Builds on |
+|-|-|
+| [audiobook](examples/audiobook) | [p0n1/epub_to_audiobook](https://github.com/p0n1/epub_to_audiobook) (forked) |
+| [article-to-podcast](examples/article-to-podcast) | [souzatharsis/podcastfy](https://github.com/souzatharsis/podcastfy) |
+| [coding-voice-mode](examples/coding-voice-mode) | [mbailey/voicemode](https://github.com/mbailey/voicemode) |
+| [docs-voice-widget](examples/docs-voice-widget) | [livekit-examples/agent-starter-embed](https://github.com/livekit-examples/agent-starter-embed) and [supabase-community/nextjs-openai-doc-search](https://github.com/supabase-community/nextjs-openai-doc-search) |
+| [front-desk](examples/front-desk) | [cartesia-ai/line](https://github.com/cartesia-ai/line/tree/main/examples/form_filler) form filler and [twilio-samples/speech-assistant-openai-realtime-api-python](https://github.com/twilio-samples/speech-assistant-openai-realtime-api-python) |
+| [meeting-notes](examples/meeting-notes) | [Nutlope/notesGPT](https://github.com/Nutlope/notesGPT) |
+| [pocket-interpreter](examples/pocket-interpreter) | [phuc-nt/my-translator](https://github.com/phuc-nt/my-translator) |
+| [speaking-partner](examples/speaking-partner) | [ZackAkil/immersive-language-learning-with-live-api](https://github.com/ZackAkil/immersive-language-learning-with-live-api) |
+| [story-time](examples/story-time) | [pipecat-ai/pipecat-examples](https://github.com/pipecat-ai/pipecat-examples/tree/main/storytelling-chatbot) storytelling chatbot |
+| [voice-chat](examples/voice-chat) | [livekit-examples/agent-starter-react](https://github.com/livekit-examples/agent-starter-react) |
+| [voice-journal](examples/voice-journal) | [ikhare/just-speak](https://github.com/ikhare/just-speak) |
+
+The UI is [shadcn/ui](https://ui.shadcn.com), the icons are [Lucide](https://lucide.dev), and the repo layout follows the cookbook in [vercel/ai](https://github.com/vercel/ai).
+
 ## License
 
 Apache-2.0, see [LICENSE](LICENSE). Two exceptions keep their upstream MIT license: [`examples/audiobook`](examples/audiobook) is a fork of [p0n1/epub_to_audiobook](https://github.com/p0n1/epub_to_audiobook), and the UI components in `components/ui` and `packages/kit/components/ui` come from [shadcn/ui](https://ui.shadcn.com) (MIT, Copyright (c) 2023 shadcn).
