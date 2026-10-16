@@ -1,10 +1,15 @@
 import { getCartesia } from "@/lib/server/cartesia";
-import { cartesiaError, json } from "@/lib/server/errors";
+import { cartesiaError, json, rateLimited } from "@/lib/server/errors";
 import { MAX_SPEAK_CHARS, TTS_MODEL } from "@/lib/limits";
+import { createRateLimiter } from "@/lib/server/rate-limit";
+
+const allow = createRateLimiter(10, 60_000);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(req: Request) {
+  const limited = rateLimited(req, allow);
+  if (limited) return limited;
   const body = await req.json().catch(() => null);
   const text = typeof body?.text === "string" ? body.text.trim() : "";
   const voiceId = typeof body?.voiceId === "string" ? body.voiceId : "";

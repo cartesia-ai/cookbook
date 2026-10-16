@@ -1,11 +1,16 @@
 import { generateText, NoObjectGeneratedError, NoOutputGeneratedError, Output } from "ai";
 import { getModel } from "@/lib/server/llm";
-import { json, llmError } from "@/lib/server/errors";
+import { json, llmError, rateLimited } from "@/lib/server/errors";
 import { RECAP_INSTRUCTIONS, recapPrompt } from "@/lib/server/prompts";
 import { RecapRequestSchema, RecapSchema } from "@/lib/schema";
 import { MAX_RECAP_INPUT_CHARS } from "@/lib/limits";
+import { createRateLimiter } from "@/lib/server/rate-limit";
+
+const allow = createRateLimiter(10, 60_000);
 
 export async function POST(req: Request) {
+  const limited = rateLimited(req, allow);
+  if (limited) return limited;
   const body = await req.json().catch(() => null);
   const parsed = RecapRequestSchema.safeParse(body);
   if (!parsed.success) return json({ error: "Send between 1 and 30 entries" }, 400);

@@ -3,10 +3,13 @@ import { defaultOptions, MAX_TEXT_CHARS, OptionsSchema } from "../../../lib/conf
 import { articleFromText, fetchArticle } from "../../../lib/extract";
 import { badRequest, errorResponse } from "../../../lib/http";
 import { getModel } from "../../../lib/model";
+import { clientIp, createRateLimiter, tooManyRequests } from "../../../lib/rate-limit";
 import { generateScript } from "../../../lib/script";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
+const allow = createRateLimiter(10, 60_000);
 
 const Body = z
   .object({
@@ -17,6 +20,7 @@ const Body = z
   .refine((b) => Boolean(b.url) !== Boolean(b.text?.trim()), { message: "Send either a url or text." });
 
 export async function POST(req: Request): Promise<Response> {
+  if (!allow(clientIp(req))) return tooManyRequests();
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest("Send a link or some text, and valid options.");
   const { url, text, options = defaultOptions() } = parsed.data;

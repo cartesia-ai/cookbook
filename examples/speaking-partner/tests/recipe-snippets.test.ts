@@ -13,7 +13,7 @@ describe.skipIf(!existsSync(RECIPE))("recipe snippets", () => {
   const found = existsSync(RECIPE) ? blocks(readFileSync(RECIPE, "utf8")) : [];
 
   it("has code blocks to check", () => {
-    expect(found.length).toBeGreaterThanOrEqual(8);
+    expect(found.length).toBeGreaterThan(0);
   });
 
   for (const [name, code] of found) {

@@ -1,8 +1,8 @@
+import { APIError, APIUserAbortError } from "@cartesia/cartesia-js";
 import { APICallError } from "ai";
 import { ConfigError } from "./env";
 import { UnreadablePageError } from "./extract";
 import { FetchBlockedError } from "./safe-fetch";
-import { RenderError } from "./tts";
 
 export function errorResponse(err: unknown): Response {
   let status = 500;
@@ -15,9 +15,12 @@ export function errorResponse(err: unknown): Response {
   } else if (err instanceof UnreadablePageError) {
     status = 422;
     message = err.message;
-  } else if (err instanceof RenderError) {
+  } else if (err instanceof APIUserAbortError) {
+    status = 499;
+    message = "The request was cancelled.";
+  } else if (err instanceof APIError) {
     status = 502;
-    message = err.message;
+    message = `The Cartesia request failed${err.status ? ` (HTTP ${err.status})` : ""}.`;
   } else if (APICallError.isInstance(err)) {
     status = 502;
     message = `The language model request failed${err.statusCode ? ` (HTTP ${err.statusCode})` : ""}.`;

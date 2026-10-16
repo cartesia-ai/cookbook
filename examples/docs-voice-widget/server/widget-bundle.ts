@@ -27,6 +27,6 @@ export function widgetSource(production: boolean): () => Promise<string> {
   return () =>
     (cached ??= readFile(WIDGET_OUT, 'utf8').catch(() => {
       cached = null;
-      throw new Error('dist/widget.js is missing. Run pnpm build first.');
+      throw new Error('dist/widget.js is missing. Run npm run build first.');
     }));
 }

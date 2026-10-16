@@ -18,9 +18,7 @@ function loadPrefs(): Prefs | null {
   try {
     const p = JSON.parse(localStorage.getItem(PREFS) ?? "null") as Prefs | null;
     if (p && isLang(p.pair?.[0]) && isLang(p.pair?.[1]) && p.pair[0] !== p.pair[1]) return p;
-  } catch {
-    // private mode or bad JSON: use the defaults
-  }
+  } catch {}
   return null;
 }
 
@@ -41,9 +39,7 @@ export default function Home() {
   useEffect(() => {
     try {
       localStorage.setItem(PREFS, JSON.stringify({ pair, layout, large }));
-    } catch {
-      // not saved, that is fine
-    }
+    } catch {}
   }, [pair, layout, large]);
 
   if (interpreter.live && interpreter.phase !== null) {

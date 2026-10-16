@@ -1,5 +1,3 @@
-"""Microphone and speaker. sounddevice is imported lazily so tests need no audio hardware."""
-
 from __future__ import annotations
 
 import asyncio
@@ -10,7 +8,7 @@ from typing import AsyncIterator
 CHUNK_MS = 100
 
 class AudioError(Exception):
-    """Plain, actionable message for the agent and the user."""
+    pass
 
 def _device(value: str | None):
     if value is None:
@@ -25,7 +23,6 @@ def _sd():
     return sd
 
 class Mic:
-    """Yields 100 ms chunks of mono s16le PCM."""
 
     def __init__(self, sample_rate: int, device: str | None = None):
         self.sample_rate = sample_rate
@@ -70,7 +67,6 @@ class Mic:
             self._stream = None
 
 class WavMic:
-    """Streams a 16 kHz mono WAV file at real time, then silence so the turn can end."""
 
     def __init__(self, path: str | Path, sample_rate: int = 16000, tail_s: float = 4.0, realtime: bool = True):
         self.path, self.sample_rate, self.tail_s, self.realtime = Path(path), sample_rate, tail_s, realtime
@@ -93,7 +89,6 @@ class WavMic:
         return None
 
 class Speaker:
-    """Plays s16le PCM as it arrives."""
 
     def __init__(self, sample_rate: int, device: str | None = None):
         self.sample_rate = sample_rate
@@ -114,14 +109,12 @@ class Speaker:
         await asyncio.to_thread(self._stream.write, pcm)
 
     async def drain(self) -> None:
-        """Wait for queued audio to finish playing, then close."""
         stream, self._stream = self._stream, None
         if stream is not None:
             await asyncio.to_thread(stream.stop)
             stream.close()
 
     def stop(self) -> None:
-        """Drop queued audio now."""
         stream, self._stream = self._stream, None
         if stream is not None:
             stream.abort()

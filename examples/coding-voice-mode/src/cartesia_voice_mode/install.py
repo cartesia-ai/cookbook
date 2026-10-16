@@ -1,5 +1,3 @@
-"""Pure helpers that build client configs. Nothing here runs a client or reads a key."""
-
 from __future__ import annotations
 
 import json
@@ -12,8 +10,38 @@ import tomli_w
 
 NAME = "cartesia-voice"
 
+class ConfigFileError(Exception):
+    pass
+
+def _read_json(path: Path) -> dict:
+    text = path.read_text() if path.exists() else ""
+    if not text.strip():
+        return {}
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ConfigFileError(
+            f"{path} is not valid JSON (line {exc.lineno}, column {exc.colno}). Fix it or move it aside, then run this again. The file was not changed."
+        ) from None
+    if not isinstance(data, dict) or not isinstance(data.get("mcpServers", {}), dict):
+        raise ConfigFileError(f"{path} must be a JSON object with an \"mcpServers\" object. The file was not changed.")
+    return data
+
+def _read_toml(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        return tomllib.loads(path.read_text())
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigFileError(f"{path} is not valid TOML ({exc}). Fix it, then run this again. The file was not changed.") from None
+
+def read_cursor(path: Path) -> dict:
+    return _read_json(path)
+
+def read_codex(path: Path) -> dict:
+    return _read_toml(path)
+
 def project_dir() -> Path:
-    """The directory holding pyproject.toml, when running from a checkout."""
     return Path(__file__).resolve().parents[2]
 
 def server_args(directory: Path | str) -> list[str]:
@@ -51,8 +79,7 @@ def codex_path(home: Path) -> Path:
     return home / ".codex" / "config.toml"
 
 def merge_cursor(path: Path, entry: dict) -> bool:
-    """Add our server to mcp.json, keeping the rest. Returns True if the file changed."""
-    data = json.loads(path.read_text()) if path.exists() and path.read_text().strip() else {}
+    data = _read_json(path)
     entry = {"type": "stdio", **entry}
     servers = data.setdefault("mcpServers", {})
     if servers.get(NAME) == entry:
@@ -65,7 +92,7 @@ def merge_cursor(path: Path, entry: dict) -> bool:
 def remove_cursor(path: Path) -> bool:
     if not path.exists():
         return False
-    data = json.loads(path.read_text() or "{}")
+    data = _read_json(path)
     if NAME not in data.get("mcpServers", {}):
         return False
     _backup_once(path)
@@ -74,8 +101,7 @@ def remove_cursor(path: Path) -> bool:
     return True
 
 def merge_codex(path: Path, entry: dict) -> bool:
-    """Add [mcp_servers.<name>] to config.toml. Comments in the file are not kept."""
-    data = tomllib.loads(path.read_text()) if path.exists() else {}
+    data = _read_toml(path)
     codex_entry = {k: v for k, v in entry.items() if v}
     codex_entry |= {"startup_timeout_sec": 30, "tool_timeout_sec": 180}
     servers = data.setdefault("mcp_servers", {})
@@ -89,7 +115,7 @@ def merge_codex(path: Path, entry: dict) -> bool:
 def remove_codex(path: Path) -> bool:
     if not path.exists():
         return False
-    data = tomllib.loads(path.read_text())
+    data = _read_toml(path)
     if NAME not in data.get("mcp_servers", {}):
         return False
     _backup_once(path)
@@ -98,7 +124,6 @@ def remove_codex(path: Path) -> bool:
     return True
 
 def save_key(path: Path, key: str) -> None:
-    """Write CARTESIA_API_KEY=... to a file that is mode 0600 from creation."""
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as f:

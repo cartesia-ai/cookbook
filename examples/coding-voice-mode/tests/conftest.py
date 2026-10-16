@@ -84,7 +84,6 @@ class FakeStream:
         self.closed = True
 
 class FakeConn:
-    """Scripted ink-2 connection. Script items are events or exceptions; when empty, recv blocks."""
 
     def __init__(self, script):
         self.script, self.raw, self.sent, self.closed = list(script), [], [], False
@@ -117,7 +116,6 @@ class FakeManager:
         return self.outcome
 
 class FakeCartesia:
-    """Records kwargs. `conns` is a list of FakeConn or Exception, consumed one per connect."""
 
     def __init__(self, sse_events=None, conns=None):
         self.sse_events = sse_events or []

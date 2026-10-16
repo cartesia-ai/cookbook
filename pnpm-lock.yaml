@@ -28,9 +28,9 @@ importers:
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
-      cn:
-        specifier: ^0.4.0
-        version: 0.4.0
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       jsdom:
         specifier: 30.1.2
         version: 30.1.2
@@ -52,6 +52,9 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+      tailwind-merge:
+        specifier: ^3.7.0
+        version: 3.7.0
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -147,9 +150,9 @@ importers:
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
-      cn:
-        specifier: ^0.4.0
-        version: 0.4.0
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       idb-keyval:
         specifier: ^6.3.0
         version: 6.3.0
@@ -171,6 +174,9 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+      tailwind-merge:
+        specifier: ^3.7.0
+        version: 3.7.0
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -223,9 +229,9 @@ importers:
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
-      cn:
-        specifier: ^0.4.0
-        version: 0.4.0
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       lucide-react:
         specifier: ^1.57.0
         version: 1.57.0(@types/react@19.3.0)(react@19.3.1)
@@ -244,6 +250,9 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+      tailwind-merge:
+        specifier: ^3.7.0
+        version: 3.7.0
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -296,9 +305,9 @@ importers:
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
-      cn:
-        specifier: ^0.4.0
-        version: 0.4.0
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       lucide-react:
         specifier: ^1.57.0
         version: 1.57.0(@types/react@19.3.0)(react@19.3.1)
@@ -317,9 +326,9 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
-      tailwindcss:
-        specifier: ^4.3.3
-        version: 4.3.3
+      tailwind-merge:
+        specifier: ^3.7.0
+        version: 3.7.0
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -339,18 +348,15 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.3.0(@types/react@19.3.0)
-      '@types/ws':
-        specifier: ^8.18.0
-        version: 8.18.2
       jsdom:
         specifier: ^30.1.2
         version: 30.1.2
       shadcn:
         specifier: ^4.21.5
         version: 4.21.5
-      tsx:
-        specifier: ^4.23.15
-        version: 4.23.15
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
@@ -360,9 +366,6 @@ importers:
       vitest:
         specifier: ^5.0.4
         version: 5.0.4(@types/node@22.20.5)(jsdom@30.1.2)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15))
-      ws:
-        specifier: ^8.22.0
-        version: 8.22.0
 
   examples/story-time:
     dependencies:
@@ -381,9 +384,9 @@ importers:
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
-      cn:
-        specifier: ^0.4.0
-        version: 0.4.0
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       idb-keyval:
         specifier: ^6.3.0
         version: 6.3.0
@@ -405,6 +408,9 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+      tailwind-merge:
+        specifier: ^3.7.0
+        version: 3.7.0
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -421,9 +427,6 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.3.0(@types/react@19.3.0)
-      fake-indexeddb:
-        specifier: ^6.2.5
-        version: 6.2.5
       shadcn:
         specifier: ^4.21.5
         version: 4.21.5
@@ -448,9 +451,9 @@ importers:
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
-      cn:
-        specifier: ^0.4.0
-        version: 0.4.0
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       lucide-react:
         specifier: ^1.57.0
         version: 1.57.0(@types/react@19.3.0)(react@19.3.1)
@@ -469,6 +472,9 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+      tailwind-merge:
+        specifier: ^3.7.0
+        version: 3.7.0
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.3.3
@@ -485,12 +491,6 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.3.0(@types/react@19.3.0)
-      '@types/ws':
-        specifier: ^8.18.0
-        version: 8.18.2
-      ai:
-        specifier: ^7.0.0
-        version: 7.0.142(zod@4.6.7)
       jsdom:
         specifier: ^30.1.2
         version: 30.1.2
@@ -500,6 +500,9 @@ importers:
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
@@ -509,9 +512,6 @@ importers:
       vitest:
         specifier: ^5.0.4
         version: 5.0.4(@types/node@22.20.5)(jsdom@30.1.2)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15))
-      ws:
-        specifier: ^8.22.0
-        version: 8.22.0
 
   examples/voice-journal:
     dependencies:
@@ -651,9 +651,9 @@ importers:
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
-      cn:
-        specifier: ^0.4.0
-        version: 0.4.0
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       lucide-react:
         specifier: ^1.57.0
         version: 1.57.0(@types/react@19.3.0)(react@19.3.1)
@@ -666,6 +666,9 @@ importers:
       sonner:
         specifier: ^2.0.8
         version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      tailwind-merge:
+        specifier: ^3.7.0
+        version: 3.7.0
     devDependencies:
       '@types/react':
         specifier: ^19
@@ -692,7 +695,11 @@ importers:
         specifier: ~5.9.0
         version: 5.9.3
 
+  tools/check-catalog: {}
+
   tools/check-content: {}
+
+  tools/check-copies: {}
 
   tools/check-facts: {}
 
@@ -3757,11 +3764,6 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
-  cn@0.4.0:
-    resolution: {integrity: sha512-qOAeUhPwPzBxx6jaeQdo646XIKliKHc2j1ZF7Ngb1o0pJZKH5gq8FkA0aVdUdPFUDXNXyUCXpCtoJISo6dhizg==}
-    engines: {node: '>=20'}
-    hasBin: true
-
   code-block-writer@13.0.3:
     resolution: {integrity: sha512-Oofo0pq3IKnsFtuHqSF7TqBfr71aeyZDVJ0HpmqB7FBM2qEigL0iPONSCZSO9pE9dZTAxANe5XHG9Uy0YMv8cg==}
 
@@ -6457,6 +6459,9 @@ packages:
     engines: {node: '>=10.0.0'}
     os: [darwin, linux, win32, freebsd, openbsd, netbsd, sunos, android]
     hasBin: true
+
+  tailwind-merge@3.7.0:
+    resolution: {integrity: sha512-XPPUyAc+cvspz3lHTcR/QgPfW2A0lv/xQNIjX3HGhLR+Nq2lHaLq5MtTesHn8GUr3W3DguT2KT5x3NVgRtYwmA==}
 
   tailwindcss@4.3.3:
     resolution: {integrity: sha512-gOhV3P7ufE62QDGg1zVaTgCR+EtPv92k2nIhVcVKcLmxT1sUBsQGhnZj175j+MqRt4zLF7ic+sCYjfhxMxj7YQ==}
@@ -10368,8 +10373,6 @@ snapshots:
 
   cn@0.2.6: {}
 
-  cn@0.4.0: {}
-
   code-block-writer@13.0.3: {}
 
   color-convert@1.9.3:
@@ -13540,6 +13543,8 @@ snapshots:
   supports-preserve-symlinks-flag@1.0.0: {}
 
   systeminformation@5.33.15: {}
+
+  tailwind-merge@3.7.0: {}
 
   tailwindcss@4.3.3: {}
 

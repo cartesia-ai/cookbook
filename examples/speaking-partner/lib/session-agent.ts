@@ -7,6 +7,9 @@ import { AGENTS_PATH, statusOf, TOOLS_PATH, type AgentsApi, type VoiceSummary } 
 export const AGENT_NAME_PREFIX = "speaking-partner-session-";
 export const DEFAULT_AGENT_MODEL = "claude-haiku-4.5";
 export const STALE_AFTER_MS = 30 * 60_000;
+export const MAX_LIVE_SESSIONS = 10;
+export const MAX_SESSIONS_PER_CLIENT = 2;
+export const VOICE_PAGE_SIZE = 100;
 const AGENT_ID_RE = /^agent_[A-Za-z0-9]{10,64}$/;
 
 export class SessionAgentError extends Error {
@@ -86,10 +89,9 @@ export async function pickVoiceId(api: AgentsApi, code: LanguageCode, env: Env =
   const hit = voiceCache.get(code);
   if (hit && now - hit.at < VOICE_TTL_MS) return hit.id;
   const seen: VoiceSummary[] = [];
-  let n = 0;
-  for await (const v of api.voices(100)) {
+  for await (const v of api.voices(VOICE_PAGE_SIZE)) {
     seen.push(v);
-    if (++n >= 600) break;
+    if (seen.length === VOICE_PAGE_SIZE) break;
   }
   const voice = chooseVoice(seen, code);
   if (!voice) throw new SessionAgentError(`No ${languageName(code)} voice found. Set VOICE_ID_${code.toUpperCase()}.`, "no_voice");
@@ -109,7 +111,7 @@ export function buildAgentBody(input: CreateInput, voiceId: string, toolId: stri
     description: "Temporary agent from examples/speaking-partner. Deleted when the session ends.",
     config: {
       instructions: buildInstructions({ target: input.target, native: input.native, mission, mode: input.mode }),
-      initial_message: null, // the learner speaks first
+      initial_message: null,
       model: { id: env.AGENT_MODEL_ID || DEFAULT_AGENT_MODEL },
       language: { primary: input.target },
       audio: { output: { voice_id: voiceId } },
@@ -147,19 +149,63 @@ export async function deleteSessionAgent(api: AgentsApi, agentId: string): Promi
   return "deleted";
 }
 
-export async function sweepStaleAgents(api: AgentsApi, now = Date.now(), max = 20): Promise<number> {
-  const list = await api.get<{ data?: { id: string; name?: string; created_at?: string }[] }>(AGENTS_PATH, { limit: 100 });
-  const stale = (list.data ?? []).filter(
-    (a) => a.name?.startsWith(AGENT_NAME_PREFIX) && a.created_at && now - Date.parse(a.created_at) > STALE_AFTER_MS,
-  );
+interface AgentRow {
+  id: string;
+  name?: string;
+  created_at?: string;
+}
+
+export async function listSessionAgents(api: AgentsApi): Promise<AgentRow[]> {
+  const res = await api.get<{ summaries?: AgentRow[] }>(AGENTS_PATH);
+  return (res.summaries ?? []).filter((a) => a.name?.startsWith(AGENT_NAME_PREFIX));
+}
+
+function isStale(a: AgentRow, now: number): boolean {
+  const created = a.created_at ? Date.parse(a.created_at) : NaN;
+  return Number.isNaN(created) || now - created > STALE_AFTER_MS;
+}
+
+export function countLiveSessions(agents: AgentRow[], now = Date.now()): number {
+  return agents.filter((a) => !isStale(a, now)).length;
+}
+
+export async function sweepStaleAgents(api: AgentsApi, agents: AgentRow[], now = Date.now(), max = 20): Promise<number> {
   let removed = 0;
-  for (const a of stale.slice(0, max)) {
+  for (const a of agents.filter((x) => x.name?.startsWith(AGENT_NAME_PREFIX) && isStale(x, now)).slice(0, max)) {
     try {
       await api.delete(`${AGENTS_PATH}/${a.id}`);
       removed++;
     } catch {
-      // another sweep may have won the race
+      continue;
     }
   }
   return removed;
+}
+
+const sessionsByClient = new Map<string, Set<string>>();
+
+export function countClientSessions(client: string, live: AgentRow[], now = Date.now()): number {
+  const mine = sessionsByClient.get(client);
+  if (!mine) return 0;
+  const liveIds = new Set(live.filter((a) => !isStale(a, now)).map((a) => a.id));
+  for (const id of mine) if (!liveIds.has(id)) mine.delete(id);
+  if (mine.size === 0) sessionsByClient.delete(client);
+  return mine.size;
+}
+
+export function rememberClientSession(client: string, agentId: string) {
+  const mine = sessionsByClient.get(client) ?? new Set<string>();
+  mine.add(agentId);
+  sessionsByClient.set(client, mine);
+}
+
+export function forgetSession(agentId: string) {
+  for (const [client, ids] of sessionsByClient) {
+    ids.delete(agentId);
+    if (ids.size === 0) sessionsByClient.delete(client);
+  }
+}
+
+export function resetClientSessions() {
+  sessionsByClient.clear();
 }

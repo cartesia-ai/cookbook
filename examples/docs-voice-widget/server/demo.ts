@@ -14,10 +14,17 @@ export interface DemoPage {
   html: string;
 }
 
-const ORDER = ['websocket-api', 'client-tools', 'webhook-tools', 'tools', 'authenticate'];
+const ORDER = ['client-tools', 'tools'];
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
+
+export function safeHref(href: string): string | null {
+  const h = href.replace(/[\u0000-\u0020\u007f]/g, '');
+  if (h.startsWith('/') && !h.startsWith('//')) return `https://docs.cartesia.ai${h}`;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(h) || h.startsWith('//')) return /^https?:\/\//i.test(h) ? h : null;
+  return h;
+}
 
 export function renderMarkdown(md: string): string {
   const slugger = new GithubSlugger();
@@ -28,8 +35,15 @@ export function renderMarkdown(md: string): string {
         return `<h${token.depth} id="${id}">${this.parser.parseInline(token.tokens)}</h${token.depth}>\n`;
       },
       link(this: { parser: { parseInline(t: Tokens.Link['tokens']): string } }, token: Tokens.Link) {
-        const href = token.href.startsWith('/') ? `https://docs.cartesia.ai${token.href}` : token.href;
-        return `<a href="${escapeHtml(href)}">${this.parser.parseInline(token.tokens)}</a>`;
+        const href = safeHref(token.href);
+        const text = this.parser.parseInline(token.tokens);
+        return href === null ? text : `<a href="${escapeHtml(href)}">${text}</a>`;
+      },
+      image(token: Tokens.Image) {
+        const src = safeHref(token.href);
+        if (src === null) return escapeHtml(token.text);
+        const title = token.title ? ` title="${escapeHtml(token.title)}"` : '';
+        return `<img src="${escapeHtml(src)}" alt="${escapeHtml(token.text)}"${title}>`;
       },
       html(token: Tokens.HTML | Tokens.Tag) {
         return escapeHtml(token.text);
@@ -143,7 +157,6 @@ ${page.html}
 </article>
 </div>
 <script>${TOGGLE_SCRIPT}</script>
-<!-- The whole integration: one script tag. -->
 <script src="/widget.js" defer></script>
 </body>
 </html>`;

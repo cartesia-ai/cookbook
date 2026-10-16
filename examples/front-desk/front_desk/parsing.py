@@ -1,10 +1,3 @@
-"""Turn what a caller says ("Friday", "the 24th", "2pm", "afternoon") into dates and times.
-
-Adapted from `examples/form_filler/appointment_scheduler.py` in cartesia-ai/line
-(Apache-2.0): ordinal stripping, month and weekday tokens, and the morning / afternoon /
-evening periods. Changed to return real dates and times instead of matching a mock slot list.
-"""
-
 from __future__ import annotations
 
 import re
@@ -27,14 +20,15 @@ MONTHS = [
 ]
 PERIODS = {"morning": (6, 12), "afternoon": (12, 17), "evening": (17, 21)}
 
+
 def _strip_ordinal(token: str) -> str:
     for suffix in ("st", "nd", "rd", "th"):
         if token.endswith(suffix) and token[: -len(suffix)].isdigit():
             return token[: -len(suffix)]
     return token
 
+
 def parse_date(text: str, today: date) -> date | None:
-    """Accepts 2026-10-17, today, tomorrow, a weekday (the next one), "October 17" or "the 17th"."""
     s = text.lower().strip().replace(",", " ")
     if not s:
         return None
@@ -71,8 +65,8 @@ def parse_date(text: str, today: date) -> date | None:
             return None
     return candidate
 
+
 def parse_time(text: str) -> time | None:
-    """Accepts 2pm, 2:30 PM, 14:00 or 9. Bare hours from 1 to 7 are read as afternoon."""
     s = text.lower().strip().replace(".", "")
     m = re.fullmatch(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", s)
     if not m:
@@ -88,6 +82,7 @@ def parse_time(text: str) -> time | None:
         return None
     return time(hour, minute)
 
+
 def parse_period(text: str) -> tuple[int, int] | None:
     s = text.lower()
     for name, hours in PERIODS.items():
@@ -95,8 +90,10 @@ def parse_period(text: str) -> tuple[int, int] | None:
             return hours
     return None
 
+
 def spoken_date(d: date) -> str:
     return f"{WEEKDAYS[d.weekday()].title()}, {MONTHS[d.month - 1].title()} {d.day}"
+
 
 def spoken_time(t: time) -> str:
     hour = t.hour % 12 or 12

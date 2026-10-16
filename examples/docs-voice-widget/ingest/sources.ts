@@ -76,26 +76,53 @@ export function htmlToMarkdown(html: string): { markdown: string; anchors: strin
   return { markdown: lines.join('\n'), anchors };
 }
 
+const MAX_REDIRECTS = 5;
+
+export function onHost(url: string, host: string): boolean {
+  try {
+    const u = new URL(url);
+    return (u.protocol === 'https:' || u.protocol === 'http:') && u.host === host;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchOnHost(f: typeof fetch, url: string, host: string): Promise<Response> {
+  let current = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (!onHost(current, host)) throw new Error(`redirect off ${host}`);
+    const res = await f(current, { redirect: 'manual', signal: AbortSignal.timeout(20_000) });
+    const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (!location) return res;
+    current = new URL(location, current).toString();
+  }
+  throw new Error('too many redirects');
+}
+
 export async function sitemapPages(
   sitemap: string,
   opts: { match?: string; limit?: number; fetchImpl?: typeof fetch; log?: (s: string) => void } = {},
 ): Promise<RawPage[]> {
   const f = opts.fetchImpl ?? fetch;
-  const res = await f(sitemap, { signal: AbortSignal.timeout(20_000) });
+  const host = new URL(sitemap).host;
+  const res = await fetchOnHost(f, sitemap, host);
   if (!res.ok) throw new Error(`The sitemap answered ${res.status}.`);
   let urls = sitemapUrls(await res.text());
+  const offHost = urls.filter((u) => !onHost(u, host));
+  if (offHost.length) opts.log?.(`skip ${offHost.length} URLs that are not on ${host}`);
+  urls = urls.filter((u) => onHost(u, host));
   if (opts.match) urls = urls.filter((u) => u.includes(opts.match!));
   if (opts.limit) urls = urls.slice(0, opts.limit);
   const pages: RawPage[] = [];
   for (const url of urls) {
     try {
-      const md = await f(`${url.replace(/\/$/, '')}.md`, { signal: AbortSignal.timeout(20_000) });
-      const type = md.headers.get('content-type') ?? '';
-      if (md.ok && !type.includes('html')) {
+      const md = await fetchOnHost(f, `${url.replace(/\/$/, '')}.md`, host).catch(() => null);
+      const type = md?.headers.get('content-type') ?? '';
+      if (md?.ok && !type.includes('html')) {
         pages.push({ url, markdown: await md.text() });
         continue;
       }
-      const page = await f(url, { signal: AbortSignal.timeout(20_000) });
+      const page = await fetchOnHost(f, url, host);
       if (!page.ok) {
         opts.log?.(`skip ${url} (${page.status})`);
         continue;

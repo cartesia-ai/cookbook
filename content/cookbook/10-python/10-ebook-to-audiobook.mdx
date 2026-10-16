@@ -16,18 +16,17 @@ You need Python 3.10 to 3.12, uv and ffmpeg. The sample book is two public-domai
 cd examples/audiobook
 cp .env.example .env            # put your key in .env
 set -a; . ./.env; set +a
-uv run python main.py examples/alice_sample.epub out --tts cartesia --no_prompt
+uv run python main.py samples/alice_sample.epub out --tts cartesia --no_prompt
 ```
 
 Add `--preview` to list the chapters and the speakers it found without calling the API.
 
 ## How a chapter becomes audio
 
-The bytes endpoint returns audio but no timings. The streaming endpoint returns both, but only as raw PCM. So the provider streams each chunk of text with `add_timestamps`, collects the PCM, and encodes the whole chapter once at the end with ffmpeg. This is the request, a method of the provider class in `audiobook_generator/tts_providers/cartesia_tts_provider.py`. `model_name` defaults to `sonic-3.6`, and `SAMPLE_RATE` is 44100.
+The bytes endpoint returns audio but no timings. The streaming endpoint returns both, but only as raw PCM. So the provider streams each chunk of text with `add_timestamps`, collects the PCM, and encodes the whole chapter once at the end with ffmpeg. This is the request, one SSE call per chunk that returns PCM bytes and `(word, start, end)` tuples in chunk time. It is a method of the provider class in `audiobook_generator/tts_providers/cartesia_tts_provider.py`. `model_name` defaults to `sonic-3.6`, and `SAMPLE_RATE` is 44100.
 
 ```python filename="audiobook_generator/tts_providers/cartesia_tts_provider.py"
 def _stream_chunk(self, chunk: cast.Segment) -> Tuple[bytes, List[Tuple[str, float, float]]]:
-    """One SSE request. Returns PCM bytes and (word, start, end) in chunk time."""
     kwargs = dict(
         model_id=self.config.model_name,
         transcript=chunk.text,
@@ -80,7 +79,7 @@ For English dialogue, a cue next to a quote sets the emotion for that request th
 
 ## Long chapters
 
-No request length limit is documented. In a test, 8,000 characters in one request worked, but the app sends at most 1,500 (`--cartesia_max_chars`) so that a failed request costs little to retry. Text is split on sentence boundaries and never across paragraphs, and paragraphs are joined with 600 ms of silence added to the PCM. A stream that dies midway is retried for that chunk only, and its partial audio and timestamps are thrown away.
+No request length limit is documented. The app sends at most 1,500 (`--cartesia_max_chars`) so that a failed request costs little to retry. Text is split on sentence boundaries and never across paragraphs, and paragraphs are joined with 600 ms of silence added to the PCM. A stream that dies midway is retried for that chunk only, and its partial audio and timestamps are thrown away.
 
 ## Read-along
 

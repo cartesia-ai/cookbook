@@ -1,50 +1,51 @@
-# Article to podcast: turn any article into a two-host AI podcast
+# Article to podcast
 
-A Next.js app that turns a link or pasted text into a two-host podcast episode. An LLM writes the script, Cartesia Sonic 3.6 text to speech voices every line with two voices, and the page plays one WAV file with a transcript that follows along.
+Turns a link or pasted text into a two-host podcast episode, with Cartesia Sonic 3.6 text to speech voicing each host in a different voice.
 
 ![The finished episode "Sonic Briefing" for an article about libraries lending heat pumps: a player at 0:08 of 2:33 with a Download button, and the script below it with Sam's current line highlighted in green](./docs/screenshot.png)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Farticle-to-podcast&env=CARTESIA_API_KEY,OPENAI_API_KEY&envDescription=Cartesia%20API%20key%20for%20speech%20and%20an%20OpenAI%20key%20for%20the%20script.%20Anthropic%20and%20the%20AI%20Gateway%20also%20work%2C%20see%20the%20README.&envLink=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Farticle-to-podcast%23environment-variables&project-name=article-to-podcast&repository-name=article-to-podcast)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Farticle-to-podcast&env=CARTESIA_API_KEY%2CLLM_MODEL%2CAPP_PASSWORD&envDescription=Cartesia%20API%20key%2C%20an%20LLM%20as%20provider%2Fmodel%20%28on%20Vercel%20the%20AI%20Gateway%20needs%20no%20key%29%2C%20and%20a%20password%20for%20the%20app%20%28or%20none%29.&envLink=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Farticle-to-podcast%23environment-variables&project-name=article-to-podcast&repository-name=article-to-podcast)
 
 ## Run it
 
-You need Node 22.13 or newer and pnpm.
+Node 22.22 or newer.
 
 ```sh
-pnpm dlx create-next-app --example https://github.com/cartesia-ai/cookbook/tree/main/examples/article-to-podcast my-podcast
-cd my-podcast
-cp .env.example .env.local   # add CARTESIA_API_KEY and one LLM key
-pnpm dev
+npx degit cartesia-ai/cookbook/examples/article-to-podcast article-to-podcast
+cd article-to-podcast
+cp .env.example .env.local   # add CARTESIA_API_KEY, LLM_MODEL and its key
+npm install
+npm run dev
 ```
 
-Open http://localhost:3000, paste a link to an article (or switch to Paste text), leave Length on Short and press Make podcast. A short episode is ready in five to ten seconds. Without keys the page still loads, and a request tells you which variable to set.
+pnpm works too (`pnpm install`, `pnpm dev`).
+
+Open http://localhost:3000, paste a link to an article (or switch to Paste text), leave Length on Short and press Make podcast. Without keys the page still loads, and a request tells you which variable to set.
 
 ## Environment variables
 
 | Name | Required | What it does |
 | --- | --- | --- |
 | `CARTESIA_API_KEY` | yes | Records the audio. Get one at https://play.cartesia.ai/keys |
-| `AI_GATEWAY_API_KEY` | one LLM key | Any model through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). Wins if several keys are set |
-| `ANTHROPIC_API_KEY` | one LLM key | Anthropic directly. Used if there is no gateway key |
-| `OPENAI_API_KEY` | one LLM key | OpenAI directly. Used if neither of the others is set |
-| `PODCAST_MODEL` | no | Replaces the model id for the provider that was picked. It never switches provider |
+| `LLM_MODEL` | yes | The model that writes the script, as `provider/model`, for example `openai/gpt-5.4-mini` or `anthropic/claude-sonnet-5-5` |
+| `OPENAI_API_KEY` | if `LLM_MODEL` starts with `openai/` | https://platform.openai.com/api-keys |
+| `ANTHROPIC_API_KEY` | if `LLM_MODEL` starts with `anthropic/` | https://console.anthropic.com |
+| `AI_GATEWAY_API_KEY` | for any other provider | Routes the model through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). Not needed on a Vercel deployment |
 | `CARTESIA_VOICE_HOST_A`, `CARTESIA_VOICE_HOST_B` | no | Voice ids for the two hosts. Defaults are Skylar and Daniel |
+| `APP_PASSWORD` | see note | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
+| `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
-The default model ids are in `lib/model.ts`. Providers retire models, so check the provider's model page before you set `PODCAST_MODEL`.
+A direct key for the `LLM_MODEL` prefix wins. Any other prefix, or a prefix with no direct key, goes through the AI Gateway. The model ids are examples. Providers retire models, so check the provider's model page before you pick one. On Vercel, a model with no matching direct key goes through the AI Gateway without `AI_GATEWAY_API_KEY`, because the deployment authenticates to it for you.
 
 ## How it works
 
-```
-POST /api/script   link or text -> fetch -> Readability -> generateText + Output.object -> { title, lines }
-POST /api/audio    { lines }    -> client.tts.generate per line, 4 at a time -> one WAV + X-Line-Starts header
-```
+Open these first:
 
-1. `lib/safe-fetch.ts` fetches the page. Because a server fetching user-supplied URLs is an SSRF risk, it blocks private and reserved addresses at the socket lookup, allows only ports 80 and 443, and caps redirects, size (2 MB) and time.
-2. `lib/extract.ts` runs Mozilla Readability in jsdom with scripts off. A page with no readable article returns a 422 that asks for pasted text.
-3. `lib/script.ts` asks the LLM for the script as JSON. Long articles are split into parts, and each part sees the last six lines of the one before. A normalizer merges same-speaker runs, splits long lines, strips markdown and allows `[laughter]` at most twice.
-4. `lib/tts.ts` voices each line with one Sonic 3.6 call. Raw 16-bit PCM makes each line's duration exact, so `lib/wav.ts` can join the lines with short gaps (350 ms on a speaker change, 180 ms otherwise) and return the exact start time of every line for the transcript.
+1. `lib/tts.ts` makes one Sonic 3.6 call per script line with `client.tts.generate`, using host A's voice or host B's voice for that line. It asks for raw 16-bit PCM, so each line's length is exact, and `lib/wav.ts` joins the lines with short gaps (350 ms on a speaker change, 180 ms otherwise) and returns the start time of every line for the follow-along transcript. Four lines are recorded at a time.
+2. `app/api/audio/route.ts` takes the script and returns one WAV, with the line start times in the `X-Line-Starts` header.
+3. `lib/script.ts` asks the LLM (through the AI SDK) for the script as JSON. Long articles are split into parts, and each part sees the last six lines of the one before.
 
-The AI SDK handles the LLM only. Speech goes through `@cartesia/cartesia-js`. This is the call each line makes:
+This is the call each line makes:
 
 ```ts
 import Cartesia from "@cartesia/cartesia-js";
@@ -59,30 +60,17 @@ const res = await client.tts.generate({
   output_format: { container: "raw", encoding: "pcm_s16le", sample_rate: 24000 },
 });
 const pcm = new Uint8Array(await res.arrayBuffer());
-console.log(`${pcm.byteLength / 2 / 24000} seconds of audio`);
 ```
 
-```
-app/api/script/route.ts       fetch, extract, write the script
-app/api/audio/route.ts        voice every line, return one WAV
-app/_components/studio.tsx    the form and progress steps
-app/_components/player.tsx    player and follow-along transcript
-lib/safe-fetch.ts             SSRF-safe fetch for user URLs
-lib/script.ts, lib/prompt.ts  script generation and the host prompt
-lib/tts.ts, lib/wav.ts        Sonic calls and WAV assembly
-lib/model.ts                  picks the LLM provider from the keys you set
-lib/http.ts                   maps every error to a fixed message
-```
+`lib/safe-fetch.ts` fetches the article and blocks private addresses at connection time, because a server that fetches user-supplied URLs can otherwise be pointed at internal services.
 
-## Models and API version
-
-Uses `sonic-3.6` for speech and `Cartesia-Version: 2026-08-14`, which `@cartesia/cartesia-js` 4.2 sends on every request. See https://docs.cartesia.ai/build-with-cartesia/tts-models/latest for current ids and https://docs.cartesia.ai/api-reference/tts/bytes for the endpoint.
+The SDK sends `Cartesia-Version: 2026-08-14` on every request. See https://docs.cartesia.ai/build-with-cartesia/tts-models/latest for current model ids.
 
 ## Change it
 
 - Use other voices: pick two at https://play.cartesia.ai/voices and set `CARTESIA_VOICE_HOST_A` and `CARTESIA_VOICE_HOST_B`. The defaults are English voices, so set voices that match the language you pick.
 - Change the show: the podcast name, tagline, host roles and dialogue structure are defaults in `lib/config.ts`. The prompt is in `lib/prompt.ts`.
-- Use another LLM provider: install its AI SDK package and return its model from `getModel` in `lib/model.ts`. If the model rejects `temperature`, remove `temperature: o.creativity` in `lib/script.ts`.
+- Use another LLM provider: set `LLM_MODEL` to its AI Gateway id, for example `google/<model id>`, with `AI_GATEWAY_API_KEY`. To call it directly instead, install its AI SDK package and return its model from `getModel` in `lib/model.ts`. If the model rejects `temperature`, remove `temperature: o.creativity` in `lib/script.ts`.
 
 ```ts
 import { google } from "@ai-sdk/google";
@@ -93,54 +81,44 @@ export function getModel() {
 
 ## Before you deploy
 
-- There is no auth and no rate limit. Both routes spend money (LLM tokens and Cartesia credits). Add a login and a rate limit to `app/api/script/route.ts` and `app/api/audio/route.ts` first. The routes already cap input size.
-- Both routes set `maxDuration = 300`. A script can have up to 120 lines, and recording one that long at 4 lines at a time takes one to two minutes, so a plan with a shorter limit cuts it off.
+- Set `APP_PASSWORD`. `proxy.ts` asks every visitor for it with HTTP Basic auth, and on Vercel (production and preview) the app refuses to serve until it is set (use `none` to make the app public on purpose). On hosts other than Vercel, set `APP_PASSWORD` yourself, because the gate only enforces it on Vercel.
+- Both routes spend money (LLM tokens and Cartesia credits). Each has an in-memory rate limit per IP address (10 scripts and 5 recordings a minute). The limiter lives in one server process, so it only slows casual abuse. The password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
+- Sonic bills per character of script, see https://docs.cartesia.ai/pricing. The audio route rejects scripts over 30,000 characters, which caps the cost of one episode, plus the LLM tokens.
+- Both routes set `maxDuration = 300`. A script can have up to 120 lines, so a plan with a shorter function limit can cut a long episode off.
 - A five minute episode is about 14 MB of WAV, and Vercel limits non-streamed function responses to 4.5 MB. The audio route streams the body in chunks, but this has not been tried on a deployment. If it fails there, switch to mp3 or store the file and return a link.
-- The fetch guard blocks private addresses at connection time, which covers DNS rebinding. Still restrict outbound network access on the host.
 
 ## FAQ
-
-### How do I keep my Cartesia API key out of the browser?
-
-The browser never talks to Cartesia here. It posts the script to `/api/audio`, and only `lib/env.ts` reads `CARTESIA_API_KEY`. If you want the browser to stream speech itself, mint a short-lived token on the server as described in https://docs.cartesia.ai/get-started/authenticate-your-client-applications.
-
-### How long does an episode take?
-
-In two runs on 2026-10-16 with `gpt-5.4-mini`, a Short episode from a 120 word article took about 5 seconds for the script (23 and 25 lines) and 3.5 seconds for two to two and a half minutes of audio. Medium and Long split the article into more LLM calls, which run one after another.
 
 ### Why one text to speech call per line instead of one long call?
 
 Each host needs a different voice, and per-line calls give exact durations, which is what keeps the transcript in sync. The cost is that tone does not carry across lines. The short gaps hide most of it.
 
-### What does an episode cost?
-
-Sonic costs about 1 credit per character of script (https://docs.cartesia.ai/pricing, checked 2026-10-16). The audio route rejects scripts over 30,000 characters, so one episode is at most about 30,000 credits, plus the LLM tokens.
-
 ### Which languages work?
 
-The Language menu has English, Spanish, French, German, Portuguese, Japanese, Hindi and Korean. The LLM writes in that language and Sonic gets the matching `language` code. The default voices are English, so for the most natural accent set host voices for that language from https://play.cartesia.ai/voices. https://docs.cartesia.ai/build-with-cartesia/capability-guides/multilingual-voices covers how a voice handles other languages.
+The Language menu has English, Spanish, French, German, Portuguese, Japanese, Hindi and Korean. The LLM writes in that language and Sonic gets the matching `language` code. The default voices are English, so for the most natural accent set host voices for that language from https://play.cartesia.ai/voices.
 
 ### Can I do this in Python?
 
 The Sonic call is the same. Start from the [generate speech to a file](https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/10-python/01-generate-speech-to-file.mdx) recipe and loop over your script lines.
 
+### Can the browser call Cartesia directly?
+
+Not in this app; only the server holds the key. If you want it to, see [browser auth with access tokens](https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx).
+
 ## Tests
 
 ```sh
-pnpm test        # script normalizer, extraction, safe fetch, WAV, routes, model choice
-pnpm typecheck
+npm test
 ```
 
-The tests need no keys and no network. They use fake clients and `MockLanguageModelV4` from `ai/test`.
+The tests need no keys and no network. They mock the Cartesia SDK and use `MockLanguageModelV4` from `ai/test`.
 
 ## Learn more
 
 - Recipe: [Article to podcast](https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/01-next/02-article-to-podcast.mdx)
-- Text to speech models: https://docs.cartesia.ai/build-with-cartesia/tts-models/latest
 - TTS bytes API: https://docs.cartesia.ai/api-reference/tts/bytes
 - Laughter, speed and emotion: https://docs.cartesia.ai/build-with-cartesia/capability-guides/volume-speed-emotion
 - Cartesia docs for agents: https://docs.cartesia.ai/llms.txt
-- Agent skills: `npx skills add cartesia-ai/skills`
 
 ## License
 

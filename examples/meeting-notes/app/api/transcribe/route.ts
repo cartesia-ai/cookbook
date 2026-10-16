@@ -1,19 +1,23 @@
 import Cartesia from "@cartesia/cartesia-js";
 import { getCartesia, MissingKeyError } from "@/lib/cartesia";
 import { MAX_AUDIO_BYTES, normalizeLanguage } from "@/lib/limits";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
 
 const UPSTREAM_ERRORS: Record<number, string> = {
   400: "Cartesia could not read this audio. Try MP3, M4A, WAV, WebM or FLAC.",
   401: "The Cartesia API key was rejected. Check CARTESIA_API_KEY.",
   402: "The Cartesia account is out of credits.",
   413: "The audio file is too large for Cartesia.",
-  429: "Too many transcription requests. Wait a moment and try again.",
+  429: "Cartesia is rate limiting this account. Try again in a minute.",
 };
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+const allow = createRateLimiter(10, 60_000);
+
 export async function POST(req: Request) {
+  if (!allow(clientIp(req))) return tooManyRequests();
   let form: FormData;
   try {
     form = await req.formData();
@@ -48,7 +52,7 @@ export async function POST(req: Request) {
       return Response.json({ error: err.message }, { status: 500 });
     }
     if (err instanceof Cartesia.APIError && typeof err.status === "number") {
-      return Response.json({ error: UPSTREAM_ERRORS[err.status] ?? "Transcription failed" }, { status: err.status });
+      return Response.json({ error: UPSTREAM_ERRORS[err.status] ?? "Transcription failed" }, { status: 502 });
     }
     return Response.json({ error: "Transcription failed" }, { status: 500 });
   }

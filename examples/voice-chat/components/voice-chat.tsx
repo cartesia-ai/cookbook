@@ -14,9 +14,6 @@ export function VoiceChat({ agentId }: { agentId: string }) {
   const agent = useCartesiaAgent({
     agentId,
     getToken,
-    // Echo cancellation is the default in agents-web; the 16 kHz input format is too.
-    // outputDelivery stays "as_available": the client owns the playback queue, which is
-    // what lets it drop audio the moment the agent is interrupted.
   });
 
   return (

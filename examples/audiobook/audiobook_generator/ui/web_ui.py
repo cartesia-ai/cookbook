@@ -4,7 +4,6 @@ import os
 from datetime import datetime
 
 import gradio as gr
-from gradio_log import Log
 from audiobook_generator.config.general_config import GeneralConfig
 from audiobook_generator.ui.theme import CartesiaTheme, load_css
 from audiobook_generator.core.cast import VOICE_POOL, DEFAULT_NARRATOR
@@ -18,6 +17,7 @@ from main import main
 
 running_process: Optional[Process] = None
 webui_log_file = None
+LOG_TAIL_BYTES = 20_000
 
 INPUT_ORDER = [
     "input_file", "output_dir", "worker_count", "log_level", "output_text", "preview",
@@ -81,6 +81,27 @@ def terminate_audiobook_generator():
         running_process = None
         print("Audiobook generator terminated manually")
 
+def read_log_tail():
+    if webui_log_file is None or not webui_log_file.exists():
+        return ""
+    with open(webui_log_file, "rb") as f:
+        f.seek(0, os.SEEK_END)
+        f.seek(max(0, f.tell() - LOG_TAIL_BYTES))
+        return f.read().decode("utf-8", errors="replace")
+
+def is_running():
+    return running_process is not None and running_process.is_alive()
+
+def start_log_refresh():
+    return gr.Timer(active=True)
+
+def refresh_log():
+    return read_log_tail(), gr.Timer(active=is_running())
+
+def stop_and_refresh_log():
+    terminate_audiobook_generator()
+    return read_log_tail(), gr.Timer(active=False)
+
 _ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{}</svg>'
 _SUN = _ICON.format('<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>')
 _MOON = _ICON.format('<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>')
@@ -117,9 +138,7 @@ def _html(value, cls=None):
     return gr.HTML(value, container=False, padding=False, elem_classes=cls)
 
 def build_ui(default_output_dir):
-    """Build the Blocks app. Returns (ui, components) without launching it."""
-    with gr.Blocks(theme=CartesiaTheme(), css=load_css(), analytics_enabled=False,
-                   title="Ebook to audiobook") as ui:
+    with gr.Blocks(analytics_enabled=False, title="Ebook to audiobook") as ui:
         _html(HEADER_HTML, "ab-header-wrap")
         _html(PAGE_HEADER_HTML)
 
@@ -208,19 +227,20 @@ def build_ui(default_output_dir):
                 stop_button = gr.Button("Stop", variant="secondary", scale=0, min_width=96, elem_classes="ab-stop")
                 start_button = gr.Button("Make audiobook", variant="primary", scale=0, min_width=160,
                                          elem_classes="ab-start")
-            stop_button.click(fn=terminate_audiobook_generator, inputs=None, outputs=None)
-            start_button.click(
-                fn=process_ui_form,
-                inputs=[components[name] for name in INPUT_ORDER],
-                outputs=None)
-
         _html(_section_head("Log", "Progress and errors from the current run."), "ab-log-head")
         global webui_log_file
         webui_log_file = generate_unique_log_path("EtA_WebUI")
         webui_log_file.touch()
-        Log(str(webui_log_file.absolute()), dark=False, xterm_font_size=12,
-            xterm_font_family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", label="Log", show_label=False,
-            elem_classes="ab-log")
+        log_box = gr.Textbox(value="", label="Log", show_label=False, lines=14, max_lines=14,
+                             interactive=False, autoscroll=True, elem_classes="ab-log")
+        log_timer = gr.Timer(1.0, active=False)
+        log_timer.tick(fn=refresh_log, inputs=None, outputs=[log_box, log_timer], show_progress="hidden")
+        stop_button.click(fn=stop_and_refresh_log, inputs=None, outputs=[log_box, log_timer])
+        start_button.click(
+            fn=process_ui_form,
+            inputs=[components[name] for name in INPUT_ORDER],
+            outputs=None,
+        ).then(fn=start_log_refresh, inputs=None, outputs=log_timer)
 
     return ui, components
 
@@ -228,4 +248,4 @@ def host_ui(config):
     default_output_dir = os.path.join("audiobook_output", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     print(f"Default audiobook output directory: {default_output_dir}")
     ui, _ = build_ui(default_output_dir)
-    ui.launch(server_name=config.host, server_port=config.port)
+    ui.launch(server_name=config.host, server_port=config.port, theme=CartesiaTheme(), css=load_css())

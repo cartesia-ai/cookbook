@@ -18,6 +18,3 @@ export function languageName(code: LanguageCode): string {
   return LANGUAGES.find((l) => l.code === code)!.name;
 }
 
-export function languageNativeName(code: LanguageCode): string {
-  return LANGUAGES.find((l) => l.code === code)!.nativeName;
-}

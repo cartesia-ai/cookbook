@@ -42,6 +42,15 @@ describe('page helpers', () => {
     expect(isSamePage('https://other.dev/docs/client-tools', loc)).toBe(false);
     expect(sourceHref(src, loc.href)).toBe('https://site.dev/docs/client-tools#results');
   });
+
+  it('links only to http(s) and relative URLs', () => {
+    const at = (url: string) => sourceHref({ ...src, url, anchor: '' }, loc.href);
+    expect(at('https://docs.example.com/a')).toBe('https://docs.example.com/a');
+    expect(at('guide')).toBe('https://site.dev/docs/guide');
+    expect(at('javascript:alert(1)')).toBeNull();
+    expect(at(' JavaScript:alert(1)')).toBeNull();
+    expect(at('data:text/html,hi')).toBeNull();
+  });
 });
 
 describe('highlight', () => {

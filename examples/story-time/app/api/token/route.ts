@@ -1,16 +1,14 @@
 import { getCartesia, MissingKeyError } from "@/lib/cartesia";
-import { createRateLimiter } from "@/lib/rate-limit";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const headers = { "Cache-Control": "no-store" };
-const allow = createRateLimiter(20, 60_000);
+const allow = createRateLimiter(10, 60_000);
 
 export async function POST(req: Request) {
-  if (!allow(req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local")) {
-    return Response.json({ error: "Too many requests. Try again in a minute." }, { status: 429, headers });
-  }
+  if (!allow(clientIp(req))) return tooManyRequests(headers);
   try {
     const { token } = await getCartesia().accessToken.create({ grants: { tts: true, stt: true }, expires_in: 60 });
     return Response.json({ token }, { headers });

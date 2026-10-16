@@ -36,9 +36,11 @@ export function useRecorder(onFinish: (r: Recording) => void) {
   const [bytes, setBytes] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [media, setMedia] = useState<MediaStream | null>(null);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
 
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
+  const ctx = useRef<AudioContext | null>(null);
   const chunks = useRef<Blob[]>([]);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAt = useRef(0);
@@ -55,6 +57,9 @@ export function useRecorder(onFinish: (r: Recording) => void) {
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
     setMedia(null);
+    void ctx.current?.close();
+    ctx.current = null;
+    setAudioContext(null);
   }, []);
 
   const stop = useCallback(() => {
@@ -67,6 +72,10 @@ export function useRecorder(onFinish: (r: Recording) => void) {
     setSeconds(0);
     setBytes(0);
     setState("requesting");
+    if (typeof AudioContext !== "undefined") {
+      ctx.current = new AudioContext();
+      void ctx.current.resume();
+    }
     try {
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
         throw new Error("unsupported");
@@ -74,6 +83,7 @@ export function useRecorder(onFinish: (r: Recording) => void) {
       const media = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.current = media;
       setMedia(media);
+      setAudioContext(ctx.current);
       const mimeType = pickMimeType();
       const r = new MediaRecorder(media, {
         ...(mimeType ? { mimeType } : {}),
@@ -127,5 +137,5 @@ export function useRecorder(onFinish: (r: Recording) => void) {
     [cleanup],
   );
 
-  return { state, seconds, bytes, error, stream: media, start, stop };
+  return { state, seconds, bytes, error, stream: media, audioContext, start, stop };
 }

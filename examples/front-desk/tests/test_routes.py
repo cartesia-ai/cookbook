@@ -10,17 +10,21 @@ from front_desk.cartesia import Cartesia, CartesiaError
 FIXTURES = Path(__file__).parent / "fixtures"
 SECRET = "test-webhook-secret-0123456789"
 
+
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setenv("CARTESIA_AGENT_ID", "agent_simulated")
     monkeypatch.setenv("CARTESIA_WEBHOOK_SECRET", SECRET)
     return TestClient(main.app)
 
+
 def fixture(name):
     return json.loads((FIXTURES / name).read_text())
 
+
 def post_event(client, event, secret=SECRET):
     return client.post("/webhooks/cartesia", json=event, headers={"x-webhook-secret": secret})
+
 
 def test_pages_render_with_no_data(client):
     for path in ("/", "/inbox", "/try", "/partials/calls"):
@@ -28,12 +32,14 @@ def test_pages_render_with_no_data(client):
         assert r.status_code == 200, path
     assert "No calls yet" in client.get("/").text
 
+
 def test_webhook_rejects_bad_secret_other_agent_and_missing_config(client, monkeypatch):
     ev = fixture("call_completed.json")
     assert post_event(client, ev, secret="nope").status_code == 401
     assert post_event(client, ev | {"agent_id": "agent_other"}).status_code == 400
     monkeypatch.setenv("CARTESIA_WEBHOOK_SECRET", "")
     assert post_event(client, ev).status_code == 503
+
 
 def test_call_completed_fills_the_dashboard_once(client):
     ev = fixture("call_completed.json")
@@ -48,6 +54,7 @@ def test_call_completed_fills_the_dashboard_once(client):
     assert "182 ms" in detail
     assert "check_availability" in detail and "book_appointment" in detail
     assert "88 ms" in detail
+
 
 def test_call_turn_events_build_a_transcript(client):
     base = {"type": "call_turn", "call_id": "ac_turns", "agent_id": "agent_simulated"}
@@ -84,6 +91,7 @@ def test_call_turn_events_build_a_transcript(client):
     call = main.store().get_call("ac_turns")
     assert [t.text for t in call.visible_turns] == ["Hi", "Hello"]
 
+
 def test_webhook_tools_need_the_tool_secret(client, monkeypatch):
     assert client.post("/tools/check_availability", json={}).status_code == 401
     monkeypatch.setenv("TOOL_SECRET", "tool-secret")
@@ -95,6 +103,7 @@ def test_webhook_tools_need_the_tool_secret(client, monkeypatch):
     assert r.status_code == 200 and json.loads(r.text)["saved"] is True
     assert client.post("/tools/rm_rf", json={}, headers={"x-tool-secret": "tool-secret"}).status_code == 404
 
+
 def test_client_tool_route_never_allows_a_transfer(client, monkeypatch):
     monkeypatch.setenv("TRANSFER_NUMBER", "+14155550100")
     r = client.post(
@@ -102,6 +111,7 @@ def test_client_tool_route_never_allows_a_transfer(client, monkeypatch):
         json={"call_id": "ac_web", "parameters": {"reason": "x", "call_direction": "inbound"}},
     )
     assert json.loads(r.text)["transfer_available"] is False
+
 
 def test_token_route(client, monkeypatch):
     assert client.post("/api/token").status_code == 503
@@ -111,6 +121,7 @@ def test_token_route(client, monkeypatch):
     assert r.json() == {"token": "tok_123", "agentId": "agent_simulated"}
     assert r.headers["cache-control"] == "no-store"
     assert "sk_test" not in r.text
+
 
 def test_sync_stores_only_this_agents_calls(client, monkeypatch):
     monkeypatch.setenv("CARTESIA_API_KEY", "sk_test")
@@ -128,3 +139,30 @@ def test_sync_stores_only_this_agents_calls(client, monkeypatch):
     monkeypatch.setattr(Cartesia, "get_call", missing)
     assert client.post("/api/calls/ac_nope/sync").status_code == 404
     assert client.post("/api/calls/bad id!/sync").status_code in (400, 404)
+
+
+def test_tool_routes_reject_malformed_json(client, monkeypatch):
+    bad = {"content": b"{not json", "headers": {"Content-Type": "application/json"}}
+    r = client.post("/api/client-tools/take_message", **bad)
+    assert r.status_code == 400 and r.json() == {"detail": "Request body must be a JSON object."}
+    assert client.post("/api/client-tools/take_message", json=[1, 2]).status_code == 400
+    monkeypatch.setenv("TOOL_SECRET", "tool-secret")
+    bad["headers"]["x-tool-secret"] = "tool-secret"
+    assert client.post("/tools/take_message", **bad).status_code == 400
+
+
+def test_webhook_retry_after_a_failed_apply_is_not_dropped(client, monkeypatch):
+    from front_desk import webhooks
+
+    ev = fixture("call_completed.json")
+    real = webhooks._apply
+
+    def boom(store, event):
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(webhooks, "_apply", boom)
+    with pytest.raises(RuntimeError):
+        post_event(client, ev)
+    monkeypatch.setattr(webhooks, "_apply", real)
+    assert post_event(client, ev).json()["result"] == "stored call"
+    assert post_event(client, ev).json()["result"] == "duplicate"

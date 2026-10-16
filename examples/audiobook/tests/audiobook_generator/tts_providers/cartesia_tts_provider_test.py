@@ -10,7 +10,7 @@ from mutagen.id3 import ID3
 
 from audiobook_generator.core.audio_tags import AudioTags
 from audiobook_generator.tts_providers import cartesia_tts_provider as mod
-from audiobook_generator.tts_providers.base_tts_provider import get_tts_provider
+from audiobook_generator.tts_providers.cartesia_tts_provider import get_tts_provider
 from tests.fake_cartesia import FakeCartesia, FakeTTS
 from tests.test_utils import get_cartesia_config
 
@@ -274,6 +274,17 @@ class TestDialogue(unittest.TestCase):
                 self.assertEqual(emo, "calm")
             else:
                 self.assertNotEqual(emo, "calm")
+
+class TestProviderLookup(unittest.TestCase):
+
+    def test_only_cartesia_is_supported(self):
+        self.assertEqual(mod.get_supported_tts_providers(), ["cartesia"])
+
+    def test_get_tts_provider_invalid(self):
+        config = get_cartesia_config()
+        config.tts = "invalid_tts_provider"
+        with self.assertRaises(ValueError):
+            get_tts_provider(config)
 
 if __name__ == "__main__":
     unittest.main()

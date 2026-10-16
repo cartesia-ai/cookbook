@@ -37,12 +37,12 @@
     "components",
     "lib",
     "tests",
+    "proxy.ts",
     "vitest.config.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "recipe-snippets"
+    "node_modules"
   ]
 }

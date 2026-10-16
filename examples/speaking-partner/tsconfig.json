@@ -37,10 +37,9 @@
     "app",
     "components",
     "lib",
-    "scripts",
     "tests",
-    "mock",
     "vitest.config.ts",
+    "proxy.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],

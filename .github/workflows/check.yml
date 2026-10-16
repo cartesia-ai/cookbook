@@ -6,16 +6,43 @@ on:
     branches: [main]
 
 jobs:
-  check:
+  node:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.x
+          check-latest: true
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check:facts
-      - run: pnpm check:content
-      - run: node .github/scripts/check-catalog.mjs
+      - name: pnpm check (facts, content, catalog, copies, typecheck, test)
+        run: pnpm check
+      - name: Build every package with no env vars set
+        run: pnpm build
+
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - template: front-desk
+            lint: uv run ruff check . && uv run ruff format --check . && uv run mypy front_desk scripts
+          - template: audiobook
+            apt: ffmpeg
+          - template: coding-voice-mode
+            apt: libportaudio2
+    defaults:
+      run:
+        working-directory: examples/${{ matrix.template }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: matrix.apt
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt }}
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run pytest
+      - if: matrix.lint
+        run: ${{ matrix.lint }}

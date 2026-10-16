@@ -1,14 +1,6 @@
-# secrets: the negation must come after the patterns
-.env
-.env.*
-!.env.example
-
 node_modules
 .next
-dist
-.turbo
+.env*
+!.env.example
 *.tsbuildinfo
 next-env.d.ts
-.DS_Store
-.venv
-__pycache__

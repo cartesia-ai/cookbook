@@ -24,7 +24,6 @@ export interface AppDeps {
   extend?: (app: Hono) => void;
   tokenLimiter?: RateLimiter;
   searchLimiter?: RateLimiter;
-  hasKeys?: { cartesia: boolean; openai: boolean };
 }
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -81,7 +80,7 @@ export function createApp(deps: AppDeps): Hono {
     }
     if (typeof body.query !== 'string' || !body.query.trim()) return c.json({ error: 'Send JSON with a query.' }, 400, NO_STORE);
     const index = deps.getIndex();
-    if (!index) return c.json({ error: 'The docs are not indexed yet. Run pnpm ingest.' }, 503, NO_STORE);
+    if (!index) return c.json({ error: 'The docs are not indexed yet. Run npm run ingest.' }, 503, NO_STORE);
     try {
       const page = typeof body.page === 'string' ? body.page.slice(0, 500) : undefined;
       return c.json(await searchDocs(index, deps.embed, body.query, page), 200, NO_STORE);
@@ -115,14 +114,7 @@ export function createApp(deps: AppDeps): Hono {
     );
   }
 
-  app.get('/health', (c) =>
-    c.json({
-      cartesiaKey: deps.hasKeys?.cartesia ?? false,
-      openaiKey: deps.hasKeys?.openai ?? false,
-      agent: Boolean(config.agentId),
-      sections: deps.getIndex()?.chunks.length ?? 0,
-    }),
-  );
+  app.get('/health', (c) => c.json({ ok: true }));
 
   deps.extend?.(app);
   return app;

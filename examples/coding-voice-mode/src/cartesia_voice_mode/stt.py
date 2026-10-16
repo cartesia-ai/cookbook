@@ -1,5 +1,3 @@
-"""Ink 2 turn detection. One call listens for one user turn."""
-
 from __future__ import annotations
 
 import asyncio
@@ -16,7 +14,7 @@ from .config import Settings
 CONNECT_TIMEOUT_S = 10.0
 
 class ListenError(Exception):
-    """Plain message, safe to hand to the agent."""
+    pass
 
 @dataclass
 class TurnResult:
@@ -63,7 +61,6 @@ async def _close(conn) -> None:
         pass
 
 async def _one_attempt(conn, mic, s: Settings, t0: float, deadline_start: float, deadline_hard: float):
-    """Returns a TurnResult, or None if the socket closed before any speech (caller may retry)."""
     loop = asyncio.get_running_loop()
     pump = asyncio.create_task(_pump(conn, mic))
     started = False
@@ -122,11 +119,6 @@ async def listen_for_turn(
     after: Awaitable | None = None,
     max_listen_s: float | None = None,
 ) -> TurnResult:
-    """Connect, wait for `after` (speech playback), open the mic, return one turn.
-
-    The handshake overlaps playback. The mic opens only after playback ends so
-    the agent never transcribes its own voice. Every wait has a deadline.
-    """
     loop = asyncio.get_running_loop()
     conn = await _connect(client, s)
     try:

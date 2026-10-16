@@ -60,8 +60,15 @@ export async function startInterpreter(pair: readonly [Lang, Lang], events: Inte
   events.onPhase("connecting");
 
   let stopped = false;
-  let client = new Cartesia({ token: await fetchToken() });
-  let speaker: Speaker = await createSpeaker(client, audioCtx);
+  let client: Cartesia;
+  let speaker: Speaker;
+  try {
+    client = new Cartesia({ token: await fetchToken() });
+    speaker = await createSpeaker(client, audioCtx);
+  } catch (err) {
+    await audioCtx.close().catch(() => {});
+    throw err;
+  }
 
   const turns: Turn[] = [];
   let nextId = 1;
@@ -221,7 +228,7 @@ export async function startInterpreter(pair: readonly [Lang, Lang], events: Inte
     listening = await listen(client, audioCtx, () => speaker.busy(), handlers);
   } catch (err) {
     speaker.close();
-    await audioCtx.close();
+    await audioCtx.close().catch(() => {});
     const name = (err as Error).name;
     if (name === "NotAllowedError" || name === "SecurityError") {
       throw new StartError("Allow microphone access for this site in the address bar, then try again.");

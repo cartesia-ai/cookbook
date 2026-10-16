@@ -1,6 +1,6 @@
 import { createAgentTokenHandler } from "@/lib/agents-web/server";
 import { getApiKey } from "./env";
-import { createRateLimiter } from "./rate-limit";
+import { clientIp, createRateLimiter, tooManyRequests } from "./rate-limit";
 
 const headers = { "Cache-Control": "no-store" };
 
@@ -13,14 +13,10 @@ export function createTokenRoute(allow = createRateLimiter(10, 60_000)) {
         { status: 503, headers },
       );
     }
-    const handler = createAgentTokenHandler({
-      apiKey,
-      expiresIn: 60,
-      authorize: (r) => allow(r.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local"),
-    });
-    const res = await handler(req);
-    if (res.status === 401) {
-      return Response.json({ error: "Too many requests. Try again in a minute." }, { status: 429, headers });
+    if (!allow(clientIp(req))) return tooManyRequests(headers);
+    const res = await createAgentTokenHandler({ apiKey, expiresIn: 60 })(req);
+    if (!res.ok) {
+      return Response.json({ error: "Could not get a Cartesia token. Check the API key." }, { status: 502, headers });
     }
     return res;
   };

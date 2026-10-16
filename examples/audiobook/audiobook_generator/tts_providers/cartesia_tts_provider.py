@@ -16,12 +16,12 @@ from pydub import AudioSegment
 
 from audiobook_generator.config.general_config import GeneralConfig
 from audiobook_generator.core import cast, readalong
-from audiobook_generator.tts_providers.base_tts_provider import BaseTTSProvider
 from audiobook_generator.utils.utils import set_audio_tags
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
+TTS_CARTESIA = "cartesia"
 DEFAULT_MODEL = "sonic-3.6"
 SAMPLE_RATE = 44100
 BYTES_PER_SECOND = SAMPLE_RATE * 2
@@ -35,7 +35,6 @@ _RETIRED_MODELS = re.compile(
 )
 
 class CartesiaStreamError(RuntimeError):
-    """The API sent an error event inside a stream that opened fine."""
 
     def __init__(self, status_code: int, message: str):
         super().__init__(f"Cartesia error {status_code}: {message}")
@@ -57,10 +56,9 @@ def get_cartesia_supported_languages() -> List[str]:
     return codes
 
 def normalise_language(language: Optional[str]) -> str:
-    """'en-US' -> 'en'. Cartesia wants the base language code."""
     return (language or "en").split("-")[0].split("_")[0].lower()
 
-class CartesiaTTSProvider(BaseTTSProvider):
+class CartesiaTTSProvider:
     def __init__(self, config: GeneralConfig):
         config.model_name = config.model_name or DEFAULT_MODEL
         config.output_format = config.output_format or "mp3"
@@ -74,7 +72,8 @@ class CartesiaTTSProvider(BaseTTSProvider):
         config.break_duration = (
             DEFAULT_BREAK_MS if config.break_duration in (None, "") else int(config.break_duration)
         )
-        super().__init__(config)
+        self.config = config
+        self.validate_config()
         self.cast = cast.load_cast(config)
         self.narrator_voice_id = self.cast.narrator_voice_id()
         config.voice_name = config.voice_name or self.cast.narrator
@@ -126,9 +125,6 @@ class CartesiaTTSProvider(BaseTTSProvider):
         return self._client
 
     def prepare_run(self, chapters):
-        """Give every speaker in the book a voice and save the table to
-        <output>/cast.json. Workers read that file, so voices do not drift
-        between chapters. Edit the file and rerun to change a voice."""
         c = self.config
         if c.cast_mode == "dialogue":
             expressive = c.cartesia_expressive and c.language == "en"
@@ -149,7 +145,7 @@ class CartesiaTTSProvider(BaseTTSProvider):
     def estimate_cost(self, total_chars):
         logger.info(
             f"About {total_chars} Cartesia credits (roughly 1 per character). "
-            "Price depends on your plan, see cartesia.ai/pricing."
+            "Price depends on your plan, see docs.cartesia.ai/pricing."
         )
         return 0.0
 
@@ -165,7 +161,6 @@ class CartesiaTTSProvider(BaseTTSProvider):
         return gen
 
     def _stream_chunk(self, chunk: cast.Segment) -> Tuple[bytes, List[Tuple[str, float, float]]]:
-        """One SSE request. Returns PCM bytes and (word, start, end) in chunk time."""
         kwargs = dict(
             model_id=self.config.model_name,
             transcript=chunk.text,
@@ -195,8 +190,6 @@ class CartesiaTTSProvider(BaseTTSProvider):
         return bytes(pcm), words
 
     def _stream_chunk_with_retry(self, chunk: cast.Segment):
-        """The SDK retries opening a request, not a stream that dies halfway.
-        On a retry the partial audio and timestamps of this chunk are dropped."""
         for attempt in range(MAX_CHUNK_RETRIES + 1):
             try:
                 return self._stream_chunk(chunk)
@@ -220,8 +213,6 @@ class CartesiaTTSProvider(BaseTTSProvider):
         return cast.chunk_segments(segments, self.config.cartesia_max_chars, self.config.language)
 
     def synthesize(self, text: str):
-        """Returns (pcm bytes, words) where words is a list of dicts with
-        w, s, e (seconds into the final audio) and speaker."""
         chunks = self.build_chunks(text)
         pcm = bytearray()
         words = []
@@ -260,3 +251,11 @@ class CartesiaTTSProvider(BaseTTSProvider):
             )
             readalong.write_sidecars(output_file, timings)
         return words
+
+def get_supported_tts_providers() -> List[str]:
+    return [TTS_CARTESIA]
+
+def get_tts_provider(config) -> CartesiaTTSProvider:
+    if config.tts != TTS_CARTESIA:
+        raise ValueError(f"Invalid TTS provider: {config.tts}")
+    return CartesiaTTSProvider(config)

@@ -1,12 +1,3 @@
-"""Every Cartesia HTTP call in the app and the setup script goes through here.
-
-CARTESIA_API_KEY is read only in this module. The browser gets a 60 second access token with
-the `agent` grant and nothing else.
-
-The Python SDK has no typed Managed Agents client yet, so this is plain httpx with the
-documented paths and the `Cartesia-Version` header.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -15,10 +6,12 @@ import httpx
 
 from .config import CARTESIA_BASE_URL, CARTESIA_VERSION
 
+
 class CartesiaError(Exception):
     def __init__(self, status: int, message: str):
         super().__init__(message)
         self.status = status
+
 
 class Cartesia:
     def __init__(
@@ -57,6 +50,5 @@ class Cartesia:
         return self.request("GET", f"/agents/calls/{call_id}")
 
     def open_call_audio(self, call_id: str) -> httpx.Response:
-        """Starts streaming the call's WAV. The caller must close the response."""
         req = self.http.build_request("GET", f"/agents/calls/{call_id}/audio")
         return self.http.send(req, stream=True)

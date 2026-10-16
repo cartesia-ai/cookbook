@@ -3,6 +3,8 @@ import stat
 import tomllib
 from pathlib import Path
 
+import pytest
+
 from cartesia_voice_mode import install as inst
 from conftest import TEST_KEY
 
@@ -28,6 +30,15 @@ def test_cursor_merge_keeps_others_and_is_idempotent(tmp_path):
     assert data["mcpServers"]["cartesia-voice"]["type"] == "stdio"
     baks = list(p.parent.glob("*.bak"))
     assert len(baks) == 1 and "other" in baks[0].read_text() and "cartesia" not in baks[0].read_text()
+
+def test_cursor_refuses_malformed_json_without_touching_it(tmp_path):
+    p = tmp_path / "mcp.json"
+    for text in ("{not json", "[]"):
+        p.write_text(text)
+        with pytest.raises(inst.ConfigFileError, match="was not changed"):
+            inst.merge_cursor(p, inst.server_entry(D))
+        assert p.read_text() == text
+    assert not list(tmp_path.glob("*.bak"))
 
 def test_cursor_creates_file(tmp_path):
     p = tmp_path / "new" / "mcp.json"

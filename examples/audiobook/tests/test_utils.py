@@ -2,10 +2,9 @@ from types import SimpleNamespace
 
 from audiobook_generator.config.general_config import GeneralConfig
 
-SAMPLE_BOOK = 'examples/alice_sample.epub'
+SAMPLE_BOOK = 'samples/alice_sample.epub'
 
 def get_cartesia_config(**overrides):
-    """A GeneralConfig the way main.py would build it. Unset fields are None."""
     values = dict(
         input_file=SAMPLE_BOOK,
         output_folder='output',

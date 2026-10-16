@@ -1,5 +1,5 @@
 {
-  "$comment": "Machine-readable list of the runnable templates in examples/. Feeds the cartesia.ai cookbook gallery and agent tooling. Model ids must match facts.json; .github/scripts/check-catalog.mjs checks this file against the repo.",
+  "$comment": "Machine-readable list of the runnable templates in examples/. Feeds the cartesia.ai cookbook gallery and agent tooling. Model ids must match facts.json; tools/check-catalog checks this file against the repo.",
   "version": 1,
   "updated": "2026-10-16",
   "repository": "https://github.com/cartesia-ai/cookbook",
@@ -31,10 +31,11 @@
       "products": ["Managed Agents", "Ink 2", "Sonic 3.6"],
       "apis": ["Managed Agents WebSocket", "Agents API (create agent)", "Access tokens"],
       "models": ["ink-2", "sonic-3.6"],
+      "features": ["turn-detection", "barge-in"],
       "env": {
         "required": ["CARTESIA_API_KEY", "CARTESIA_AGENT_ID"],
         "oneOf": [],
-        "optional": ["AGENT_MODEL_ID", "CARTESIA_VOICE_ID"]
+        "optional": ["AGENT_MODEL_ID", "CARTESIA_VOICE_ID", "APP_PASSWORD", "TRUST_PROXY"]
       },
       "path": "examples/voice-chat",
       "readme": "examples/voice-chat/README.md",
@@ -42,14 +43,14 @@
       "recipe": "content/cookbook/15-agents/02-voice-chat.mdx",
       "screenshot": "examples/voice-chat/docs/screenshot.png",
       "run": {
-        "clone": "pnpm dlx create-next-app --example https://github.com/cartesia-ai/cookbook/tree/main/examples/voice-chat my-voice-chat",
-        "setup": "pnpm setup:agent",
-        "dev": "pnpm dev",
+        "clone": "npx degit cartesia-ai/cookbook/examples/voice-chat voice-chat",
+        "setup": "npm run setup:agent",
+        "dev": "npm run dev",
         "url": "http://localhost:3000"
       },
       "deploy": {
-        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fvoice-chat&env=CARTESIA_API_KEY%2CCARTESIA_AGENT_ID&envDescription=CARTESIA_API_KEY%20from%20play.cartesia.ai%2Fkeys.%20CARTESIA_AGENT_ID%20comes%20from%20running%20pnpm%20setup%3Aagent%20locally.&envLink=https%3A%2F%2Fplay.cartesia.ai%2Fkeys&project-name=voice-chat&repository-name=voice-chat",
-        "note": "Run pnpm setup:agent locally first to get CARTESIA_AGENT_ID."
+        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fvoice-chat&env=CARTESIA_API_KEY%2CCARTESIA_AGENT_ID%2CAPP_PASSWORD&envDescription=Cartesia%20API%20key%20from%20play.cartesia.ai%2Fkeys%2C%20the%20agent%20id%20from%20running%20npm%20run%20setup%3Aagent%20locally%2C%20and%20a%20password%20for%20the%20app%20%28or%20none%29.&envLink=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fvoice-chat%23environment-variables&project-name=voice-chat&repository-name=voice-chat",
+        "note": "Run npm run setup:agent locally first to get CARTESIA_AGENT_ID."
       },
       "license": "Apache-2.0"
     },
@@ -71,10 +72,11 @@
       "products": ["Managed Agents", "Ink 2", "Sonic 3.6"],
       "apis": ["Managed Agents WebSocket", "Agents API (create and delete agents)", "Client tools", "Voices API", "Access tokens"],
       "models": ["ink-2", "sonic-3.6"],
+      "features": ["turn-detection", "barge-in", "client-tools", "multilingual"],
       "env": {
         "required": ["CARTESIA_API_KEY"],
         "oneOf": [],
-        "optional": ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "CORRECTIONS_MODEL", "AGENT_MODEL_ID", "VOICE_ID_EN", "VOICE_ID_ES", "VOICE_ID_FR", "VOICE_ID_HI", "VOICE_ID_JA"]
+        "optional": ["LLM_MODEL", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "AI_GATEWAY_API_KEY", "AGENT_MODEL_ID", "VOICE_ID_EN", "VOICE_ID_ES", "VOICE_ID_FR", "VOICE_ID_HI", "VOICE_ID_JA", "APP_PASSWORD", "TRUST_PROXY"]
       },
       "path": "examples/speaking-partner",
       "readme": "examples/speaking-partner/README.md",
@@ -82,14 +84,14 @@
       "recipe": "content/cookbook/15-agents/03-speaking-partner.mdx",
       "screenshot": "examples/speaking-partner/docs/screenshot.png",
       "run": {
-        "clone": "pnpm dlx create-next-app --example https://github.com/cartesia-ai/cookbook/tree/main/examples/speaking-partner my-speaking-partner",
+        "clone": "npx degit cartesia-ai/cookbook/examples/speaking-partner speaking-partner",
         "setup": null,
-        "dev": "pnpm dev",
+        "dev": "npm run dev",
         "url": "http://localhost:3000"
       },
       "deploy": {
-        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fspeaking-partner&env=CARTESIA_API_KEY&envDescription=Your%20Cartesia%20API%20key.%20Add%20ANTHROPIC_API_KEY%20or%20OPENAI_API_KEY%20later%20for%20written%20corrections.&envLink=https%3A%2F%2Fplay.cartesia.ai%2Fkeys&project-name=speaking-partner&repository-name=speaking-partner",
-        "note": "Without an LLM key the corrections panel stays off and says which key to add."
+        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fspeaking-partner&env=CARTESIA_API_KEY%2CAPP_PASSWORD&envDescription=Cartesia%20API%20key%20and%20a%20password%20for%20the%20app%20%28or%20none%29.%20Add%20LLM_MODEL%20later%20for%20the%20corrections%20panel.&envLink=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fspeaking-partner%23environment-variables&project-name=speaking-partner&repository-name=speaking-partner",
+        "note": "Without LLM_MODEL and a matching key the corrections panel stays off and says what to add."
       },
       "license": "Apache-2.0"
     },
@@ -105,16 +107,17 @@
         "voice RAG over docs with citations",
         "Cartesia client tools example"
       ],
-      "stack": ["Hono", "Node.js", "Web Components", "esbuild", "OpenAI embeddings"],
+      "stack": ["Hono", "Node.js", "Web Components", "esbuild", "BM25 or OpenAI embeddings"],
       "languages": ["TypeScript"],
       "spokenLanguages": ["en", "es", "fr", "hi", "ja"],
       "products": ["Managed Agents", "Ink 2", "Sonic 3.6"],
       "apis": ["Managed Agents WebSocket", "Agents API (create agent and tools)", "Client tools", "Access tokens"],
       "models": ["ink-2", "sonic-3.6"],
+      "features": ["turn-detection", "barge-in", "client-tools", "multilingual"],
       "env": {
-        "required": ["CARTESIA_API_KEY", "OPENAI_API_KEY", "CARTESIA_AGENT_ID", "CARTESIA_TOOL_IDS"],
+        "required": ["CARTESIA_API_KEY", "CARTESIA_AGENT_ID", "CARTESIA_TOOL_IDS"],
         "oneOf": [],
-        "optional": ["ALLOWED_ORIGINS", "PUBLIC_URL", "TRUST_PROXY", "PORT", "MAX_SESSION_SECS", "WIDGET_TITLE", "DEMO_SITE", "AGENT_MODEL_ID", "CARTESIA_VOICE_ID", "AGENT_LANGUAGE"]
+        "optional": ["OPENAI_API_KEY", "ALLOWED_ORIGINS", "PUBLIC_URL", "TRUST_PROXY", "PORT", "MAX_SESSION_SECS", "WIDGET_TITLE", "DEMO_SITE", "AGENT_MODEL_ID", "CARTESIA_VOICE_ID", "AGENT_LANGUAGE"]
       },
       "path": "examples/docs-voice-widget",
       "readme": "examples/docs-voice-widget/README.md",
@@ -122,9 +125,9 @@
       "recipe": null,
       "screenshot": "examples/docs-voice-widget/docs/screenshot.png",
       "run": {
-        "clone": "pnpm dlx degit cartesia-ai/cookbook/examples/docs-voice-widget my-docs-widget",
-        "setup": "pnpm setup:agent && pnpm ingest",
-        "dev": "pnpm dev",
+        "clone": "npx degit cartesia-ai/cookbook/examples/docs-voice-widget docs-voice-widget",
+        "setup": "npm run setup:agent && npm run ingest",
+        "dev": "npm run dev",
         "url": "http://localhost:4512"
       },
       "deploy": {
@@ -138,19 +141,14 @@
       "title": "Voice mode for coding agents",
       "description": "Talk to Claude Code, Cursor or Codex through one MCP tool: Sonic 3.6 speaks the agent's message and Ink 2 turn detection hears your reply.",
       "category": "voice-agents",
-      "searchPhrases": [
-        "talk to Claude Code with my voice",
-        "voice mode MCP server for Cursor",
-        "speech to text and text to speech MCP tool",
-        "hands-free coding agent",
-        "voice input for Codex CLI"
-      ],
+      "searchPhrases": ["talk to Claude Code with my voice", "voice mode MCP server for Cursor", "speech to text and text to speech MCP tool", "hands-free coding agent", "voice input for Codex CLI"],
       "stack": ["Python", "FastMCP", "sounddevice", "uv"],
       "languages": ["Python"],
       "spokenLanguages": ["en", "es", "fr", "hi", "ja"],
       "products": ["Sonic 3.6", "Ink 2"],
       "apis": ["TTS SSE (/tts/sse)", "Streaming STT with turn detection (/stt/turns/websocket)", "Voices API"],
       "models": ["sonic-3.6", "ink-2"],
+      "features": ["turn-detection", "multilingual"],
       "env": {
         "required": ["CARTESIA_API_KEY"],
         "oneOf": [],
@@ -162,7 +160,7 @@
       "recipe": "content/cookbook/10-python/05-voice-mode-for-coding-agents.mdx",
       "screenshot": null,
       "run": {
-        "clone": "pnpm dlx degit cartesia-ai/cookbook/examples/coding-voice-mode coding-voice-mode",
+        "clone": "npx degit cartesia-ai/cookbook/examples/coding-voice-mode coding-voice-mode",
         "setup": "./setup.sh claude --save-key",
         "dev": null,
         "url": null
@@ -191,10 +189,11 @@
       "products": ["Sonic 3.6"],
       "apis": ["TTS bytes (/tts/bytes)"],
       "models": ["sonic-3.6"],
+      "features": ["multilingual"],
       "env": {
-        "required": ["CARTESIA_API_KEY"],
-        "oneOf": ["AI_GATEWAY_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"],
-        "optional": ["PODCAST_MODEL", "CARTESIA_VOICE_HOST_A", "CARTESIA_VOICE_HOST_B"]
+        "required": ["CARTESIA_API_KEY", "LLM_MODEL"],
+        "oneOf": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "AI_GATEWAY_API_KEY"],
+        "optional": ["CARTESIA_VOICE_HOST_A", "CARTESIA_VOICE_HOST_B", "APP_PASSWORD", "TRUST_PROXY"]
       },
       "path": "examples/article-to-podcast",
       "readme": "examples/article-to-podcast/README.md",
@@ -202,13 +201,13 @@
       "recipe": "content/cookbook/01-next/02-article-to-podcast.mdx",
       "screenshot": "examples/article-to-podcast/docs/screenshot.png",
       "run": {
-        "clone": "pnpm dlx create-next-app --example https://github.com/cartesia-ai/cookbook/tree/main/examples/article-to-podcast my-podcast",
+        "clone": "npx degit cartesia-ai/cookbook/examples/article-to-podcast article-to-podcast",
         "setup": null,
-        "dev": "pnpm dev",
+        "dev": "npm run dev",
         "url": "http://localhost:3000"
       },
       "deploy": {
-        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Farticle-to-podcast&env=CARTESIA_API_KEY%2COPENAI_API_KEY&envDescription=Your%20Cartesia%20API%20key%2C%20and%20an%20LLM%20key%20for%20the%20script.%20ANTHROPIC_API_KEY%20or%20AI_GATEWAY_API_KEY%20also%20work.&envLink=https%3A%2F%2Fplay.cartesia.ai%2Fkeys&project-name=article-to-podcast&repository-name=article-to-podcast",
+        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Farticle-to-podcast&env=CARTESIA_API_KEY%2CLLM_MODEL%2CAPP_PASSWORD&envDescription=Cartesia%20API%20key%2C%20an%20LLM%20as%20provider%2Fmodel%20%28on%20Vercel%20the%20AI%20Gateway%20needs%20no%20key%29%2C%20and%20a%20password%20for%20the%20app%20%28or%20none%29.&envLink=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Farticle-to-podcast%23environment-variables&project-name=article-to-podcast&repository-name=article-to-podcast",
         "note": "Routes set maxDuration = 300. Long episodes have not been tested on a Vercel deployment."
       },
       "license": "Apache-2.0"
@@ -218,13 +217,7 @@
       "title": "Ebook to audiobook",
       "description": "Turn an EPUB into narrated MP3 chapters with Sonic 3.6, a voice per speaker, and word timestamps for read-along.",
       "category": "speech-generation",
-      "searchPhrases": [
-        "convert an EPUB to an audiobook",
-        "ebook to MP3 with AI voices",
-        "multi-voice audiobook generator",
-        "text to speech with word timestamps",
-        "read-along subtitles from TTS"
-      ],
+      "searchPhrases": ["convert an EPUB to an audiobook", "ebook to MP3 with AI voices", "multi-voice audiobook generator", "text to speech with word timestamps", "read-along subtitles from TTS"],
       "stack": ["Python", "Gradio", "EbookLib", "ffmpeg", "uv"],
       "languages": ["Python"],
       "spokenLanguages": ["en"],
@@ -232,6 +225,7 @@
       "products": ["Sonic 3.6"],
       "apis": ["TTS SSE with timestamps (/tts/sse)", "Voices API"],
       "models": ["sonic-3.6"],
+      "features": ["word-timestamps"],
       "env": {
         "required": ["CARTESIA_API_KEY"],
         "oneOf": [],
@@ -243,9 +237,9 @@
       "recipe": "content/cookbook/10-python/10-ebook-to-audiobook.mdx",
       "screenshot": "examples/audiobook/docs/screenshot.png",
       "run": {
-        "clone": "pnpm dlx degit cartesia-ai/cookbook/examples/audiobook audiobook",
+        "clone": "npx degit cartesia-ai/cookbook/examples/audiobook audiobook",
         "setup": null,
-        "dev": "uv run python main.py examples/alice_sample.epub out --tts cartesia --no_prompt",
+        "dev": "uv run python main.py samples/alice_sample.epub out --tts cartesia --no_prompt",
         "url": "http://127.0.0.1:7860"
       },
       "deploy": {
@@ -272,10 +266,11 @@
       "products": ["Sonic 3.6", "Ink 2"],
       "apis": ["TTS WebSocket with contexts and timestamps (/tts/websocket)", "Streaming STT with turn detection (/stt/turns/websocket)", "Access tokens"],
       "models": ["sonic-3.6", "ink-2"],
+      "features": ["word-timestamps", "turn-detection"],
       "env": {
         "required": ["CARTESIA_API_KEY", "LLM_MODEL"],
         "oneOf": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "AI_GATEWAY_API_KEY"],
-        "optional": []
+        "optional": ["APP_PASSWORD", "TRUST_PROXY"]
       },
       "path": "examples/story-time",
       "readme": "examples/story-time/README.md",
@@ -283,13 +278,13 @@
       "recipe": null,
       "screenshot": "examples/story-time/docs/screenshot.png",
       "run": {
-        "clone": "pnpm dlx create-next-app --example https://github.com/cartesia-ai/cookbook/tree/main/examples/story-time my-stories",
+        "clone": "npx degit cartesia-ai/cookbook/examples/story-time story-time",
         "setup": null,
-        "dev": "pnpm dev",
+        "dev": "npm run dev",
         "url": "http://localhost:3000"
       },
       "deploy": {
-        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fstory-time&env=CARTESIA_API_KEY%2CLLM_MODEL%2COPENAI_API_KEY&envDescription=Your%20Cartesia%20API%20key%2C%20LLM_MODEL%20as%20provider%2Fmodel%20%28for%20example%20openai%2Fgpt-5.4-mini%29%2C%20and%20the%20key%20for%20that%20provider.&envLink=https%3A%2F%2Fplay.cartesia.ai%2Fkeys&project-name=story-time&repository-name=story-time",
+        "vercel": null,
         "note": "Add your own login and a moderation API before sharing it publicly."
       },
       "license": "BSD-2-Clause"
@@ -312,10 +307,11 @@
       "products": ["Ink"],
       "apis": ["Batch STT (/stt)"],
       "models": ["ink-whisper"],
+      "features": ["batch-stt", "multilingual"],
       "env": {
         "required": ["CARTESIA_API_KEY", "LLM_MODEL"],
         "oneOf": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "AI_GATEWAY_API_KEY"],
-        "optional": []
+        "optional": ["APP_PASSWORD", "TRUST_PROXY"]
       },
       "path": "examples/meeting-notes",
       "readme": "examples/meeting-notes/README.md",
@@ -323,13 +319,13 @@
       "recipe": "content/cookbook/01-next/20-transcribe-and-summarize-meetings.mdx",
       "screenshot": "examples/meeting-notes/docs/screenshot.png",
       "run": {
-        "clone": "pnpm dlx create-next-app --example https://github.com/cartesia-ai/cookbook/tree/main/examples/meeting-notes my-meeting-notes",
+        "clone": "npx degit cartesia-ai/cookbook/examples/meeting-notes meeting-notes",
         "setup": null,
-        "dev": "pnpm dev",
+        "dev": "npm run dev",
         "url": "http://localhost:3000"
       },
       "deploy": {
-        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fmeeting-notes&env=CARTESIA_API_KEY%2CLLM_MODEL%2COPENAI_API_KEY&envDescription=Your%20Cartesia%20API%20key%2C%20LLM_MODEL%20as%20provider%2Fmodel%20%28for%20example%20openai%2Fgpt-5.4-mini%29%2C%20and%20the%20key%20for%20that%20provider.&envLink=https%3A%2F%2Fplay.cartesia.ai%2Fkeys&project-name=meeting-notes&repository-name=meeting-notes",
+        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fmeeting-notes&env=CARTESIA_API_KEY%2CLLM_MODEL%2CAPP_PASSWORD&envDescription=Cartesia%20API%20key%2C%20an%20LLM%20as%20provider%2Fmodel%20%28on%20Vercel%20the%20AI%20Gateway%20needs%20no%20key%29%2C%20and%20a%20password%20for%20the%20app%20%28or%20none%29.&envLink=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fmeeting-notes%23environment-variables&project-name=meeting-notes&repository-name=meeting-notes",
         "note": "Uploads are capped at 4 MB because of the Vercel request body limit."
       },
       "license": "MIT"
@@ -352,10 +348,11 @@
       "products": ["Ink 2", "Sonic 3.6"],
       "apis": ["Streaming STT with turn detection (/stt/turns/websocket)", "TTS WebSocket (/tts/websocket)", "Access tokens"],
       "models": ["ink-2", "sonic-3.6"],
+      "features": ["turn-detection", "multilingual"],
       "env": {
         "required": ["CARTESIA_API_KEY", "LLM_MODEL"],
         "oneOf": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "AI_GATEWAY_API_KEY"],
-        "optional": []
+        "optional": ["APP_PASSWORD", "TRUST_PROXY"]
       },
       "path": "examples/pocket-interpreter",
       "readme": "examples/pocket-interpreter/README.md",
@@ -363,13 +360,13 @@
       "recipe": null,
       "screenshot": "examples/pocket-interpreter/docs/screenshot-phone.png",
       "run": {
-        "clone": "pnpm dlx create-next-app --example https://github.com/cartesia-ai/cookbook/tree/main/examples/pocket-interpreter my-interpreter",
+        "clone": "npx degit cartesia-ai/cookbook/examples/pocket-interpreter pocket-interpreter",
         "setup": null,
-        "dev": "pnpm dev",
+        "dev": "npm run dev",
         "url": "http://localhost:3000"
       },
       "deploy": {
-        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fpocket-interpreter&env=CARTESIA_API_KEY%2CLLM_MODEL%2COPENAI_API_KEY&envDescription=Your%20Cartesia%20API%20key%2C%20LLM_MODEL%20as%20provider%2Fmodel%20%28for%20example%20openai%2Fgpt-5.4-mini%29%2C%20and%20the%20key%20for%20that%20provider.&envLink=https%3A%2F%2Fplay.cartesia.ai%2Fkeys&project-name=pocket-interpreter&repository-name=pocket-interpreter",
+        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fpocket-interpreter&env=CARTESIA_API_KEY%2CLLM_MODEL%2COPENAI_API_KEY%2CAPP_PASSWORD&envDescription=Your%20Cartesia%20API%20key%2C%20LLM_MODEL%20as%20provider%2Fmodel%20%28for%20example%20openai%2Fgpt-5.4-mini%29%2C%20and%20the%20key%20for%20that%20provider.&envLink=https%3A%2F%2Fplay.cartesia.ai%2Fkeys&project-name=pocket-interpreter&repository-name=pocket-interpreter",
         "note": "Phones only allow the microphone over HTTPS, so a deploy is the easiest way to try it on one."
       },
       "license": "Apache-2.0"
@@ -392,10 +389,29 @@
       "products": ["Managed Agents", "Ink 2", "Sonic 3.6", "Phone numbers"],
       "apis": ["Agents API (agents, tools, webhooks)", "Webhook tools", "Client tools", "Calls API", "Call webhooks", "Managed Agents WebSocket", "Access tokens"],
       "models": ["ink-2", "sonic-3.6"],
+      "features": ["telephony", "client-tools"],
       "env": {
         "required": ["CARTESIA_API_KEY", "CARTESIA_AGENT_ID"],
         "oneOf": [],
-        "optional": ["BUSINESS_NAME", "BUSINESS_SERVICES", "BUSINESS_TIMEZONE", "BUSINESS_HOURS", "APPOINTMENT_MINUTES", "TRANSFER_NUMBER", "PUBLIC_BASE_URL", "TOOL_SECRET", "CARTESIA_WEBHOOK_ID", "CARTESIA_WEBHOOK_SECRET", "CALCOM_API_KEY", "CALCOM_EVENT_TYPE_ID", "AGENT_MODEL_ID", "CARTESIA_VOICE_ID", "DATABASE_PATH"]
+        "optional": [
+          "BUSINESS_NAME",
+          "BUSINESS_SERVICES",
+          "BUSINESS_TIMEZONE",
+          "BUSINESS_HOURS",
+          "APPOINTMENT_MINUTES",
+          "TRANSFER_NUMBER",
+          "PUBLIC_BASE_URL",
+          "TOOL_SECRET",
+          "CARTESIA_WEBHOOK_ID",
+          "CARTESIA_WEBHOOK_SECRET",
+          "CALCOM_API_KEY",
+          "CALCOM_EVENT_TYPE_ID",
+          "AGENT_MODEL_ID",
+          "CARTESIA_VOICE_ID",
+          "DATABASE_PATH",
+          "DASHBOARD_PASSWORD",
+          "TRUST_PROXY"
+        ]
       },
       "path": "examples/front-desk",
       "readme": "examples/front-desk/README.md",
@@ -403,7 +419,7 @@
       "recipe": null,
       "screenshot": "examples/front-desk/docs/screenshot.png",
       "run": {
-        "clone": "pnpm dlx degit cartesia-ai/cookbook/examples/front-desk front-desk",
+        "clone": "npx degit cartesia-ai/cookbook/examples/front-desk front-desk",
         "setup": "uv run scripts/setup_agent.py",
         "dev": "uv run uvicorn front_desk.main:app --port 8000",
         "url": "http://localhost:8000/try"
@@ -432,10 +448,11 @@
       "products": ["Ink", "Sonic 3.6"],
       "apis": ["Batch STT (/stt)", "TTS bytes (/tts/bytes)", "Voices API"],
       "models": ["ink-whisper", "sonic-3.6"],
+      "features": ["batch-stt"],
       "env": {
         "required": ["CARTESIA_API_KEY", "LLM_MODEL"],
         "oneOf": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "AI_GATEWAY_API_KEY"],
-        "optional": []
+        "optional": ["TRUST_PROXY"]
       },
       "path": "examples/voice-journal",
       "readme": "examples/voice-journal/README.md",
@@ -443,9 +460,9 @@
       "recipe": null,
       "screenshot": "examples/voice-journal/docs/screenshot.png",
       "run": {
-        "clone": "pnpm dlx create-expo-app@latest my-journal --template https://github.com/cartesia-ai/cookbook/tree/main/examples/voice-journal",
+        "clone": "npx degit cartesia-ai/cookbook/examples/voice-journal voice-journal",
         "setup": null,
-        "dev": "pnpm dev",
+        "dev": "npm run dev",
         "url": "http://localhost:8081"
       },
       "deploy": {

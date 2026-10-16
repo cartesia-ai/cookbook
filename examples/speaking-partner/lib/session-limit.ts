@@ -17,7 +17,6 @@ export function useCountdown(running: boolean, seconds: number, onZero: () => vo
       }
     }, 250);
     return () => clearInterval(id);
-    // onZero is read through the closure at fire time; restarting the timer on every render would reset it
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, seconds]);
   return left;

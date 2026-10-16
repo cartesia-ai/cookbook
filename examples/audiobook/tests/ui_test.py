@@ -54,5 +54,29 @@ class TestWebUi(unittest.TestCase):
         for key, value in expected.items():
             self.assertEqual(getattr(config, key), value, key)
 
+    def test_log_timer_starts_inactive_and_follows_the_run(self):
+        ui, _ = web_ui.build_ui("out")
+        import gradio as gr
+        timers = [b for b in ui.blocks.values() if isinstance(b, gr.Timer)]
+        self.assertEqual(len(timers), 1)
+        self.assertFalse(timers[0].active)
+        fns = {f.fn for f in ui.fns.values()}
+        self.assertIn(web_ui.start_log_refresh, fns)
+        self.assertIn(web_ui.refresh_log, fns)
+        self.assertIn(web_ui.stop_and_refresh_log, fns)
+
+    def test_refresh_log_stops_the_timer_after_the_run(self):
+        web_ui.build_ui("out")
+        web_ui.webui_log_file.write_text("chapter 1 done\n")
+        alive = SimpleNamespace(is_alive=lambda: True)
+        with patch.object(web_ui, "running_process", alive):
+            text, timer = web_ui.refresh_log()
+        self.assertEqual(text, "chapter 1 done\n")
+        self.assertTrue(timer.active)
+        with patch.object(web_ui, "running_process", None):
+            text, timer = web_ui.refresh_log()
+        self.assertEqual(text, "chapter 1 done\n")
+        self.assertFalse(timer.active)
+
 if __name__ == "__main__":
     unittest.main()

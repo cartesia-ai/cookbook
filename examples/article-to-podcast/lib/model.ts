@@ -1,35 +1,35 @@
-import { anthropic } from "@ai-sdk/anthropic";
-import { openai } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 import { ConfigError } from "./env";
 
+type Env = Record<string, string | undefined>;
+
 export type ModelChoice = { provider: "gateway" | "anthropic" | "openai"; id: string };
 
-const DEFAULT_IDS = {
-  gateway: "anthropic/claude-sonnet-5.5",
-  anthropic: "claude-sonnet-5-5",
-  openai: "gpt-5.4-mini",
-} as const;
-
-export function chooseModel(env: Record<string, string | undefined> = process.env): ModelChoice {
-  const override = env.PODCAST_MODEL?.trim();
-  const has = (k: string) => Boolean(env[k]?.trim());
-  const provider = has("AI_GATEWAY_API_KEY")
-    ? "gateway"
-    : has("ANTHROPIC_API_KEY")
-      ? "anthropic"
-      : has("OPENAI_API_KEY")
-        ? "openai"
-        : null;
-  if (!provider) {
-    throw new ConfigError("Set one LLM key in .env.local: AI_GATEWAY_API_KEY, ANTHROPIC_API_KEY or OPENAI_API_KEY.");
+export function chooseModel(env: Env = process.env): ModelChoice {
+  const id = env.LLM_MODEL?.trim();
+  if (!id || !id.includes("/")) {
+    throw new ConfigError("Set LLM_MODEL in .env.local as provider/model, for example openai/gpt-5.4-mini.");
   }
-  return { provider, id: override || DEFAULT_IDS[provider] };
+  const slash = id.indexOf("/");
+  const provider = id.slice(0, slash);
+  const bare = id.slice(slash + 1);
+
+  if (provider === "openai" && env.OPENAI_API_KEY) return { provider: "openai", id: bare };
+  if (provider === "anthropic" && env.ANTHROPIC_API_KEY) return { provider: "anthropic", id: bare };
+  if (env.AI_GATEWAY_API_KEY || env.VERCEL) return { provider: "gateway", id };
+
+  throw new ConfigError(
+    `No key for "${provider}". Set ${
+      provider === "openai" ? "OPENAI_API_KEY" : provider === "anthropic" ? "ANTHROPIC_API_KEY" : "AI_GATEWAY_API_KEY"
+    }, or AI_GATEWAY_API_KEY to route through the Vercel AI Gateway.`,
+  );
 }
 
-export function getModel(env: Record<string, string | undefined> = process.env): LanguageModel {
+export function getModel(env: Env = process.env): LanguageModel {
   const { provider, id } = chooseModel(env);
-  if (provider === "gateway") return id;
-  if (provider === "anthropic") return anthropic(id);
-  return openai(id);
+  if (provider === "openai") return createOpenAI({ apiKey: env.OPENAI_API_KEY })(id);
+  if (provider === "anthropic") return createAnthropic({ apiKey: env.ANTHROPIC_API_KEY })(id);
+  return id;
 }

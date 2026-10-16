@@ -53,3 +53,8 @@ export function originAllowed(origin: string | undefined | null, allowed: string
   if (o === selfOrigin.toLowerCase()) return true;
   return allowed.includes(o);
 }
+
+export function lastForwardedFor(header: string | undefined): string | undefined {
+  const last = header?.split(',').at(-1)?.trim();
+  return last || undefined;
+}

@@ -1,17 +1,16 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
   "projectTitle": "Cartesia Cookbook",
-  "description": "Runnable templates and recipes for Cartesia: Sonic text to speech, Ink speech to text and Managed Agents voice agents in Next.js, Node, Python and Expo.",
+  "description": "Templates and recipes for Cartesia speech and voice agents: Sonic text to speech, Ink speech to text and Managed Agents in Next.js, Node, Python and Expo.",
   "branch": "main",
   "folders": [],
   "excludeFolders": [
     "tools",
     "examples/docs-voice-widget/content",
-    "examples/audiobook/examples",
+    "examples/audiobook/samples",
     "**/node_modules/**",
     "**/tests/**",
     "**/test/**",
-    "**/mock/**",
     "**/__tests__/**"
   ],
   "excludeFiles": [
@@ -27,6 +26,7 @@
     "Never send CARTESIA_API_KEY to a browser or mobile bundle. A server route mints client.accessToken.create({ grants, expires_in: 60 }) with the narrowest grants (agent, tts or stt) and the browser uses that token.",
     "Managed Agents WebSocket: wss://api.cartesia.ai/v1/agents/websocket/{agent_id}, opened with an access token that has the agent grant. Client tool results must be under 4096 bytes.",
     "Return fixed error messages from routes. Do not forward SDK error text or upstream response bodies to the client.",
-    "To start a new app, clone a template: pnpm dlx create-next-app --example https://github.com/cartesia-ai/cookbook/tree/main/examples/<slug> (Next.js) or pnpm dlx degit cartesia-ai/cookbook/examples/<slug>."
+    "To start a new app, clone a template: npx degit cartesia-ai/cookbook/examples/<slug> <slug>, then follow its README. templates.json lists every slug.",
+    "docs.cartesia.ai/line/... URLs are a legacy path prefix that still hosts current Managed Agents pages. Do not use the Line SDK for these templates."
   ]
 }

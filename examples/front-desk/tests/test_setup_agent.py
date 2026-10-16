@@ -10,11 +10,13 @@ spec = importlib.util.spec_from_file_location(
 setup_agent = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(setup_agent)
 
+
 def test_client_tools_without_a_public_url():
     s = settings()
     body = setup_agent.tool_body(TOOL_SPECS[1], s, "x")
     assert body["type"] == "client" and body["expects_response"] is True
     assert "call_id" not in body["parameters"]["properties"]
+
 
 def test_webhook_tools_with_a_public_url(monkeypatch):
     monkeypatch.setenv("PUBLIC_BASE_URL", "https://desk.example.com/")
@@ -27,6 +29,7 @@ def test_webhook_tools_with_a_public_url(monkeypatch):
         "dynamic_variable": "system__conversation_id",
     }
     assert api["request_headers"]["X-Tool-Secret"] == {"type": "secret", "secret_value": "tool-secret"}
+
 
 def test_agent_body(monkeypatch):
     s = settings()
@@ -42,6 +45,7 @@ def test_agent_body(monkeypatch):
         cfg["system_tools"]["transfer_to_number"]["transfers"][0]["destination"]["phone_number"]
         == "+14155550100"
     )
+
 
 def test_upsert_env(tmp_path):
     p = tmp_path / ".env"

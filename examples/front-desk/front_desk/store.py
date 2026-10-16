@@ -1,9 +1,3 @@
-"""SQLite storage for calls, turns, appointments, messages and handoffs.
-
-This is the only module that runs SQL. It opens a short-lived connection per call, which is
-plenty for one small business and keeps the code free of pools and sessions.
-"""
-
 from __future__ import annotations
 
 import json
@@ -78,8 +72,10 @@ create table if not exists webhook_events (
 );
 """
 
+
 def now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
+
 
 class Store:
     def __init__(self, path: Path):
@@ -98,15 +94,7 @@ class Store:
         finally:
             conn.close()
 
-    def seen(self, request_id: str) -> bool:
-        with self._conn() as c:
-            return (
-                c.execute("select 1 from webhook_events where request_id = ?", (request_id,)).fetchone()
-                is not None
-            )
-
     def first_delivery(self, request_id: str) -> bool:
-        """Records a webhook_request_id. False if it was seen before (a retry)."""
         with self._conn() as c:
             cur = c.execute(
                 "insert or ignore into webhook_events (request_id, received_at) values (?, ?)",
@@ -114,8 +102,11 @@ class Store:
             )
             return cur.rowcount == 1
 
+    def forget_delivery(self, request_id: str) -> None:
+        with self._conn() as c:
+            c.execute("delete from webhook_events where request_id = ?", (request_id,))
+
     def upsert_call(self, call: dict[str, Any]) -> None:
-        """Merges known fields of a Cartesia call object. Missing fields keep their value."""
         tp = call.get("telephony_params") or {}
         connection = tp.get("connection_type") or ""
         caller = ""
@@ -214,7 +205,6 @@ class Store:
         calendar: str,
         external_id: str = "",
     ) -> bool:
-        """Saves a booking. False if the local slot is already taken."""
         try:
             with self._conn() as c:
                 c.execute(
@@ -257,8 +247,10 @@ class Store:
                 (call_id, reason, name, int(transferred), now_iso()),
             )
 
+
 def _num(v: Any) -> float | None:
     return float(v) if isinstance(v, int | float) and not isinstance(v, bool) else None
+
 
 def _turn_row(call_id: str, idx: int, t: dict[str, Any]) -> tuple[Any, ...]:
     return (
@@ -274,6 +266,7 @@ def _turn_row(call_id: str, idx: int, t: dict[str, Any]) -> tuple[Any, ...]:
         json.dumps(t.get("tool_calls") or []),
         json.dumps(t["log_metric"]) if isinstance(t.get("log_metric"), dict) else "",
     )
+
 
 @dataclass
 class TurnRow:
@@ -311,6 +304,7 @@ class TurnRow:
             metric=metric if isinstance(metric, dict) else {},
         )
 
+
 @dataclass
 class CallRow:
     id: str
@@ -341,12 +335,10 @@ class CallRow:
 
     @property
     def visible_turns(self) -> list[TurnRow]:
-        """Caller and agent turns in time order. System turns only carry metrics."""
         shown = [t for t in self.turns if t.role != "system" and (t.text or t.tool_calls)]
         return sorted(shown, key=lambda t: (t.start_ts if t.start_ts is not None else 0.0, t.idx))
 
     def metric_values(self, name: str) -> list[float]:
-        """Values of one `log_metric` (milliseconds) from the call's system turns."""
         out = []
         for t in self.turns:
             v = t.metric.get("value")
@@ -360,7 +352,6 @@ class CallRow:
 
     @property
     def outcome(self) -> str:
-        """Booked, Transferred, Message or Info, from our own records or the transcript's tool calls."""
         names = self.tool_names
         if self.side_effects.get("appointments") or _succeeded(self.turns, "book_appointment"):
             return "Booked"
@@ -381,6 +372,7 @@ class CallRow:
                 pass
         ends = [t.end_ts for t in self.turns if t.end_ts is not None]
         return max(ends) if ends else None
+
 
 def _succeeded(turns: list[TurnRow], name: str) -> bool:
     for t in turns:

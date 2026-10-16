@@ -23,14 +23,14 @@
   },
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=22.13"
+    "node": ">=22.22"
   },
   "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "next typegen && tsc --noEmit && tsc --noEmit -p recipe-snippets/tsconfig.json",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
@@ -39,7 +39,7 @@
     "@cartesia/cartesia-js": "^4.2.0",
     "ai": "^7.0.140",
     "class-variance-authority": "^0.7.1",
-    "cn": "^0.4.0",
+    "clsx": "^2.1.1",
     "idb-keyval": "^6.3.0",
     "lucide-react": "^1.57.0",
     "next": "16.4.1",
@@ -47,6 +47,7 @@
     "radix-ui": "^1.8.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "tailwind-merge": "^3.7.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

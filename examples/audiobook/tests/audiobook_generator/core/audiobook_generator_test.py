@@ -31,7 +31,6 @@ def make_epub(path):
     epub.write_epub(path, book)
 
 class InProcessPool:
-    """Stands in for multiprocessing.Pool so fakes and patches apply."""
     def __init__(self, processes=None, initializer=None, initargs=()):
         pass
 

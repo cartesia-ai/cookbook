@@ -1,5 +1,5 @@
 import * as React from "react"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 import { Check, Loader2 } from "lucide-react"
 
 function Steps({ steps, current, className }: { steps: string[]; current: number; className?: string }) {

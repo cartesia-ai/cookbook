@@ -38,7 +38,7 @@ export const light: Palette = {
   mutedForeground: "#787672",
   accent: "#e2f5da",
   accentForeground: "#1a6b2e",
-  destructive: "#e7000b", // oklch(0.577 0.245 27.325)
+  destructive: "#e7000b",
   destructiveTint: "rgba(231, 0, 11, 0.08)",
   border: "#e4e3db",
   input: "#e4e3db",
@@ -64,9 +64,9 @@ export const dark: Palette = {
   mutedForeground: "#a7a6a2",
   accent: "#1f3a27",
   accentForeground: "#abd49e",
-  destructive: "#ff6467", // oklch(0.704 0.191 22.216)
+  destructive: "#ff6467",
   destructiveTint: "rgba(255, 100, 103, 0.12)",
-  border: "rgba(82, 81, 80, 0.55)", // #525150 at 55%
+  border: "rgba(82, 81, 80, 0.55)",
   input: "rgba(82, 81, 80, 0.7)",
   ring: "#5db368",
   ringSoft: "rgba(93, 179, 104, 0.5)",

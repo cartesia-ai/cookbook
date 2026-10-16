@@ -9,6 +9,9 @@ beforeEach(() => {
   delete process.env.CARTESIA_API_KEY;
   delete process.env.ANTHROPIC_API_KEY;
   delete process.env.OPENAI_API_KEY;
+  delete process.env.AI_GATEWAY_API_KEY;
+  delete process.env.VERCEL;
+  delete process.env.LLM_MODEL;
 });
 afterEach(() => {
   process.env = { ...saved };
@@ -22,6 +25,7 @@ describe("the page", () => {
   it("renders the app and never puts a key in the HTML or the flight props", () => {
     process.env.CARTESIA_API_KEY = "sentinel-cartesia-key-0001";
     process.env.ANTHROPIC_API_KEY = "sentinel-anthropic-key-0002";
+    process.env.LLM_MODEL = "anthropic/claude-x";
     const html = renderToString(Page());
     expect(html).toContain("Speaking partner");
     expect(html).not.toContain("sentinel-");

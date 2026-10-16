@@ -135,7 +135,7 @@ export async function run(opts: SetupOptions): Promise<number> {
 
   upsertEnv(localPath, "CARTESIA_AGENT_ID", agent.id);
   log(`Created agent ${agent.id} and saved it to .env.local.`);
-  log("Next: add CARTESIA_API_KEY to .env.local if it is not there yet, then run `pnpm dev`.");
+  log("Next: add CARTESIA_API_KEY to .env.local if it is not there yet, then run `npm run dev`.");
   return 0;
 }
 

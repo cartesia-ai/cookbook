@@ -17,7 +17,7 @@ describe("page", () => {
     const { default: Page } = await import("../app/page");
     render(<Page />);
     expect(screen.getByText(/create the agent first/i)).toBeTruthy();
-    expect(screen.getByText("pnpm setup:agent")).toBeTruthy();
+    expect(screen.getByText("npm run setup:agent")).toBeTruthy();
   });
 
   it("renders the chat with the agent id from the environment", async () => {

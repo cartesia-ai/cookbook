@@ -4,7 +4,7 @@ AI meeting notes: Next.js 16 App Router. Cartesia `ink-whisper` transcribes the 
 
 ## Commands (run in this folder)
 
-- Install and run: `pnpm install`, `cp .env.example .env.local`, `pnpm dev`
+- Install and run: `npm install` (or `pnpm install`), `cp .env.example .env.local`, `npm run dev`
 - Check: `pnpm test && pnpm typecheck && pnpm build`. Tests need no keys and no network. The build must pass with no env set.
 
 ## Files
@@ -17,7 +17,9 @@ lib/cartesia.ts               the only Cartesia client; reads the key at call ti
 lib/llm.ts                    LLM_MODEL "provider/model" to an AI SDK model
 lib/store.ts                  the only file that touches IndexedDB
 lib/limits.ts                 4 MB upload cap, recorder limits, language list
-recipe-snippets/              code shown in the recipe, compared by a test
+lib/rate-limit.ts             in-memory per-IP limiter for transcribe and summarize
+lib/use-recorder.ts           MediaRecorder plus the AudioContext for the level meter
+proxy.ts                      APP_PASSWORD Basic auth gate
 ```
 
 ## Rules
@@ -26,15 +28,16 @@ recipe-snippets/              code shown in the recipe, compared by a test
 - Read env inside functions, not at module load.
 - `ink-whisper` is the file model. `ink-2` is streaming only and fails on the batch `/stt` endpoint. If you add speech output, use `sonic-3.6`; older Sonic ids are retired (see `facts.json` at the repo root). The SDK sends `Cartesia-Version: 2026-08-14`.
 - Never hardcode an LLM id in code. `LLM_MODEL` is the only switch; new providers get a branch in `lib/llm.ts`.
-- Error bodies are short fixed strings, plus env var names from `LlmConfigError`. The transcribe route passes the Cartesia `APIError` message through; don't add LLM error text, stack traces or request details to any response.
+- Error bodies are short fixed strings, plus env var names from `LlmConfigError`. The transcribe route maps a Cartesia `APIError` status to a fixed message; don't add LLM error text, stack traces or request details to any response.
 - Audio is never stored. Only the transcript and notes go to IndexedDB.
-- `recipe-snippets/` must match `content/cookbook/01-next/20-transcribe-and-summarize-meetings.mdx` in the cookbook repo. `tests/recipe-snippets.test.ts` fails when they differ, so edit both.
-- UI is shadcn/ui with the Cartesia Verdant theme in `app/globals.css`, vendored from `packages/kit`. No other component library.
+- Both routes that spend money check `createRateLimiter` first. `proxy.ts` gates the whole app when `APP_PASSWORD` is set and refuses to serve on Vercel (production or preview) without it.
+- `lib/use-recorder.ts` creates and resumes the `AudioContext` inside the Start click, because Safari leaves a context made outside a user gesture suspended. It closes the context on stop and unmount. `components/level-meter.tsx` only reads from it.
+- UI is shadcn/ui with the Cartesia Verdant theme in `app/globals.css`, copied byte for byte from `packages/kit`. Change behavior in a new file, not in a copy. No other component library.
 - `next.config.ts` sets `agentRules: false` so `next dev` leaves this file alone.
-- Don't commit `.env.local`. Don't print keys. No em dashes in docs or UI copy.
+- Don't commit `.env.local`. Don't print keys.
 
 ## Verify a change
 
-1. `pnpm test && pnpm typecheck`.
+1. `pnpm test && pnpm typecheck && pnpm build`.
 2. `pnpm dev`, upload a short WAV or record ten seconds, and check that the notes page shows a summary and action items.
 3. Docs: https://docs.cartesia.ai/llms.txt, batch STT https://docs.cartesia.ai/api-reference/stt/transcribe.md.

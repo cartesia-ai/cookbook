@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createApp, type AppDeps } from '../server/app';
-import { RateLimiter, originAllowed, parseOrigins } from '../server/guard';
+import { renderMarkdown, safeHref } from '../server/demo';
+import { RateLimiter, lastForwardedFor, originAllowed, parseOrigins } from '../server/guard';
 import { DocIndex } from '../server/store';
 
 const SELF = 'http://localhost:4512';
@@ -93,5 +94,45 @@ describe('POST /api/search', () => {
     const { app: none } = app({ getIndex: () => null });
     expect((await none.fetch(post('/api/search', SELF, { query: 'hi' }))).status).toBe(503);
     expect((await a.fetch(post('/api/search', 'https://evil.dev', { query: 'hi' }))).status).toBe(403);
+  });
+});
+
+describe('GET /health', () => {
+  it('says only that the server is up', async () => {
+    const { app: a } = app();
+    expect(await (await a.fetch(new Request(`${SELF}/health`))).json()).toEqual({ ok: true });
+  });
+});
+
+describe('demo links', () => {
+  it('keeps http(s) and relative links and drops other schemes', () => {
+    expect(safeHref('/agents/tools')).toBe('https://docs.cartesia.ai/agents/tools');
+    expect(safeHref('https://x.dev/a')).toBe('https://x.dev/a');
+    expect(safeHref('#results')).toBe('#results');
+    expect(safeHref('javascript:alert(1)')).toBeNull();
+    expect(safeHref('java\tscript:alert(1)')).toBeNull();
+    expect(safeHref('//evil.dev/x')).toBeNull();
+    const html = renderMarkdown('[bad](javascript:alert(1)) and [good](https://x.dev)');
+    expect(html).not.toContain('javascript:');
+    expect(html).toContain('<a href="https://x.dev">good</a>');
+  });
+
+  it('drops image sources that are not http, https or relative', () => {
+    const bad = renderMarkdown('![pic](javascript:alert(1))');
+    expect(bad).not.toContain('javascript:');
+    expect(bad).not.toContain('<img');
+    expect(bad).toContain('pic');
+    expect(renderMarkdown('![logo](/logo.png "Logo")')).toContain(
+      '<img src="https://docs.cartesia.ai/logo.png" alt="logo" title="Logo">',
+    );
+  });
+});
+
+describe('lastForwardedFor', () => {
+  it('takes the address the proxy appended, not the one the client sent', () => {
+    expect(lastForwardedFor('198.51.100.7, 203.0.113.1')).toBe('203.0.113.1');
+    expect(lastForwardedFor('203.0.113.1')).toBe('203.0.113.1');
+    expect(lastForwardedFor('198.51.100.7, ')).toBeUndefined();
+    expect(lastForwardedFor(undefined)).toBeUndefined();
   });
 });

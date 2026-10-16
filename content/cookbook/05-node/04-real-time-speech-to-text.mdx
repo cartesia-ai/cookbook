@@ -14,8 +14,8 @@ Use `ink-2` only on the WebSocket. For a finished recording, use the file endpoi
 
 ## Prerequisites
 
-- Node 22.13 or newer
-- `pnpm add @cartesia/cartesia-js ws`. The SDK uses the `ws` package for WebSockets in Node.
+- Node 22.22 or newer
+- `npm install @cartesia/cartesia-js ws`. The SDK uses the `ws` package for WebSockets in Node.
 - `CARTESIA_API_KEY` set in your shell
 - A 16 kHz, 16-bit mono raw PCM file of someone talking. Convert any recording with `ffmpeg -i input.m4a -f s16le -ac 1 -ar 16000 question.pcm`.
 
@@ -59,7 +59,7 @@ ws.send({ type: 'close' });
 await events;
 ```
 
-Run it with `pnpm dlx tsx listen.mts question.pcm`. On 2026-10-16, with a 2.4 second question, it printed:
+Run it with `npx tsx listen.mts question.pcm`. With a short spoken question it prints something like:
 
 ```text
 [turn.start]
@@ -73,7 +73,7 @@ Run it with `pnpm dlx tsx listen.mts question.pcm`. On 2026-10-16, with a 2.4 se
 
 ## Which audio format does Ink 2 take?
 
-Raw, headerless audio in the `encoding` and `sample_rate` you declare. The socket does not read file headers, so convert WAV, m4a or WebM recordings to raw PCM first, and make sure the declared rate matches the audio. In Node, 16 kHz `pcm_s16le` is the usual choice. In a browser, capture Float32 from an `AudioWorklet` and declare `encoding: 'pcm_f32le'` with `sample_rate: audioCtx.sampleRate`, so no resampling is needed. The `byo-snippets/listen.ts` file in [examples/voice-chat](../../../examples/voice-chat/README.md) does that.
+Raw, headerless audio in the `encoding` and `sample_rate` you declare. The socket does not read file headers, so convert WAV, m4a or WebM recordings to raw PCM first, and make sure the declared rate matches the audio. In Node, 16 kHz `pcm_s16le` is the usual choice. In a browser, capture Float32 from an `AudioWorklet` and declare `encoding: 'pcm_f32le'` with `sample_rate: audioCtx.sampleRate`, so no resampling is needed. The own-LLM section of [Build a browser voice chat](../15-agents/02-voice-chat.mdx) does that.
 
 Send chunks of about 100 ms. Send silence while the user is muted instead of sending nothing, so the stream keeps its timing.
 
@@ -91,7 +91,7 @@ To make turns end sooner or later, pass `turn_end_timeout_ms` (640 to 11200, def
 
 ## Can the browser connect directly?
 
-Yes. Mint an access token on your server with the `stt` grant and build the browser client with `new Cartesia({ token })`. A token with only `{ stt: true }` opened this socket in a test on 2026-10-16. The API key never goes to the page. See [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
+Yes. Mint an access token on your server with the `stt` grant and build the browser client with `new Cartesia({ token })`. A token with only `{ stt: true }` opens this socket. The API key never goes to the page. See [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
 
 ## Next steps
 

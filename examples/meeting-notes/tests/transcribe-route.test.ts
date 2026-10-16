@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const transcribe = vi.fn();
 
@@ -22,10 +22,14 @@ import { POST } from "@/app/api/transcribe/route";
 
 const SECRET = "sk-test-secret-value";
 
-function request(fields: Record<string, string | File>) {
+beforeAll(() => vi.stubEnv("TRUST_PROXY", "1"));
+afterAll(() => vi.unstubAllEnvs());
+
+let ip = 0;
+function request(fields: Record<string, string | File>, from = `10.0.0.${++ip}`) {
   const form = new FormData();
   for (const [k, v] of Object.entries(fields)) form.append(k, v);
-  return new Request("http://localhost/api/transcribe", { method: "POST", body: form });
+  return new Request("http://localhost/api/transcribe", { method: "POST", body: form, headers: { "x-forwarded-for": from } });
 }
 
 const audio = (bytes = 10) => new File([new Uint8Array(bytes)], "a.webm", { type: "audio/webm" });
@@ -76,14 +80,14 @@ describe("POST /api/transcribe", () => {
     expect(body.error).toBe("CARTESIA_API_KEY is not set");
   });
 
-  it("passes an upstream API error status through", async () => {
+  it("maps an upstream API error to 502 with a fixed message", async () => {
     transcribe.mockRejectedValue(new (Cartesia.APIError as unknown as new (status: number, message: string) => Error)(429, "rate limited"));
     const res = await POST(request({ file: audio() }));
-    expect(res.status).toBe(429);
+    expect(res.status).toBe(502);
     const text = await res.text();
     expect(text).not.toContain(SECRET);
     expect(text).not.toContain("rate limited");
-    expect(JSON.parse(text).error).toBe("Too many transcription requests. Wait a moment and try again.");
+    expect(JSON.parse(text).error).toBe("Cartesia is rate limiting this account. Try again in a minute.");
   });
 
   it("maps other failures to a generic 500", async () => {
@@ -91,5 +95,17 @@ describe("POST /api/transcribe", () => {
     const res = await POST(request({ file: audio() }));
     expect(res.status).toBe(500);
     expect((await res.json()).error).toBe("Transcription failed");
+  });
+
+  it("returns 429 after too many requests from one address", async () => {
+    const statuses: number[] = [];
+    let last: Response | undefined;
+    for (let i = 0; i < 11; i++) {
+      last = await POST(request({ file: audio() }, "10.9.9.9"));
+      statuses.push(last.status);
+    }
+    expect(statuses.slice(0, 10).every((s) => s === 200)).toBe(true);
+    expect(statuses[10]).toBe(429);
+    expect(await last?.json()).toEqual({ error: "Too many requests. Try again in a minute." });
   });
 });

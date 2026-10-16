@@ -13,85 +13,190 @@ The two steps are separate routes on purpose. The page can show "Transcribing" a
 ## Prerequisites
 
 - A Next.js App Router app
-- `pnpm add @cartesia/cartesia-js ai zod`
+- `npm install @cartesia/cartesia-js ai zod`
 - `CARTESIA_API_KEY` in `.env.local`
 - `LLM_MODEL` in `.env.local`, as `provider/model`. The AI SDK sends a plain string like this through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway), which needs `AI_GATEWAY_API_KEY` (or OIDC on Vercel). To call a provider directly, install its package, for example `@ai-sdk/openai`, and pass `createOpenAI()(modelId)` as `model` instead.
 
 ## Server: transcribe
 
+The routes read the key when a request comes in, so `next build` works with no environment set.
+
+```ts filename="lib/cartesia.ts"
+import Cartesia from "@cartesia/cartesia-js";
+
+export class MissingKeyError extends Error {
+  constructor() {
+    super("CARTESIA_API_KEY is not set");
+  }
+}
+
+export function getCartesia(): Cartesia {
+  const apiKey = process.env.CARTESIA_API_KEY;
+  if (!apiKey) throw new MissingKeyError();
+  return new Cartesia({ apiKey });
+}
+```
+
+Both routes spend money, so each one gets an in-memory rate limiter keyed by client IP. It is per process and only slows casual abuse.
+
+```ts filename="lib/rate-limit.ts"
+export function createRateLimiter(limit: number, windowMs: number, now: () => number = Date.now) {
+  const hits = new Map<string, number[]>();
+  return function allow(key: string): boolean {
+    const t = now();
+    const recent = (hits.get(key) ?? []).filter((at) => t - at < windowMs);
+    if (recent.length >= limit) {
+      hits.set(key, recent);
+      return false;
+    }
+    recent.push(t);
+    hits.set(key, recent);
+    if (hits.size > 1000) {
+      for (const [k, v] of hits) if (v.every((at) => t - at >= windowMs)) hits.delete(k);
+    }
+    return true;
+  };
+}
+```
+
 ```ts filename="app/api/transcribe/route.ts"
-import Cartesia from '@cartesia/cartesia-js';
+import Cartesia from "@cartesia/cartesia-js";
+import { getCartesia, MissingKeyError } from "@/lib/cartesia";
+import { createRateLimiter } from "@/lib/rate-limit";
 
-const client = new Cartesia({ apiKey: process.env.CARTESIA_API_KEY });
+const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
 
-const MAX_BYTES = 4 * 1024 * 1024;
+const UPSTREAM_ERRORS: Record<number, string> = {
+  400: "Cartesia could not read this audio. Try MP3, M4A, WAV, WebM or FLAC.",
+  401: "The Cartesia API key was rejected. Check CARTESIA_API_KEY.",
+  402: "The Cartesia account is out of credits.",
+  413: "The audio file is too large for Cartesia.",
+  429: "Too many transcription requests. Wait a moment and try again.",
+};
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const allow = createRateLimiter(10, 60_000);
 
 export async function POST(req: Request) {
-  const form = await req.formData();
-  const file = form.get('file');
-  if (!(file instanceof File) || file.size === 0 || file.size > MAX_BYTES) {
-    return Response.json({ error: 'Send an audio file under 4 MB' }, { status: 400 });
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  if (!allow(ip)) {
+    return Response.json({ error: "Too many requests. Wait a minute and try again." }, { status: 429 });
+  }
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return Response.json({ error: "Send the audio as multipart form data" }, { status: 400 });
   }
 
+  const file = form.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return Response.json({ error: "Missing audio file" }, { status: 400 });
+  }
+  if (file.size > MAX_AUDIO_BYTES) {
+    return Response.json({ error: "File too large (4 MB limit)" }, { status: 413 });
+  }
+  const language = typeof form.get("language") === "string" ? String(form.get("language")) : "en";
+
   try {
-    const res = await client.stt.transcribe({
-      file,
-      model: 'ink-whisper',
-      language: 'en',
-    });
-    return Response.json({ transcript: res.text, duration: res.duration });
+    const res = await getCartesia().stt.transcribe({ file, model: "ink-whisper", language });
+    return Response.json({ transcript: res.text, duration: res.duration ?? null, language: res.language ?? language });
   } catch (err) {
-    if (err instanceof Cartesia.APIError && err.status) {
-      const error = err.status === 429 ? 'Too many requests. Try again shortly.' : 'Transcription failed';
-      return Response.json({ error }, { status: err.status });
+    if (err instanceof MissingKeyError) {
+      return Response.json({ error: err.message }, { status: 500 });
     }
-    throw err;
+    if (err instanceof Cartesia.APIError && typeof err.status === "number") {
+      return Response.json({ error: UPSTREAM_ERRORS[err.status] ?? "Transcription failed" }, { status: err.status });
+    }
+    return Response.json({ error: "Transcription failed" }, { status: 500 });
   }
 }
 ```
 
-`ink-whisper` is the model for file transcription. `ink-2` is for streaming and does not work on this endpoint. The file from `formData()` goes to the SDK as it is. Send a `language` code (ISO 639-1) if the meeting is not in English. The SDK sends the `Cartesia-Version` header for you.
+`ink-whisper` is the model for file transcription. `ink-2` is for streaming and does not work on this endpoint. The file from `formData()` goes to the SDK as it is. Send a `language` code (ISO 639-1) if the meeting is not in English; the template checks it against a list of supported languages. The SDK sends the `Cartesia-Version` header for you. Upstream errors map to fixed messages, so the provider's error body never reaches the page.
 
 ## Server: summarize
 
-```ts filename="app/api/summarize/route.ts"
-import { generateText, Output } from 'ai';
-import { z } from 'zod';
+```ts filename="lib/schema.ts"
+import { z } from "zod";
 
-const MeetingNotes = z.object({
-  title: z.string().describe('Short title, under 80 characters'),
-  summary: z.string().describe('Neutral third-person summary, 3 to 6 sentences'),
+export const MeetingNotesSchema = z.object({
+  title: z.string().describe("Short title, under 80 characters"),
+  summary: z.string().describe("Neutral third-person summary, 3 to 6 sentences"),
   decisions: z
     .array(z.string())
-    .describe('Decisions that were made, one sentence each. Empty array if none.'),
+    .describe(
+      "Decisions that were made, one sentence each. Empty array if none. Do not include open questions or proposals nobody agreed to.",
+    ),
   actionItems: z.array(
     z.object({
-      task: z.string().describe('Short, imperative, self-contained'),
-      owner: z.string().nullable().describe('Person named as responsible, or null'),
+      task: z.string().describe("Short, imperative, self-contained"),
+      owner: z.string().nullable().describe("Person named as responsible, or null"),
     }),
   ),
 });
+```
+
+```ts filename="app/api/summarize/route.ts"
+import { generateText, NoObjectGeneratedError, NoOutputGeneratedError, Output } from "ai";
+import { createRateLimiter } from "@/lib/rate-limit";
+import { MeetingNotesSchema } from "@/lib/schema";
+
+const MAX_TRANSCRIPT_CHARS = 120_000;
+
+const NOTES_INSTRUCTIONS = `You turn meeting transcripts into notes.
+
+Rules:
+- Write the notes in the language of the transcript.
+- Only use what the transcript says. Never invent owners, dates or decisions.
+- A decision is something the participants agreed or settled. Proposals nobody agreed to and open questions are not decisions. If there are none, return an empty decisions array.
+- An action item is a task someone committed to or was asked to do. Set owner to the person's name only if the transcript names them, otherwise null.
+- The transcript has no speaker labels. Do not guess who said what.
+- Ignore filler words and small talk.`;
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const allow = createRateLimiter(10, 60_000);
 
 export async function POST(req: Request) {
-  const { transcript } = await req.json();
-  if (typeof transcript !== 'string' || !transcript.trim()) {
-    return Response.json({ error: 'The transcript is empty' }, { status: 400 });
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  if (!allow(ip)) {
+    return Response.json({ error: "Too many requests. Wait a minute and try again." }, { status: 429 });
+  }
+  const body = await req.json().catch(() => null);
+  const transcript = typeof body?.transcript === "string" ? body.transcript.trim() : "";
+  if (!transcript) {
+    return Response.json({ error: "The transcript is empty" }, { status: 400 });
+  }
+  if (transcript.length > MAX_TRANSCRIPT_CHARS) {
+    return Response.json({ error: "The transcript is too long to summarize in one pass" }, { status: 413 });
   }
 
-  const { output } = await generateText({
-    model: process.env.LLM_MODEL!,
-    instructions:
-      'Turn the meeting transcript into notes. Only use what the transcript says. ' +
-      'Never invent owners or decisions. Open questions are not decisions.',
-    prompt: transcript,
-    output: Output.object({ schema: MeetingNotes }),
-  });
-
-  return Response.json(output);
+  try {
+    const result = await generateText({
+      model: process.env.LLM_MODEL!,
+      instructions: NOTES_INSTRUCTIONS,
+      prompt: transcript,
+      output: Output.object({ schema: MeetingNotesSchema }),
+      temperature: 0.2,
+      maxOutputTokens: 1500,
+      maxRetries: 2,
+    });
+    const notes = result.output;
+    return Response.json({ ...notes, title: notes.title.slice(0, 80), summary: notes.summary.slice(0, 1200) });
+  } catch (err) {
+    if (NoObjectGeneratedError.isInstance(err) || NoOutputGeneratedError.isInstance(err)) {
+      return Response.json({ error: "The model did not return valid notes" }, { status: 502 });
+    }
+    return Response.json({ error: "Could not generate notes. Check the LLM key and model id." }, { status: 500 });
+  }
 }
 ```
 
-The schema makes every key required, and `owner` is nullable instead of optional. OpenAI's strict structured outputs reject optional keys, and this shape works with the other providers too. The `describe` text on `decisions` matters. Without it, models list open questions as decisions.
+The schema makes every key required, and `owner` is nullable instead of optional. OpenAI's strict structured outputs reject optional keys, and this shape works with the other providers too. The `describe` text on `decisions` matters. Without it, models list open questions as decisions. The template's `lib/llm.ts` also accepts an OpenAI or Anthropic key directly instead of the AI Gateway.
 
 ## Client: record and post
 
@@ -149,6 +254,8 @@ export default function Page() {
 }
 ```
 
+This page is the minimal version. The template moves recording into `lib/use-recorder.ts`, stops at 3.6 MB, and creates and resumes an `AudioContext` inside the click handler for its level meter, because Safari only starts audio from a user gesture.
+
 Chrome and Firefox record `audio/webm` or `audio/ogg`. Safari records `audio/mp4`. The code picks the first type the browser supports and names the file to match. At 24 kbps, 20 minutes of speech is about 3.6 MB.
 
 ## How it works
@@ -161,7 +268,7 @@ The speech-to-text endpoint returns no speaker labels. An action item's owner is
 
 ## Limits
 
-- Vercel serverless functions reject request bodies over 4.5 MB, which is about 20 minutes of Opus at 24 kbps. Cartesia accepted a 45 MB, 25 minute WAV file in testing, so the cap comes from the host and not from the API. For longer meetings, run the route somewhere without that limit.
+- Vercel serverless functions reject request bodies over 4.5 MB, which is about 20 minutes of Opus at 24 kbps. That cap comes from the host, not from the Cartesia API. For longer meetings, run the route somewhere without that limit.
 - The summarize route sends the whole transcript in one call. A very long transcript needs chunking, which this recipe does not do.
 - Both routes spend your credits for anyone who can reach them. Put them behind your own auth before you deploy.
 

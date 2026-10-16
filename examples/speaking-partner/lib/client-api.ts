@@ -44,7 +44,7 @@ export function endSession(agentId: string): void {
       body: JSON.stringify({ agentId }),
     }).catch(() => undefined);
   } catch {
-    // nothing to do; the server sweeps old session agents
+    return;
   }
 }
 

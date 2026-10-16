@@ -2,6 +2,7 @@ import { generateText, NoObjectGeneratedError, NoOutputGeneratedError, Output } 
 import { getModel, LlmConfigError } from "@/lib/llm";
 import { scenePrompt, storyInstructions } from "@/lib/prompt";
 import { isFlagged, moderate, ModerationError } from "@/lib/moderation";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
 import { cleanHeroName, cleanThemes, looksUnsafe } from "@/lib/safety";
 import { AGES, SceneSchema, TOTAL_SCENES, type Age, type Scene, type SceneRecord } from "@/lib/story";
 
@@ -9,6 +10,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MAX_HISTORY_CHARS = 6000;
+const allow = createRateLimiter(10, 60_000);
 
 export const NAME_NOT_OK = "Let's pick a different name for our hero and try again.";
 export const SCENE_NOT_OK = "This story wandered somewhere it shouldn't. Let's start a new one.";
@@ -41,6 +43,7 @@ function checkScene(scene: Scene, last: boolean): "format" | "unsafe" | null {
 }
 
 export async function POST(req: Request) {
+  if (!allow(clientIp(req))) return tooManyRequests();
   const body = await req.json().catch(() => null);
   const hero = cleanHeroName(body?.hero);
   const themes = cleanThemes(body?.themes);

@@ -1,13 +1,3 @@
-"""Build examples/alice_sample.epub from examples/alice_ch1_2.txt.
-
-    uv run python scripts/make_sample_epub.py
-
-The text is two excerpts of Lewis Carroll's Alice's Adventures in Wonderland
-(Project Gutenberg ebook #11, public domain in the United States), with the
-Project Gutenberg header, footer and license text removed. Nothing is
-downloaded here. The text file has one "=== Chapter title ===" line per chapter
-and blank lines between paragraphs.
-"""
 import html
 import os
 import re
@@ -15,8 +5,8 @@ import re
 from ebooklib import epub
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SOURCE = os.path.join(HERE, "..", "examples", "alice_ch1_2.txt")
-TARGET = os.path.join(HERE, "..", "examples", "alice_sample.epub")
+SOURCE = os.path.join(HERE, "..", "samples", "alice_ch1_2.txt")
+TARGET = os.path.join(HERE, "..", "samples", "alice_sample.epub")
 
 def read_chapters(path):
     with open(path, encoding="utf-8") as f:

@@ -21,23 +21,23 @@ def _settings() -> Settings:
     except ConfigError as exc:
         raise click.ClickException(str(exc))
 
-@click.group(invoke_without_command=True)
+@click.group(invoke_without_command=True, help="Cartesia voice mode for coding agents.")
 @click.version_option(__version__)
 @click.pass_context
 def main(ctx: click.Context) -> None:
-    """Cartesia voice mode for coding agents."""
     if ctx.invoked_subcommand is None:
         ctx.invoke(serve)
 
-@main.command()
+@main.command(help="Run the MCP server on stdio.")
 def serve() -> None:
-    """Run the MCP server on stdio."""
     from .server import main as run
 
     run()
 
-def _install_one(name: str, opts: dict) -> str:
-    home = Path.home()
+def _cursor_target(opts: dict) -> Path:
+    return inst.cursor_path(Path.home(), Path.cwd() if opts["project"] else None)
+
+def _install_one(name: str, opts: dict) -> tuple[bool, str]:
     directory = inst.project_dir()
     uv = shutil.which("uv") or "uv"
     entry = inst.server_entry(directory, uv=uv, voice=opts["voice"])
@@ -46,18 +46,29 @@ def _install_one(name: str, opts: dict) -> str:
         cmd = inst.claude_add_cmd(directory, scope=opts["scope"], uv=uv, voice=opts["voice"])
         if dry or not shutil.which("claude"):
             why = "dry run" if dry else "claude not found on PATH, run this yourself"
-            return f"claude ({why}):\n  {' '.join(cmd)}"
+            return True, f"claude ({why}):\n  {' '.join(cmd)}"
         r = subprocess.run(cmd, capture_output=True, text=True)
-        return "claude: added" if r.returncode == 0 else f"claude: failed ({(r.stderr or r.stdout).strip()})"
+        if r.returncode == 0:
+            return True, "claude: added"
+        return False, f"claude: failed ({(r.stderr or r.stdout).strip()})"
     if name == "cursor":
-        path = inst.cursor_path(home, Path.cwd() if opts["project"] else None)
+        path = _cursor_target(opts)
         if dry:
-            return f"cursor (dry run): would write {path}"
-        return f"cursor: {'updated' if inst.merge_cursor(path, entry) else 'already set up'} {path}"
-    path = inst.codex_path(home)
+            return True, f"cursor (dry run): would write {path}"
+        return True, f"cursor: {'updated' if inst.merge_cursor(path, entry) else 'already set up'} {path}"
+    path = inst.codex_path(Path.home())
     if dry:
-        return f"codex (dry run): would write {path}"
-    return f"codex: {'updated' if inst.merge_codex(path, entry) else 'already set up'} {path}"
+        return True, f"codex (dry run): would write {path}"
+    return True, f"codex: {'updated' if inst.merge_codex(path, entry) else 'already set up'} {path}"
+
+def _validate(names: list[str], opts: dict) -> None:
+    try:
+        if "cursor" in names:
+            inst.read_cursor(_cursor_target(opts))
+        if "codex" in names:
+            inst.read_codex(inst.codex_path(Path.home()))
+    except inst.ConfigFileError as exc:
+        raise click.ClickException(f"{exc} Nothing was installed.")
 
 def _present(name: str) -> bool:
     home = Path.home()
@@ -67,7 +78,7 @@ def _present(name: str) -> bool:
         "codex": (home / ".codex").exists() or bool(shutil.which("codex")),
     }[name]
 
-@main.command()
+@main.command(help="Register the server with a coding agent.")
 @click.argument("client", type=click.Choice([*CLIENTS, "all"]))
 @click.option("--scope", type=click.Choice(["user", "project", "local"]), default="user", show_default=True, help="Claude Code scope.")
 @click.option("--project", is_flag=True, help="Cursor: write ./.cursor/mcp.json instead of the user file.")
@@ -76,8 +87,9 @@ def _present(name: str) -> bool:
 @click.option("--skill", is_flag=True, help="Claude Code: also install the skill into ~/.claude/skills.")
 @click.option("--dry-run", is_flag=True, help="Print what would happen, change nothing.")
 def install(client, scope, project, voice, save_key, skill, dry_run) -> None:
-    """Register the server with a coding agent."""
     opts = dict(scope=scope, project=project, voice=voice, dry_run=dry_run)
+    names = [c for c in CLIENTS if _present(c)] if client == "all" else [client]
+    _validate(names, opts)
     if save_key:
         key = os.environ.get("CARTESIA_API_KEY")
         if not key:
@@ -87,29 +99,36 @@ def install(client, scope, project, voice, save_key, skill, dry_run) -> None:
         else:
             inst.save_key(key_file(), key)
             click.echo(f"saved the key to {key_file()} (mode 0600)")
-    names = [c for c in CLIENTS if _present(c)] if client == "all" else [client]
     if client == "all":
         for c in CLIENTS:
             if c not in names:
                 click.echo(f"{c}: not found, skipped")
+    failed = []
     for n in names:
-        click.echo(_install_one(n, opts))
+        try:
+            ok, msg = _install_one(n, opts)
+        except inst.ConfigFileError as exc:
+            ok, msg = False, f"{n}: failed ({exc})"
+        click.echo(msg)
+        if not ok:
+            failed.append(n)
     want_skill = skill or (
-        "claude" in names and not dry_run and sys.stdin.isatty()
+        "claude" in names and "claude" not in failed and not dry_run and sys.stdin.isatty()
         and click.confirm("Install the skill into ~/.claude/skills?", default=False)
     )
-    if want_skill and "claude" in names and not dry_run:
+    if want_skill and "claude" in names and "claude" not in failed and not dry_run:
         click.echo(f"skill: {inst.install_skill(Path.home())}")
     if not (save_key or os.environ.get("CARTESIA_API_KEY") or load_settings().api_key):
         click.echo("note: no API key found yet. Set CARTESIA_API_KEY or run install again with --save-key.")
+    if failed:
+        raise click.ClickException(f"install failed for: {', '.join(failed)}")
 
-@main.command()
+@main.command(help="Remove only this server's entry.")
 @click.argument("client", type=click.Choice(CLIENTS))
 @click.option("--scope", type=click.Choice(["user", "project", "local"]), default="user")
 @click.option("--project", is_flag=True)
 @click.option("--dry-run", is_flag=True)
 def uninstall(client, scope, project, dry_run) -> None:
-    """Remove only this server's entry."""
     home = Path.home()
     if client == "claude":
         cmd = inst.claude_remove_cmd(scope)
@@ -117,15 +136,18 @@ def uninstall(client, scope, project, dry_run) -> None:
             click.echo(" ".join(cmd))
         else:
             subprocess.run(cmd)
-    elif client == "cursor":
-        path = inst.cursor_path(home, Path.cwd() if project else None)
-        click.echo("removed" if not dry_run and inst.remove_cursor(path) else "nothing to remove")
-    else:
-        click.echo("removed" if not dry_run and inst.remove_codex(inst.codex_path(home)) else "nothing to remove")
+        return
+    try:
+        if client == "cursor":
+            removed = not dry_run and inst.remove_cursor(inst.cursor_path(home, Path.cwd() if project else None))
+        else:
+            removed = not dry_run and inst.remove_codex(inst.codex_path(home))
+    except inst.ConfigFileError as exc:
+        raise click.ClickException(str(exc))
+    click.echo("removed" if removed else "nothing to remove")
 
-@main.command()
+@main.command(help="Check the setup. Never prints the key.")
 def doctor() -> None:
-    """Check the setup. Never prints the key."""
     import cartesia
 
     ok = True
@@ -184,12 +206,11 @@ def _need_key() -> Settings:
         raise click.ClickException(MISSING_KEY)
     return s
 
-@main.command()
+@main.command(help="Speak text once (smoke test).")
 @click.argument("text")
 @click.option("--voice")
 @click.option("--speed", type=float)
 def say(text, voice, speed) -> None:
-    """Speak text once (smoke test)."""
     from .audio import Speaker
     from .tts import speak
 
@@ -205,10 +226,9 @@ def say(text, voice, speed) -> None:
 
     asyncio.run(run())
 
-@main.command()
+@main.command(help="Listen for one turn and print the transcript.")
 @click.option("--wav", type=click.Path(exists=True), help="Stream a 16 kHz mono WAV instead of the microphone.")
 def hear(wav) -> None:
-    """Listen for one turn and print the transcript."""
     from .audio import Mic, WavMic
     from .stt import listen_for_turn
 

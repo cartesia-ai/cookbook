@@ -1,28 +1,21 @@
 import unittest
-import logging
+
 from audiobook_generator.utils.utils import split_text
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
 class TestSplitText(unittest.TestCase):
-    def test_input_file(self):
-        """Test input file."""
-        input_file = "tests/long_text.txt"
-        with open(input_file, "r") as f:
+    def test_chinese_text_splits_under_the_limit_without_losing_text(self):
+        with open("tests/long_text.txt", encoding="utf-8") as f:
             text = f.read()
 
         max_chars = 400
         chunks = split_text(text, max_chars, "zh-CN")
+        self.assertGreater(len(chunks), 3)
         for i, chunk in enumerate(chunks, 1):
-            print(f"Chunk {i} of {len(chunks)}, length={len(chunk)}, text=[{chunk}]")
-            print("-"*100)
-            assert len(chunk) <= max_chars, f"Chunk {i} length {len(chunk)} exceeds max_chars {max_chars}"
+            self.assertLessEqual(len(chunk), max_chars, f"chunk {i}")
 
-        original_sans_whitespace = ''.join(c for c in text if not c.isspace())
-        chunks_sans_whitespace = ''.join(c for c in ''.join(chunks) if not c.isspace())
-
-        assert len(chunks_sans_whitespace) == len(original_sans_whitespace), "Content might be lost during splitting"
+        original = "".join(c for c in text if not c.isspace())
+        joined = "".join(c for c in "".join(chunks) if not c.isspace())
+        self.assertEqual(joined, original)
 
 if __name__ == "__main__":
     unittest.main()
-

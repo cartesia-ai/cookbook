@@ -1,11 +1,3 @@
-"""Cartesia call webhooks: check the request, then store what it says.
-
-Cartesia does not sign webhook bodies. It sends the secret you registered in the
-`x-webhook-secret` header (https://docs.cartesia.ai/line/infrastructure/observability#webhooks).
-So this module compares that header in constant time, rejects events for other agents, and
-drops retries by `webhook_request_id`, which stays the same across delivery attempts.
-"""
-
 from __future__ import annotations
 
 import hmac
@@ -17,13 +9,14 @@ from .store import Store
 
 CALL_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
+
 @dataclass
 class Verdict:
     status: int
     detail: str
 
+
 def check(headers: dict[str, str], body: Any, *, secret: str, agent_id: str) -> Verdict | None:
-    """Returns a rejection, or None when the event should be processed."""
     if not secret:
         return Verdict(503, "CARTESIA_WEBHOOK_SECRET is not set.")
     given = headers.get("x-webhook-secret", "")
@@ -38,16 +31,19 @@ def check(headers: dict[str, str], body: Any, *, secret: str, agent_id: str) -> 
         return Verdict(400, "Missing call_id.")
     return None
 
+
 def ingest(store: Store, event: dict[str, Any]) -> str:
-    """Stores one event. Returns what happened, for the response body and logs."""
     request_id = event.get("webhook_request_id")
-    if isinstance(request_id, str) and request_id:
-        if store.seen(request_id):
-            return "duplicate"
-        result = _apply(store, event)
-        store.first_delivery(request_id)
-        return result
-    return _apply(store, event)
+    if not isinstance(request_id, str) or not request_id:
+        return _apply(store, event)
+    if not store.first_delivery(request_id):
+        return "duplicate"
+    try:
+        return _apply(store, event)
+    except Exception:
+        store.forget_delivery(request_id)
+        raise
+
 
 def _apply(store: Store, event: dict[str, Any]) -> str:
     kind = event["type"]

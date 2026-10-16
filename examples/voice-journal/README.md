@@ -1,21 +1,24 @@
-# Voice journal: an AI voice diary app in Expo with Cartesia speech to text and text to speech
+# Voice journal
 
-An Expo (React Native) voice journal for iOS, Android and the web. Tap to record an entry, Cartesia Ink (`ink-whisper`) transcribes it, an LLM adds a title, a mood and a one-line reflection, and once a week the app writes a short recap and reads it aloud with a Cartesia Sonic 3.6 voice you pick. Entries stay on the device. A few Expo Router API routes hold the keys, so it runs with API keys only: no database, no login.
+An Expo app for iOS, Android and the web that turns spoken diary entries into text with Cartesia Ink (`ink-whisper`) and reads a weekly recap aloud with Cartesia Sonic 3.6.
 
 ![Phone screenshot of the Weekly recap screen: a This week panel with one entry and a Hopeful mood badge, the voice picker set to Tessa, the Write my recap button, and the latest recap playing at 0:04 of 0:32](./docs/screenshot.png)
+
+Tap to record an entry, `ink-whisper` transcribes it, and an LLM adds a title, a mood and a one-line reflection. Once a week the app writes a short recap and reads it with a Sonic voice you pick. Entries stay on the device. A few Expo Router API routes hold the keys, so there is no database and no login.
 
 ## Run it
 
 ```sh
-pnpm dlx create-expo-app@latest my-journal --template https://github.com/cartesia-ai/cookbook/tree/main/examples/voice-journal
-cd my-journal
-cp .env.example .env.local   # add CARTESIA_API_KEY, LLM_MODEL and the matching provider key
-pnpm dev
+npx degit cartesia-ai/cookbook/examples/voice-journal voice-journal
+cd voice-journal
+cp .env.example .env.local
+npm install
+npm run dev
 ```
 
-Press `w` to open the web app at http://localhost:8081, or scan the QR code with Expo Go. Tap Start recording, talk for a few seconds, tap Stop and save. Then open Recap and tap Write my recap.
+Add `CARTESIA_API_KEY`, `LLM_MODEL` and the matching provider key to `.env.local` first. pnpm works too. Node 22.22 or newer.
 
-If a key is missing, the app says which one. Node 22.13 or newer.
+Press `w` to open the web app at http://localhost:8081, or scan the QR code with Expo Go. Tap Start recording, talk for a few seconds, tap Stop and save. Then open Recap and tap Write my recap. If a key is missing, the app says which one.
 
 ## Environment variables
 
@@ -26,12 +29,19 @@ If a key is missing, the app says which one. Node 22.13 or newer.
 | `OPENAI_API_KEY` | if `LLM_MODEL` starts with `openai/` | https://platform.openai.com/api-keys |
 | `ANTHROPIC_API_KEY` | if `LLM_MODEL` starts with `anthropic/` | https://console.anthropic.com |
 | `AI_GATEWAY_API_KEY` | for any other provider | https://vercel.com/docs/ai-gateway |
+| `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
 None of these have an `EXPO_PUBLIC_` prefix, so Expo never puts them in the app bundle. Only the API routes in `app/api` read them. Model ids are examples; providers retire models, so check the provider's model page first.
 
 ## How it works
 
-1. `lib/use-recorder.ts` records with `expo-audio` (m4a on iOS and Android, WebM on the web) and shows a level meter from the recorder's metering.
+Open these first:
+
+- `app/api/transcribe+api.ts` sends the recording to `ink-whisper`.
+- `app/api/speak+api.ts` turns the recap into an MP3 with Sonic 3.6.
+- `lib/use-recorder.ts` records with `expo-audio`.
+
+1. `lib/use-recorder.ts` records with `expo-audio` (m4a on iOS and Android, WebM on the web) and shows a level meter from the recorder's metering. Recording stops at four minutes.
 2. The app posts the file to `POST /api/transcribe`, which sends it to Cartesia `ink-whisper` and returns the text. The entry is saved right away with its transcript.
 3. `POST /api/analyze` asks the LLM for a title, one mood from a fixed list and a one-sentence reflection, using the AI SDK with a zod schema (`lib/schema.ts`). If this step fails, the entry keeps its transcript and the entry page shows Retry.
 4. On the Recap page, `POST /api/recap` gets the last seven days of entries (oldest first) and writes a 120 to 200 word recap meant to be heard, not read.
@@ -59,13 +69,11 @@ app/api/speak+api.ts       Sonic 3.6 MP3
 app/api/voices+api.ts      public English voices for the picker
 app/api/health+api.ts      booleans for the setup banner
 lib/store.ts               the only file that touches storage (AsyncStorage)
-lib/server/                Cartesia client, LLM resolver, prompts, error mapping
+lib/server/                Cartesia client, LLM resolver, prompts, error mapping, rate limit
 components/ui, blocks      the cookbook kit rebuilt in React Native
 ```
 
 Audio is not stored. The transcribe route reads the file, sends it to Cartesia and forgets it. Entries, recaps and the chosen voice live in AsyncStorage, which is `localStorage` on the web and a local file on iOS and Android.
-
-## Models and API version
 
 `ink-whisper` for file transcription, `sonic-3.6` for speech, through `@cartesia/cartesia-js`, which sends `Cartesia-Version: 2026-08-14`. Current model ids: https://docs.cartesia.ai/build-with-cartesia/tts-models/latest and https://docs.cartesia.ai/build-with-cartesia/stt/latest.
 
@@ -77,11 +85,21 @@ Audio is not stored. The transcribe route reads the file, sends it to Cartesia a
 - Swap the LLM: set `LLM_MODEL`. `lib/server/llm.ts` is the whole switch.
 - Store entries elsewhere: replace the functions in `lib/store.ts` and keep `useJournal()`.
 
+## Before you deploy
+
+The API routes in `app/api` are open. There is no password gate here, because the iOS and Android apps call the routes directly and a secret shipped in the app bundle is not a secret. Anyone who finds the server URL can spend your Cartesia and LLM credits. Before you deploy, put the routes behind real auth: sign users in with a provider that has a React Native SDK (for example Clerk, Supabase Auth or Firebase Auth), send its session token in an `Authorization` header from `lib/api.ts`, and verify it at the top of each `app/api/*+api.ts` route with the provider's server SDK, returning 401 when it fails.
+
+Every route that calls Cartesia or the LLM also has an in-memory rate limit per client IP (`lib/server/rate-limit.ts`). It is per process and only slows casual abuse; auth is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
+
+Recordings over 4 MB are rejected, because hosts such as Vercel refuse request bodies over 4.5 MB before the route runs. The four minute recording cap keeps the 128 kbps recordings under that.
+
+Each entry costs one `ink-whisper` transcription and one LLM call. Each recap costs one LLM call and Sonic characters for the text. See https://docs.cartesia.ai/pricing and your LLM provider's pricing page.
+
+Entries are sent to Cartesia and your LLM provider for processing; tell your users that.
+
 ## FAQ
 
-### How do I keep my Cartesia API key out of the app?
-
-The key is only read in `lib/server/cartesia.ts`, which only API routes import, and it has no `EXPO_PUBLIC_` prefix, so Metro never inlines it into the client bundle. If you want the phone to call Cartesia directly instead, mint a short-lived access token on the server, as in [Browser auth with access tokens](../../content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx).
+The app never sees `CARTESIA_API_KEY`. If you want the phone to call Cartesia directly instead, see [Browser auth with access tokens](../../content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx).
 
 ### Does it work on a real iPhone or Android phone?
 
@@ -99,9 +117,11 @@ No. The prompts tell the model not to diagnose or give medical advice, and to po
 
 Not in this template. Voice cloning was left out on purpose, so the app only uses voices from the Cartesia library.
 
-## Before you deploy
+## Tests
 
-The API routes have no auth. Anyone who finds the URL can spend your Cartesia and LLM credits. Put them behind your own login or a rate limiter first. Entries are sent to Cartesia and your LLM provider for processing; tell your users that.
+```sh
+npm test
+```
 
 ## Learn more
 

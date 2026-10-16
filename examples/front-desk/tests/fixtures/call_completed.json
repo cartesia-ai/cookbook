@@ -23,7 +23,7 @@
     },
     "telephony_account_type": "cartesia",
     "transcript": [
-      {"role": "assistant", "text": "Hi, thanks for calling Juniper Hair Studio. How can I help you today?", "start_timestamp": 0.41, "end_timestamp": 3.9, "tts_ttfb": 0.071},
+      {"role": "assistant", "text": "Hi, thanks for calling Juniper Hair Studio. I'm an AI assistant, and this call may be recorded. How can I help you today?", "start_timestamp": 0.41, "end_timestamp": 3.9, "tts_ttfb": 0.071},
       {"role": "user", "text": "Hi, I'd like to book a haircut for Saturday morning.", "start_timestamp": 4.6, "end_timestamp": 7.8, "stt_ttfb": 0.182},
       {"role": "assistant", "text": "Let me check Saturday. I have ten, ten thirty or eleven in the morning. Which works best?", "start_timestamp": 8.5, "end_timestamp": 13.6, "tts_ttfb": 0.094,
        "tool_calls": [{"id": "tc_1", "name": "check_availability", "arguments": {"date": "2026-10-17", "part_of_day": "morning"}, "result": "{\"date\":\"2026-10-17\",\"day\":\"Saturday, October 17\",\"open_times\":[\"10 AM\",\"10:30 AM\",\"11 AM\",\"11:30 AM\"],\"more\":0}"}]},

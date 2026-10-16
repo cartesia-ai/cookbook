@@ -3,6 +3,7 @@ import { z } from "zod";
 import { LANGS } from "./languages";
 import { getModel } from "./llm";
 import { translatePrompt } from "./prompt";
+import { clientIp, createRateLimiter, tooManyRequests } from "./rate-limit";
 
 export const MAX_TURN_CHARS = 2000;
 
@@ -11,8 +12,12 @@ const Body = z.object({
   pair: z.tuple([z.enum(LANGS), z.enum(LANGS)]).refine(([a, b]) => a !== b),
 });
 
-export function createTranslateRoute(model: () => LanguageModel = () => getModel()) {
+export function createTranslateRoute(
+  model: () => LanguageModel = () => getModel(),
+  allow = createRateLimiter(60, 60_000),
+) {
   return async function POST(req: Request): Promise<Response> {
+    if (!allow(clientIp(req))) return tooManyRequests();
     const parsed = Body.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
       return Response.json({ error: "Send one turn of text and two different languages." }, { status: 400 });

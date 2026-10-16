@@ -3,7 +3,6 @@ import os
 import unicodedata
 
 def _detect_name_max(path):
-    """Return NAME_MAX for filesystem containing path, or sane default."""
     directory = path if os.path.isdir(path) else os.path.dirname(path) or "."
     try:
         name_max = os.pathconf(directory, "PC_NAME_MAX")
@@ -14,7 +13,6 @@ def _detect_name_max(path):
     return 255
 
 def _sanitize_base_name(name):
-    """Normalize and sanitize text for use in filename (no extension)."""
     if not name:
         return ""
 
@@ -39,15 +37,6 @@ def _sanitize_base_name(name):
 def make_safe_filename(
     title, idx, output_dir, ext, reserve=16, collision_check=True
 ):
-    """
-    Build filesystem-safe filename for given title and chapter index.
-
-    - Uses NAME_MAX (if available) for output_dir.
-    - Produces cross-platform safe filenames.
-    - Truncates by UTF-8 bytes to respect filesystem limits.
-    - Adds a short hash on truncation for stability.
-    - Raises RuntimeError on collision if collision_check is True.
-    """
     if not ext:
         raise ValueError("Extension must be non-empty")
     if not ext.startswith("."):

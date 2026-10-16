@@ -11,7 +11,7 @@ A script that sends text to Sonic and writes the audio to `hello.wav`.
 ## Prerequisites
 
 - Node 22 or newer
-- `pnpm add @cartesia/cartesia-js`
+- `npm install @cartesia/cartesia-js`
 - `CARTESIA_API_KEY` set in your shell. `CARTESIA_VOICE_ID` is optional; the script falls back to a public voice.
 
 ## The script
@@ -33,7 +33,7 @@ await writeFile('hello.wav', Buffer.from(await response.arrayBuffer()));
 console.log('Wrote hello.wav');
 ```
 
-Run it with a TypeScript runner such as `pnpm dlx tsx speak.mts`.
+Run it with a TypeScript runner such as `npx tsx speak.mts`.
 
 ## How it works
 

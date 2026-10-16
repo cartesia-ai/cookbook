@@ -1,5 +1,3 @@
-"""The real SDK against local fake servers. Catches SDK drift: headers, body and query string."""
-
 import asyncio
 import base64
 import json

@@ -1,7 +1,8 @@
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, openAIEmbedder } from '../server/embeddings';
+import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, openAIEmbedder, type Embedder } from '../server/embeddings';
 import { loadEnvFiles } from '../server/env-file';
+import { KEYWORD_MODEL } from '../server/keyword';
 import { DocIndex } from '../server/store';
 import { ingest } from './run';
 import { folderPages, sitemapPages } from './sources';
@@ -19,30 +20,29 @@ const { values, positionals } = parseArgs({
   },
 });
 
-if (!process.env.OPENAI_API_KEY) {
-  console.error('OPENAI_API_KEY is empty. Put it in .env.local (see .env.example) and run this again.');
-  process.exit(1);
-}
+const apiKey = process.env.OPENAI_API_KEY;
+const model = apiKey ? EMBEDDING_MODEL : KEYWORD_MODEL;
+const dimensions = apiKey ? EMBEDDING_DIMENSIONS : 0;
+const embed: Embedder = apiKey ? openAIEmbedder(apiKey) : async (texts) => texts.map(() => new Float32Array(0));
+console.log(apiKey ? `Embedding with ${EMBEDDING_MODEL}.` : 'OPENAI_API_KEY is empty, so search will use keyword scoring.');
 
 const out = resolve(values.out!);
 const existing = DocIndex.load(out);
 const index =
-  existing && existing.model === EMBEDDING_MODEL && existing.dimensions === EMBEDDING_DIMENSIONS
-    ? existing
-    : new DocIndex(EMBEDDING_MODEL, EMBEDDING_DIMENSIONS);
+  existing && existing.model === model && existing.dimensions === dimensions ? existing : new DocIndex(model, dimensions);
 
 const started = Date.now();
 const pages = values.sitemap
   ? await sitemapPages(values.sitemap, { match: values.match, limit: values.limit ? Number(values.limit) : undefined, log: console.log })
   : await folderPages(resolve(positionals[0] ?? 'content'), values['base-url']!);
 
-const stats = await ingest(pages, index, openAIEmbedder(process.env.OPENAI_API_KEY), {
+const stats = await ingest(pages, index, embed, {
   force: values.force,
   prune: true,
   log: console.log,
 });
 index.save(out);
 console.log(
-  `${stats.pages} pages: ${stats.embedded} embedded, ${stats.skipped} unchanged, ${stats.removed} removed. ` +
+  `${stats.pages} pages: ${stats.embedded} indexed, ${stats.skipped} unchanged, ${stats.removed} removed. ` +
     `${stats.chunks} sections in ${values.out} (${Date.now() - started} ms).`,
 );

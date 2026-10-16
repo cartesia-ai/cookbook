@@ -37,7 +37,7 @@ export function SetupNotice() {
           <Code>CARTESIA_API_KEY=...</Code>
         </Step>
         <Step n={2} title="Create the agent">
-          <Code>pnpm setup:agent</Code>
+          <Code>npm run setup:agent</Code>
         </Step>
         <Step n={3} title="Restart the dev server">
           <p className="text-[13px] leading-5 text-muted-foreground">The app reads the new agent id when it starts.</p>

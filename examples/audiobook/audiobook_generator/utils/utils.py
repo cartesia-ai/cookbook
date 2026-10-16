@@ -13,17 +13,6 @@ import os
 logger = logging.getLogger(__name__)
 
 def split_text(text: str, max_chars: int, language: str) -> List[str]:
-    """
-    Split text into chunks, where each chunk is as close to max_chars as possible.
-
-    Args:
-        text: The text to split
-        max_chars: The maximum number of characters per chunk
-        language: The language of the text
-
-    Returns:
-        A list of text chunks
-    """
     if not text:
         return []
     if max_chars <= 0:
@@ -59,16 +48,6 @@ def split_text(text: str, max_chars: int, language: str) -> List[str]:
     return chunks
 
 def split_long_sentence(sentence: str, max_chars: int) -> List[str]:
-    """
-    Split a long sentence into smaller parts based on punctuation and spaces.
-
-    Args:
-        sentence: The sentence to split
-        max_chars: The maximum number of characters per part
-
-    Returns:
-        A list of sentence parts
-    """
     if max_chars < 5:
         return [sentence[i:i+max_chars] for i in range(0, len(sentence), max_chars)]
 
@@ -142,17 +121,6 @@ def is_special_char(char: str) -> bool:
     return result
 
 def save_segment_tmp(segment: io.BytesIO, output_format: str, prefix: str = None) -> str:
-    """
-    Save audio segment to a temporary file
-
-    Args:
-        segment: Audio segment (io.BytesIO)
-        output_format: Audio file format
-        prefix: Optional prefix for the temporary filename
-
-    Returns:
-        Path to the temporary file
-    """
     kwargs = {"delete": False, "suffix": f".{output_format}"}
     if prefix:
         kwargs["prefix"] = f"{prefix}_"
@@ -164,14 +132,6 @@ def save_segment_tmp(segment: io.BytesIO, output_format: str, prefix: str = None
         return tmp_file.name
 
 def pydub_merge_audio_segments(tmp_files: List[str], output_file: str, output_format: str) -> None:
-    """
-    Merge multiple audio segments into one and set audio tags
-
-    Args:
-        tmp_files: List of temporary file paths
-        output_file: Path to the final output file
-        output_format: Audio file format
-    """
     if not tmp_files:
         logger.warning("No temporary files to merge")
         return
@@ -191,13 +151,6 @@ def pydub_merge_audio_segments(tmp_files: List[str], output_file: str, output_fo
     logger.debug(f"Temporary files deleted: {tmp_files}")
 
 def direct_merge_audio_segments(audio_segments: List[io.BytesIO], output_file: str) -> None:
-    """
-    Directly write multiple audio segments into one file without using pydub
-
-    Args:
-        audio_segments: List of audio segments in memory
-        output_file: Path to the final output file
-    """
     if not audio_segments:
         logger.warning("No audio segments to write")
         return
@@ -211,16 +164,6 @@ def direct_merge_audio_segments(audio_segments: List[io.BytesIO], output_file: s
 
 def merge_audio_segments(audio_segments: List[io.BytesIO], output_file: str, output_format: str,
                           chunk_ids: List[str], use_pydub_merge: bool) -> None:
-    """
-    Merge audio segments using either pydub or direct write method based on configuration
-
-    Args:
-        audio_segments: List of audio segments (BytesIO objects)
-        output_file: Path to the final output file
-        output_format: Audio file format
-        chunk_ids: List of IDs for each audio chunk
-        use_pydub_merge: Whether to use pydub for merging (True) or direct write (False)
-    """
     if use_pydub_merge:
         logger.info(f"Using pydub to merge audio segments: {chunk_ids}")
         tmp_files = []

@@ -4,7 +4,9 @@
   "sources": [
     "https://docs.cartesia.ai/build-with-cartesia/tts-models/latest",
     "https://docs.cartesia.ai/build-with-cartesia/tts-models/api-changes",
-    "https://docs.cartesia.ai/build-with-cartesia/stt-models/latest"
+    "https://docs.cartesia.ai/build-with-cartesia/stt/latest",
+    "https://docs.cartesia.ai/build-with-cartesia/stt/older-models",
+    "https://docs.cartesia.ai/api-reference/auth/access-token"
   ],
   "apiVersion": "2026-08-14",
   "tts": { "model": "sonic-3.6", "snapshot": "sonic-3.6-2026-08-27" },

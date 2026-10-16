@@ -6,28 +6,19 @@ tags: ['agents', 'client tools', 'web component', 'rag', 'hono']
 
 # Add voice search to your docs with a Managed Agent and client tools
 
-This recipe adds a voice button to any documentation site with one `<script>` tag. A visitor asks a question out loud, and a Cartesia Managed Agent answers from your docs, names the page it used, and scrolls the page to that section. The agent runs `ink-2` for speech recognition, `sonic-3.6` for its voice and `claude-haiku-4.5` as the LLM. The widget is a framework-free web component. The server is Hono on Node with a JSON vector store.
+A voice button on any documentation site, added with one `<script>` tag. A visitor asks a question out loud, and a Cartesia Managed Agent answers from your docs, names the page it used, and scrolls the page to that section. The agent runs `ink-2` for speech recognition, `sonic-3.6` for its voice and `claude-haiku-4.5` as the LLM. The widget is a framework-free web component. The server is Hono on Node with a JSON vector store.
 
-The finished template is in [`examples/docs-voice-widget`](../../../examples/docs-voice-widget/README.md).
+This recipe covers the Cartesia parts: the client tools, the result size limit and the token route. To run the finished widget and server, follow the [`examples/docs-voice-widget`](../../../examples/docs-voice-widget/README.md) README.
 
 The trick is two client tools. The agent calls `search_docs`, the browser asks your server, and the result goes back to the agent over the same WebSocket. Then the agent calls `show_source`, and the browser scrolls to the cited section. Nothing on Cartesia's side needs to reach your server.
 
 ## Prerequisites
 
-- A Cartesia API key and an OpenAI API key (for `text-embedding-3-small` embeddings)
-- Node 22.13 or newer and pnpm
+- A Cartesia API key. An OpenAI API key is optional: with it, search uses `text-embedding-3-small` embeddings, and without it, a keyword (BM25) index
+- Node 22.22 or newer
 - The agent connection basics from [Connect to a Managed Agent from the browser](./01-talk-to-a-managed-agent.mdx)
 
-```sh
-cd examples/docs-voice-widget
-pnpm install
-cp .env.example .env.local   # add CARTESIA_API_KEY and OPENAI_API_KEY
-pnpm setup:agent             # creates the agent and its two tools, saves the ids
-pnpm ingest                  # embeds content/*.md into data/index.json
-pnpm dev
-```
-
-Open http://localhost:4512 and ask "How big can a client tool result be?". On your own site, the embed is one line.
+On your own site, the embed is one line.
 
 ```html
 <script src="https://your-server.example.com/widget.js" defer>
@@ -60,66 +51,24 @@ export const SEARCH_TOOL = {
     required: ['query'],
   },
 } as const;
-
-export const SOURCE_TOOL = {
-  type: 'client',
-  name: 'show_source',
-  description:
-    'Scrolls the page to the section your answer is based on and shows it as a source. Call it once per answer, as you start answering, with the source_id of the result you used most.',
-  pre_tool_speech: 'off',
-  execution_mode: 'async',
-  expects_response: false,
-  parameters: {
-    type: 'object',
-    properties: {
-      source_id: { type: 'string', description: 'The source_id of a search_docs result.' },
-    },
-    required: ['source_id'],
-  },
-} as const;
 ```
 
-The prompt tells the agent when to call each one. It searches first, answers only from the results, and cites before it speaks.
+`SOURCE_TOOL` has the same shape with `name: 'show_source'`, one required `source_id` string, `pre_tool_speech: 'off'`, `execution_mode: 'async'` and `expects_response: false`.
+
+The prompt tells the agent when to call each one. It searches first, cites before it speaks, and answers only from the results.
 
 ```md filename="scripts/agent-config.ts"
 # How to answer
-- For any question about the product, call search_docs first. Answer only from what it returns.
-- If the results do not cover the question, say you could not find it in the docs and suggest a related topic they cover. Never guess at APIs, limits or values.
-- Call show_source with the source_id of the result you relied on most, then give the answer. Prefer a result with on_this_page set to true when it answers the question. Call it once per answer and do not talk about it: the page scrolls by itself.
-- Keep answers to two or three short spoken sentences. Offer to go deeper instead of listing everything.
+Every answer about the product takes the same three steps, in this order, including follow-up questions on a topic you already covered:
+1. Call search_docs with a short query.
+2. Call show_source with the source_id of the result you rely on most. Prefer a result with on_this_page set to true when it answers the question.
+3. Speak the answer, using only what the results say.
+
+- Never skip step 2 when you answer from the results. Never mention it either: the page scrolls by itself, so do not say you are showing, opening or highlighting anything.
+- If the results do not cover the question, skip show_source, say you could not find it in the docs and suggest a related topic they cover. Never guess at APIs, limits or values.
 ```
 
-`pnpm setup:agent` creates the tools first, then an agent that references them by id. If any step fails, it deletes the tools it already made.
-
-```ts filename="scripts/setup-agent.ts"
-const created: string[] = [];
-try {
-  for (const tool of [SEARCH_TOOL, SOURCE_TOOL]) {
-    const t = await client.post<{ id: string }>('/v1/agents/tools', { body: tool });
-    created.push(t.id);
-    console.log(`Created tool ${tool.name} ${t.id}`);
-  }
-  const agent = await client.post<{ id: string }>('/v1/agents', { body: agentBody(env, created) });
-  upsertEnv(localPath, 'CARTESIA_AGENT_ID', agent.id);
-  upsertEnv(localPath, 'CARTESIA_TOOL_IDS', created.join(','));
-  console.log(`Created agent ${agent.id} and saved it to .env.local.`);
-  console.log('Next: pnpm ingest, then pnpm dev.');
-} catch (err) {
-  console.error(`Setup failed (${status(err) ?? 'network'}): ${brief(err)}`);
-  for (const id of created) await client.delete(`/v1/agents/tools/${id}`).catch(() => {});
-  process.exit(1);
-}
-```
-
-The agent body ends idle calls after 60 seconds of silence, which matters for a button any visitor can press.
-
-```ts filename="scripts/agent-config.ts"
-      turn: { inactivity_check_in_secs: 20, inactivity_end_call_secs: 60 },
-      tools: toolIds.map((id) => ({ id })),
-      system_tools: { end_call: { pre_tool_speech: 'force' } },
-```
-
-Run `pnpm setup:agent --dry-run` to print the three request bodies without a key or a network call.
+The setup script creates the two tools with `POST /v1/agents/tools`, then an agent that lists their ids in `tools`. It also ends idle calls after 60 seconds of silence (`inactivity_end_call_secs: 60`), which matters for a button any visitor can press.
 
 ## Handle client_tool_call in the browser
 
@@ -166,32 +115,13 @@ An error result is a sentence the LLM can act on, not an exception. "Say you cou
 
 ## Send client_tool_result under 4096 bytes
 
-`respond` sends `client_tool_result` once per `tool_call_id`, and does nothing when the agent did not ask for a response.
-
-```ts filename="widget/src/agents-web/client.ts"
-    const respond = (result: string, o: ToolResultOptions = {}) => {
-      if (!ev.expects_response || this.answered.has(ev.tool_call_id)) return;
-      this.answered.add(ev.tool_call_id);
-      this.sendRaw(
-        s,
-        encodeClientEvent({
-          type: 'client_tool_result',
-          tool_call_id: ev.tool_call_id,
-          result: truncateToolResult(result),
-          ...(o.isError ? { is_error: true } : {}),
-          ...(o.errorType
-            ? { error_type: truncateUtf8(o.errorType, MAX_ERROR_TYPE_BYTES) }
-            : {}),
-        }),
-      );
-    };
-```
+`respond` sends one `client_tool_result` event with the matching `tool_call_id`, the `result` string, and `is_error` plus `error_type` when set. It sends nothing when the agent did not ask for a response, and answers each call id once.
 
 Results can be at most 4096 bytes. Per the Cartesia docs, a longer result is replaced with an error whose `error_type` is `result_too_large`, so the agent gets nothing useful. `truncateToolResult` cuts at `MAX_TOOL_RESULT_BYTES = 4096` as a last guard. Cutting JSON in the middle leaves it broken, though, so the server keeps the result well under the limit before it ever reaches the browser.
 
 ## Search the docs index on the server
 
-`POST /api/search` takes the query and the visitor's current path. It embeds the query, ranks every section by cosine similarity, and adds a small boost for sections on the page the visitor is reading.
+`POST /api/search` takes the query and the visitor's current path. It embeds the query, ranks every section by cosine similarity (or by BM25 keyword score when the index was built without an OpenAI key), and adds a small boost for sections on the page the visitor is reading.
 
 ```ts filename="server/search.ts"
 export async function searchDocs(
@@ -202,62 +132,24 @@ export async function searchDocs(
 ): Promise<SearchResponse> {
   const q = query.trim().slice(0, MAX_QUERY_CHARS);
   if (!q || index.chunks.length === 0) return packResults([], page);
+  const boost = (c: Chunk) => (samePage(c.url, page) ? SAME_PAGE_BOOST : 0);
+  if (index.model === KEYWORD_MODEL) return packResults(keywordSearch(index.chunks, q, TOP_K, boost), page);
   const [vector] = await embed([q]);
-  const ranked = index.search(vector!, TOP_K, (c) => (samePage(c.url, page) ? SAME_PAGE_BOOST : 0));
-  return packResults(ranked, page);
+  return packResults(index.search(vector!, TOP_K, boost), page);
 }
 ```
 
 The index is one JSON file. Vectors are normalized when they are embedded, so a dot product is the cosine similarity, and a brute-force scan over a few thousand 512-dimension vectors is fast enough to skip a database.
 
-```ts filename="server/store.ts"
-  search(query: Float32Array, k: number, boost?: (c: Chunk) => number): Array<{ chunk: Chunk; score: number }> {
-    const scored = this.chunks.map((chunk) => ({ chunk, score: dot(query, chunk.vector) + (boost?.(chunk) ?? 0) }));
-    scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, k);
-  }
-```
-
 `packResults` turns the top four sections into the tool result. Each item carries a `source_id`, the page and section names, an `on_this_page` flag and the text. The URL and anchor go into a separate `sources` map that only the widget sees. If the JSON is over 3,800 bytes, the loop shortens the longest text by a fifth, and drops the last result once every text is down to 80 characters.
-
-```ts filename="server/search.ts"
-export const RESULT_BUDGET_BYTES = 3800;
-export const TOP_K = 4;
-export const SAME_PAGE_BOOST = 0.03;
-```
-
-```ts filename="server/search.ts"
-  const render = () => JSON.stringify({ results: items });
-  let out = render();
-  while (byteLength(out) > budget) {
-    const longest = items.reduce((a, b) => (b.text.length > a.text.length ? b : a));
-    if (longest.text.length <= 80) {
-      items.pop();
-      if (items.length === 0) break;
-    } else {
-      longest.text = longest.text.slice(0, Math.floor(longest.text.length * 0.8)).trimEnd() + '...';
-    }
-    out = render();
-  }
-```
 
 The budget counts bytes with `TextEncoder`, not string length, so pages in Japanese or Hindi do not slip past it.
 
-`pnpm ingest` builds the index. It splits each Markdown page into one section per heading with a GitHub-style slug, which becomes the anchor the widget scrolls to. Run `pnpm ingest --sitemap https://docs.example.com/sitemap.xml` to index a live site and keep its own heading ids. Pages whose checksum has not changed are not embedded again.
+The template's ingest script splits each Markdown page into one section per heading, with a GitHub-style slug that becomes the anchor the widget scrolls to.
 
 ## Keep the API key on the server with a token route
 
-The browser never sees `CARTESIA_API_KEY` or `OPENAI_API_KEY`. When the visitor presses Start talking, the widget calls `POST /api/token`, and the server mints a token with only the `agent` grant that expires in 60 seconds. The token is used once, to open `wss://api.cartesia.ai/v1/agents/websocket/{agent_id}`.
-
-```ts filename="server/index.ts"
-  async mintToken() {
-    const apiKey = env.CARTESIA_API_KEY;
-    if (!apiKey) throw new Error('CARTESIA_API_KEY is not set.');
-    const client = new Cartesia({ apiKey });
-    const { token } = await client.accessToken.create({ grants: { agent: true }, expires_in: 60 });
-    return { token, expiresIn: 60 };
-  },
-```
+The browser never sees `CARTESIA_API_KEY` or `OPENAI_API_KEY`. When the visitor presses Start talking, the widget calls `POST /api/token`, and the server mints a token with only the `agent` grant that expires in 60 seconds. The route calls `client.accessToken.create({ grants: { agent: true }, expires_in: 60 })`, and the widget uses the token once, to open `wss://api.cartesia.ai/v1/agents/websocket/{agent_id}`.
 
 A public button that starts paid voice calls will get abused, so the route checks the `Origin` header against `ALLOWED_ORIGINS`, rate limits per IP, and never passes upstream errors to the browser.
 
@@ -286,8 +178,12 @@ When the agent cites a section on the current page, the widget finds the heading
 
 Models sometimes answer without calling `show_source`. Once the assistant's transcript passes 40 characters with no citation, the widget waits 1.2 seconds and cites the top search result itself.
 
+## Limits
+
+The tool loop depends on the model calling `search_docs` before it answers. The prompt asks for that, but a model can still answer from memory, so check answers against your docs before you put the widget on a public site.
+
 ## Next steps
 
-- Read the full template in [`examples/docs-voice-widget`](../../../examples/docs-voice-widget/README.md), including the widget UI, the ingest CLI and the tests.
+- Run the full template from [`examples/docs-voice-widget`](../../../examples/docs-voice-widget/README.md), including the widget UI, the ingest CLI and the tests.
 - See [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx) for more on the token route.
 - [Build an AI language speaking partner](./03-speaking-partner.mdx) uses a fire and forget client tool to end a role play.

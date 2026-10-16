@@ -1,13 +1,15 @@
 import { writeFileSync } from "node:fs";
+import { APIError } from "@cartesia/cartesia-js";
 import { APICallError } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigError } from "../lib/env";
 import { UnreadablePageError } from "../lib/extract";
 import { FetchBlockedError } from "../lib/safe-fetch";
+import { concatPcm, toWav } from "../lib/wav";
 
 const generateScript = vi.fn();
 const fetchArticle = vi.fn();
-const createClient = vi.fn();
+const renderEpisode = vi.fn();
 
 vi.mock("../lib/script", async (importActual) => ({
   ...(await importActual<typeof import("../lib/script")>()),
@@ -19,15 +21,20 @@ vi.mock("../lib/extract", async (importActual) => ({
 }));
 vi.mock("../lib/tts", async (importActual) => ({
   ...(await importActual<typeof import("../lib/tts")>()),
-  createClient: (...args: unknown[]) => createClient(...args),
+  renderEpisode: (...args: unknown[]) => renderEpisode(...args),
 }));
 
 const { POST: postScript } = await import("../app/api/script/route");
 const { POST: postAudio } = await import("../app/api/audio/route");
 
 const SENTINEL = "sk-test-sentinel";
-const json = (body: unknown) =>
-  new Request("http://localhost/api", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+let ip = 0;
+const json = (body: unknown, from = `10.0.0.${++ip}`) =>
+  new Request("http://localhost/api", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-forwarded-for": from },
+    body: JSON.stringify(body),
+  });
 
 const script = {
   title: "Tides",
@@ -42,7 +49,11 @@ const script = {
 const savedEnv = { ...process.env };
 beforeEach(() => {
   process.env.ANTHROPIC_API_KEY = SENTINEL;
+  process.env.LLM_MODEL = "anthropic/claude-x";
+  delete process.env.AI_GATEWAY_API_KEY;
+  delete process.env.VERCEL;
   process.env.CARTESIA_API_KEY = SENTINEL;
+  process.env.TRUST_PROXY = "1";
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 afterEach(() => {
@@ -110,15 +121,10 @@ describe("POST /api/script", () => {
 });
 
 describe("POST /api/audio", () => {
-  function fakeClient() {
-    return {
-      tts: {
-        async generate(body: Record<string, unknown>) {
-          const n = String(body.transcript).length;
-          return new Response(new Uint8Array(n * 1200).fill(3));
-        },
-      },
-    };
+  function fakeRender(lines: { text: string }[]) {
+    const parts = lines.map((l) => new Uint8Array(l.text.length * 1200).fill(3));
+    const { pcm, starts, duration } = concatPcm(parts, lines.map(() => 0));
+    return { wav: toWav(pcm), starts, duration };
   }
 
   it("400 on a bad body", async () => {
@@ -132,7 +138,7 @@ describe("POST /api/audio", () => {
   });
 
   it("returns a WAV with length and line start headers", async () => {
-    createClient.mockReturnValue(fakeClient());
+    renderEpisode.mockImplementation(fakeRender);
     const res = await postAudio(json({ script }));
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("audio/wav");
@@ -146,22 +152,32 @@ describe("POST /api/audio", () => {
   });
 
   it("does not leak secrets from SDK errors", async () => {
-    createClient.mockReturnValue({
-      tts: { generate: async () => { throw Object.assign(new Error(`bad key ${SENTINEL}`), { status: 401 }); } },
-    });
+    renderEpisode.mockRejectedValue(new APIError(401, undefined, `bad key ${SENTINEL}`, new Headers()));
     const res = await postAudio(json({ script }));
     const text = await res.text();
     expect(res.status).toBe(502);
-    expect(text).toMatch(/line 1/);
+    expect(text).toMatch(/Cartesia request failed \(HTTP 401\)/);
     expect(text).not.toContain(SENTINEL);
   });
 
   it("names CARTESIA_API_KEY when it is missing", async () => {
-    createClient.mockImplementation(() => {
-      throw new ConfigError("Set CARTESIA_API_KEY in .env.local to record audio.");
-    });
+    renderEpisode.mockRejectedValue(new ConfigError("Set CARTESIA_API_KEY in .env.local to record audio."));
     const res = await postAudio(json({ script }));
     expect(res.status).toBe(500);
     expect((await res.json()).error).toMatch(/CARTESIA_API_KEY/);
+  });
+});
+
+describe("rate limits", () => {
+  it("returns 429 after too many requests from one address", async () => {
+    const statuses: number[] = [];
+    let last: Response | undefined;
+    for (let i = 0; i < 6; i++) {
+      last = await postAudio(json({}, "10.9.9.9"));
+      statuses.push(last.status);
+    }
+    expect(statuses.slice(0, 5).every((s) => s === 400)).toBe(true);
+    expect(statuses[5]).toBe(429);
+    expect(await last?.json()).toEqual({ error: "Too many requests. Try again in a minute." });
   });
 });

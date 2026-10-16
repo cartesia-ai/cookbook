@@ -19,6 +19,6 @@
     "baseUrl": ".",
     "paths": { "@/*": ["./*"] }
   },
-  "include": ["next-env.d.ts", "app", "components", "lib", "scripts", "tests", "mock", "vitest.config.ts", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
-  "exclude": ["node_modules", "byo-snippets"]
+  "include": ["next-env.d.ts", "app", "components", "lib", "scripts", "tests", "proxy.ts", "vitest.config.ts", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }

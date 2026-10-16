@@ -56,9 +56,7 @@ export async function listen(
       mic.stop();
       try {
         ws.send({ type: "close" });
-      } catch {
-        // already closed
-      }
+      } catch {}
     },
   };
 }

@@ -12,8 +12,8 @@ Timestamps come back on the streaming endpoints, server-sent events (`tts.genera
 
 ## Prerequisites
 
-- Node 22.13 or newer
-- `pnpm add @cartesia/cartesia-js`
+- Node 22.22 or newer
+- `npm install @cartesia/cartesia-js`
 - `CARTESIA_API_KEY` set in your shell. `CARTESIA_VOICE_ID` is optional; the script falls back to a public voice.
 
 ## The script
@@ -31,7 +31,7 @@ const stream = await client.tts.generateSSE({
   voice: process.env.CARTESIA_VOICE_ID ?? 'db6b0ed5-d5d3-463d-ae85-518a07d3c2b4',
   output_format: { container: 'raw', encoding: 'pcm_s16le', sample_rate: SAMPLE_RATE },
   add_timestamps: true,
-  use_normalized_timestamps: false, // keep "Dr." and "3:30" as written
+  use_normalized_timestamps: false,
 });
 
 const audio: Buffer[] = [];
@@ -55,11 +55,11 @@ await writeFile('speech.words.json', JSON.stringify(words, null, 2));
 console.table(words);
 ```
 
-Run it with `pnpm dlx tsx timestamps.mts`. Play the audio with `ffplay -f s16le -ar 44100 speech.pcm`.
+Run it with `npx tsx timestamps.mts`. Play the audio with `ffplay -f s16le -ar 44100 speech.pcm`.
 
 ## What do the timestamps look like?
 
-Each `timestamps` event carries a batch of words as three parallel arrays, `words`, `start` and `end`. A run on 2026-10-16 printed this (times rounded):
+Each `timestamps` event carries a batch of words as three parallel arrays, `words`, `start` and `end`. A run prints something like this (times rounded):
 
 | word | start | end |
 | --- | --- | --- |

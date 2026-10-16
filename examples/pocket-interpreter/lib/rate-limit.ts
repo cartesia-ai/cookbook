@@ -15,3 +15,17 @@ export function createRateLimiter(limit: number, windowMs: number, now: () => nu
     return true;
   };
 }
+
+export function clientIp(request: Request): string {
+  const forwarded = (request.headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (process.env.VERCEL) return forwarded[0] ?? "global";
+  if (process.env.TRUST_PROXY === "1") return forwarded[forwarded.length - 1] ?? "global";
+  return "global";
+}
+
+export function tooManyRequests(headers?: HeadersInit): Response {
+  return Response.json({ error: "Too many requests. Try again in a minute." }, { status: 429, headers });
+}

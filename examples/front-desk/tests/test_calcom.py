@@ -8,6 +8,7 @@ from front_desk.calendars import CalComCalendar, make_calendar
 from front_desk.config import settings
 from front_desk.store import Store
 
+
 def test_calcom_slots_and_booking_requests(monkeypatch):
     monkeypatch.setenv("CALCOM_API_KEY", "cal_test")
     monkeypatch.setenv("CALCOM_EVENT_TYPE_ID", "42")

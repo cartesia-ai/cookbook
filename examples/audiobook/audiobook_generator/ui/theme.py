@@ -1,10 +1,3 @@
-"""Gradio theme in the look of the cookbook kit: shadcn/ui-style neutral
-surfaces, Cartesia Verdant accents, Inter for all text, hairline borders.
-
-Token values are copied from packages/kit/theme.css (light and dark). Gradio
-themes only reach so far: colours, fonts, radii and spacing presets work, the
-kit's own components and icons do not.
-"""
 import os
 
 import gradio as gr

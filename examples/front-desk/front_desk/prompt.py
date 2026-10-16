@@ -1,17 +1,14 @@
-"""The receptionist's instructions and greeting.
-
-The speaking rules and the end-call guardrails follow the prompt in
-`examples/form_filler/main.py` from cartesia-ai/line (Apache-2.0). The section layout follows
-https://docs.cartesia.ai/agents/configuration: identity, speaking rules, objectives, guardrails.
-`{{system__time}}` and `{{system__caller_id}}` are Cartesia system variables, filled per call.
-"""
-
 from __future__ import annotations
 
 from .config import Settings
 
+
 def greeting(s: Settings) -> str:
-    return f"Hi, thanks for calling {s.business_name}. How can I help you today?"
+    return (
+        f"Hi, thanks for calling {s.business_name}. I'm an AI assistant, and this call may be recorded. "
+        "How can I help you today?"
+    )
+
 
 def instructions(s: Settings) -> str:
     transfer = (
@@ -25,6 +22,7 @@ def instructions(s: Settings) -> str:
     return f"""# Identity
 You are the receptionist for {s.business_name}. You answer the phone, book appointments, take
 messages, and pass callers to a person when they need one. You are warm, quick and clear.
+You are an AI assistant. If a caller asks whether you are a person or a bot, say you are an AI assistant.
 
 # Business facts
 - Services: {s.services}.

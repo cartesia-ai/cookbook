@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
+import { createRateLimiter } from "@/lib/rate-limit";
 import { createTranslateRoute } from "@/lib/translate-route";
 
 function streaming(parts: string[]) {
@@ -25,8 +26,16 @@ function streaming(parts: string[]) {
   });
 }
 
-const post = (route: ReturnType<typeof createTranslateRoute>, body: unknown) =>
-  route(new Request("http://localhost/api/translate", { method: "POST", body: JSON.stringify(body) }));
+const post = (route: ReturnType<typeof createTranslateRoute>, body: unknown, ip = "1.2.3.4") =>
+  route(
+    new Request("http://localhost/api/translate", {
+      method: "POST",
+      headers: { "x-forwarded-for": ip },
+      body: JSON.stringify(body),
+    }),
+  );
+
+afterEach(() => vi.unstubAllEnvs());
 
 describe("POST /api/translate", () => {
   it("streams the language line and the translation", async () => {
@@ -63,5 +72,19 @@ describe("POST /api/translate", () => {
     const res = await post(route, { text: "hola", pair: ["en", "es"] });
     expect(res.status).toBe(503);
     expect((await res.json()).error).toBe("Translation is not set up. Set LLM_MODEL and its key.");
+  });
+
+  it("rate limits each client before calling the model", async () => {
+    vi.stubEnv("TRUST_PROXY", "1");
+    const model = streaming(["es\n", "hola"]);
+    const route = createTranslateRoute(() => model, createRateLimiter(1, 60_000));
+    const ok = await post(route, { text: "hi", pair: ["en", "es"] });
+    expect(ok.status).toBe(200);
+    expect(await ok.text()).toBe("es\nhola");
+    const res = await post(route, { text: "hi", pair: ["en", "es"] });
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe("Too many requests. Try again in a minute.");
+    expect(model.doStreamCalls).toHaveLength(1);
+    expect((await post(route, { text: "hi", pair: ["en", "es"] }, "5.6.7.8")).status).toBe(200);
   });
 });

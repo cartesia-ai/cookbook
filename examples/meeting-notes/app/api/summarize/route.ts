@@ -2,12 +2,16 @@ import { generateText, NoObjectGeneratedError, NoOutputGeneratedError, Output } 
 import { getModel, LlmConfigError } from "@/lib/llm";
 import { MAX_TRANSCRIPT_CHARS } from "@/lib/limits";
 import { NOTES_INSTRUCTIONS } from "@/lib/prompt";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
 import { MeetingNotesSchema } from "@/lib/schema";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+const allow = createRateLimiter(10, 60_000);
+
 export async function POST(req: Request) {
+  if (!allow(clientIp(req))) return tooManyRequests();
   const body = await req.json().catch(() => null);
   const transcript = typeof body?.transcript === "string" ? body.transcript.trim() : "";
   if (!transcript) {

@@ -13,8 +13,8 @@ The full app is in [`examples/article-to-podcast`](../../../examples/article-to-
 ## Prerequisites
 
 - A Next.js App Router app
-- `pnpm add @cartesia/cartesia-js ai zod @mozilla/readability jsdom`, plus a provider package such as `@ai-sdk/anthropic`
-- `CARTESIA_API_KEY` and one language model key in `.env.local`. See the example's `.env.example`.
+- `npm install @cartesia/cartesia-js ai zod @mozilla/readability jsdom`, plus a provider package such as `@ai-sdk/anthropic`
+- `CARTESIA_API_KEY`, `LLM_MODEL` as `provider/model` and the matching model key in `.env.local`. See the example's `.env.example`.
 
 ## How it fits together
 
@@ -71,18 +71,12 @@ The system prompt asks for plain spoken prose and treats the article as untruste
 Call `client.tts.generate` once per line, with the voice for that speaker.
 
 ```ts filename="lib/tts.ts"
-export async function renderLine(
-  client: TtsClient,
-  line: ScriptLine,
-  o: Pick<Options, "outputLanguage">,
-  voices: Record<Speaker, string>,
-  signal?: AbortSignal,
-): Promise<Uint8Array> {
+async function speakLine(client: Cartesia, text: string, voiceId: string, o: Pick<Options, "outputLanguage">, signal?: AbortSignal) {
   const res = await client.tts.generate(
     {
       model_id: TTS_MODEL,
-      transcript: line.text,
-      voice: { mode: "id", id: voices[line.speaker] },
+      transcript: text,
+      voice: { mode: "id", id: voiceId },
       language: languageCode(o),
       output_format: { container: "raw", encoding: "pcm_s16le", sample_rate: SAMPLE_RATE },
     },
@@ -90,9 +84,26 @@ export async function renderLine(
   );
   return new Uint8Array(await res.arrayBuffer());
 }
+
+export const LINES_AT_ONCE = 4;
+const GAP_SPEAKER_CHANGE_MS = 350;
+const GAP_SAME_SPEAKER_MS = 180;
+
+export async function renderEpisode(lines: ScriptLine[], o: Pick<Options, "outputLanguage">, signal?: AbortSignal): Promise<Episode> {
+  const client = new Cartesia({ apiKey: cartesiaApiKey(), maxRetries: 2, timeout: 60_000 });
+  const voices = voiceIds();
+  const parts: Uint8Array[] = [];
+  for (let i = 0; i < lines.length; i += LINES_AT_ONCE) {
+    const batch = lines.slice(i, i + LINES_AT_ONCE);
+    parts.push(...(await Promise.all(batch.map((line) => speakLine(client, line.text, voices[line.speaker], o, signal)))));
+  }
+  const gaps = lines.map((l, i) => (i === 0 ? 0 : l.speaker !== lines[i - 1].speaker ? GAP_SPEAKER_CHANGE_MS : GAP_SAME_SPEAKER_MS));
+  const { pcm, starts, duration } = concatPcm(parts, gaps);
+  return { wav: toWav(pcm), starts, duration };
+}
 ```
 
-The example runs four calls at a time and keeps the results in order. If one line fails, the whole episode fails and the error names the line.
+Lines are recorded four at a time, in batches, and `Promise.all` keeps them in order. If one line fails, the whole episode fails.
 
 ### Why raw PCM
 
@@ -154,13 +165,17 @@ The audio route returns the WAV in 64 KB chunks with `Content-Length` and an `X-
 
 ## Swap the model provider
 
-`lib/model.ts` returns an AI SDK model. The example picks the AI Gateway, Anthropic or OpenAI from the keys you set. To use another provider, return its model from `getModel`.
+`lib/model.ts` turns `LLM_MODEL` into an AI SDK model. An `openai/` or `anthropic/` id uses that provider directly when its key is set. Any other id goes through the Vercel AI Gateway, so `google/<model id>` with `AI_GATEWAY_API_KEY` needs no code change. To call another provider directly, return its model from `getModel`.
 
 ## Deploying
 
 - Both routes set `maxDuration = 300`. A long episode can take one to two minutes, so check your plan allows it.
-- A five minute episode is about 14 MB as WAV. Vercel limits non-streamed responses to 4.5 MB, and the route streams the body, but this has not been tested on a deployment. If it fails, switch to mp3 or store the file and return a link.
+- A five minute episode is about 14 MB as WAV. Vercel limits non-streamed responses to 4.5 MB, so the route streams the body.
 - The routes have no auth and no rate limiting, and they spend money. Add both before the app is public.
+
+## Limits
+
+The streamed WAV response has not been tried on a Vercel deployment. If a long episode fails there, switch to mp3 or store the file and return a link.
 
 ## Next steps
 

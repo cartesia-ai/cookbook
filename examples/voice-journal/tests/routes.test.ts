@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const transcribe = vi.fn();
 const generate = vi.fn();
@@ -25,6 +25,7 @@ const { POST: speakRoute } = await import("@/app/api/speak+api");
 const post = (body: unknown) => new Request("http://x/api", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 beforeEach(() => vi.clearAllMocks());
+afterEach(() => vi.unstubAllEnvs());
 
 describe("/api/transcribe", () => {
   it("sends the file to ink-whisper and trims the text", async () => {
@@ -93,5 +94,31 @@ describe("/api/speak", () => {
 
   it("rejects a bad voice id", async () => {
     expect((await speakRoute(post({ text: "Hello", voiceId: "../x" }))).status).toBe(400);
+  });
+});
+
+describe("limits", () => {
+  it("rejects audio over the 4 MB hosted body limit", async () => {
+    const form = new FormData();
+    form.append("file", new Blob([new Uint8Array(4 * 1024 * 1024 + 1)], { type: "audio/webm" }), "entry.webm");
+    const res = await transcribeRoute(new Request("http://x/api/transcribe", { method: "POST", body: form }));
+    expect(res.status).toBe(413);
+    expect(transcribe).not.toHaveBeenCalled();
+  });
+
+  it("rate limits each client before calling the model", async () => {
+    vi.stubEnv("TRUST_PROXY", "1");
+    const from = (ip: string) =>
+      new Request("http://x/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": ip },
+        body: JSON.stringify({ transcript: " " }),
+      });
+    for (let i = 0; i < 10; i++) expect((await analyzeRoute(from("9.9.9.9"))).status).toBe(400);
+    const res = await analyzeRoute(from("9.9.9.9"));
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe("Too many requests. Try again in a minute.");
+    expect((await analyzeRoute(from("9.9.9.8"))).status).toBe(400);
+    expect(generateText).not.toHaveBeenCalled();
   });
 });

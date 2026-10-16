@@ -8,12 +8,12 @@ tags: ['next', 'tts', 'timestamps', 'stt']
 
 This recipe reads a scene aloud in the browser with Cartesia Sonic 3.6 (`sonic-3.6`). The narrator and each character get their own voice and their own emotion, the word being spoken lights up on screen, and when the scene ends the listener says what happens next. Cartesia Ink 2 (`ink-2`) turns that answer into text, and a small matcher picks one of the two choices.
 
-The code comes from a bedtime story app, [examples/story-time](../../../examples/story-time/README.md), which also writes the scenes with an LLM, checks them for kid safety and saves the narration in IndexedDB for replay. This page covers the voice and timing parts.
+Where the scene text comes from is up to you. A fixed script works, and so do lines an LLM writes as JSON. This page covers the voice and timing parts.
 
 ## Prerequisites
 
 - A Next.js App Router app
-- `pnpm add @cartesia/cartesia-js` (the template uses `^4.2.0`, which sends `Cartesia-Version: 2026-08-14`)
+- `npm install @cartesia/cartesia-js` (this code uses `^4.2.0`, which sends `Cartesia-Version: 2026-08-14`)
 - `CARTESIA_API_KEY` in `.env.local`
 - A scene as an array of lines, each with a `speaker`, an `emotion` and a `text`
 
@@ -67,7 +67,7 @@ The [browser auth guide](../00-guides/01-browser-auth-with-access-tokens.mdx) co
 
 ## How do I give each character a different voice?
 
-Every new speaker gets the next voice from a pool, and the narrator keeps the voice picked on the setup screen. `lib/cast.ts` stores that mapping on the story, so a character sounds the same in every scene.
+Every new speaker gets the next voice from a pool, and the narrator keeps the voice picked on the setup screen. Store that mapping with the story, so a character sounds the same in every scene.
 
 ```ts filename="lib/cast.ts"
 export function castVoices(cast: Record<string, VoiceKey>, narrator: VoiceKey, lines: Line[]): Record<string, VoiceKey> {
@@ -89,68 +89,65 @@ export function voiceFor(speaker: string, cast: Record<string, VoiceKey>, narrat
 }
 ```
 
-`VOICES` in `lib/story.ts` holds seven voice ids from the Cartesia voice library, the ones the docs list as having the widest emotional range.
+`VOICES` holds voice ids from the Cartesia voice library. Pick the ones the docs list as having the widest emotional range.
 
 ## Voice each line in its own context
 
-The scene uses one Sonic WebSocket. Each line gets its own context on that socket, with the speaker's voice, the line's emotion, and `add_timestamps: true` so Sonic sends word timings along with the audio. Contexts on one connection are independent, so the narrator and a character can take turns without reconnecting.
+The scene uses one Sonic WebSocket, opened with `const ws = await client.tts.websocket()`. Each line gets its own context on that socket, with the speaker's voice, the line's emotion, and `add_timestamps: true` so Sonic sends word timings along with the audio. Contexts on one connection are independent, so the narrator and a character can take turns without reconnecting.
 
 ```ts filename="lib/narrate.ts"
-    const ws = await client.tts.websocket();
-    // ...
-      for (const [i, line] of lines.entries()) {
-        if (isStopped) return null;
-        const c = ws.context({
-          model_id: "sonic-3.6",
-          voice: { mode: "id", id: voiceOf(line.speaker) },
-          output_format: { container: "raw", encoding: "pcm_f32le", sample_rate: SAMPLE_RATE },
-          language: "en",
-          add_timestamps: true,
-          use_normalized_timestamps: false,
-        });
-        cancel = () => c.cancel();
-        await c.push({
-          transcript: spokenText(line.text),
-          ...(line.emotion === "neutral" ? {} : { generation_config: { emotion: line.emotion } }),
-        });
-        await c.no_more_inputs();
+for (const [i, line] of lines.entries()) {
+  if (isStopped) return null;
+  const c = ws.context({
+    model_id: "sonic-3.6",
+    voice: { mode: "id", id: voiceOf(line.speaker) },
+    output_format: { container: "raw", encoding: "pcm_f32le", sample_rate: SAMPLE_RATE },
+    language: "en",
+    add_timestamps: true,
+    use_normalized_timestamps: false,
+  });
+  cancel = () => c.cancel();
+  await c.push({
+    transcript: spokenText(line.text),
+    ...(line.emotion === "neutral" ? {} : { generation_config: { emotion: line.emotion } }),
+  });
+  await c.no_more_inputs();
 
-        const words: WordTiming[] = [];
-        timeline.words[i] = words;
-        meta.push({ offset: length / SAMPLE_RATE, words });
-        let started = false;
-        for await (const ev of c.receive()) {
-          if (ev.type === "chunk" && ev.audio?.byteLength) {
-            const samples = new Float32Array(ev.audio.slice().buffer);
-            if (!started) {
-              timeline.lineStarts[i] = Math.max(out.next, ctx.currentTime);
-              started = true;
-            }
-            out.play(samples);
-            pcm.push(samples);
-            length += samples.length;
-          } else if (ev.type === "timestamps" && ev.word_timestamps) {
-            const w = ev.word_timestamps;
-            w.words.forEach((word, k) => words.push({ word, start: w.start[k] ?? 0, end: w.end[k] ?? 0 }));
-          } else if (ev.type === "error") {
-            throw new Error(ev.message ?? ev.title ?? "Sonic returned an error");
-          }
-        }
-        // ...
-        out.skip(GAP_SECONDS);
+  const words: WordTiming[] = [];
+  timeline.words[i] = words;
+  meta.push({ offset: length / SAMPLE_RATE, words });
+  let started = false;
+  for await (const ev of c.receive()) {
+    if (ev.type === "chunk" && ev.audio?.byteLength) {
+      const samples = new Float32Array(ev.audio.slice().buffer);
+      if (!started) {
+        timeline.lineStarts[i] = Math.max(out.next, ctx.currentTime);
+        started = true;
       }
+      out.play(samples);
+      pcm.push(samples);
+      length += samples.length;
+    } else if (ev.type === "timestamps" && ev.word_timestamps) {
+      const w = ev.word_timestamps;
+      w.words.forEach((word, k) => words.push({ word, start: w.start[k] ?? 0, end: w.end[k] ?? 0 }));
+    } else if (ev.type === "error") {
+      throw new Error(ev.message ?? ev.title ?? "Sonic returned an error");
+    }
+  }
+  out.skip(GAP_SECONDS);
+}
 ```
 
 A few choices in this loop matter:
 
-- Lines run one after another, not all at once. Sonic generates faster than the audio plays, so line two is ready before line one finishes. The template's notes say that opening a context for every line at the same time can hit concurrency limits.
-- A new context per line is also how the emotion changes. The Cartesia docs advise a separate context when the emotion changes. `generation_config.emotion` is in beta, works in English only, and works best when it matches the words, so the scene prompt asks the LLM for that.
+- Lines run one after another, not all at once. Sonic generates faster than the audio plays, so line two is ready before line one finishes. Opening a context for every line at the same time can hit concurrency limits.
+- A new context per line is also how the emotion changes. The Cartesia docs advise a separate context when the emotion changes. `generation_config.emotion` is in beta, works in English only, and works best when it matches the words, so write lines whose words carry the emotion.
 - `pcm_f32le` at 24 kHz is already Float32, so each chunk goes into an `AudioBuffer` without conversion. `out.play` schedules it right where the last chunk ends on the `AudioContext` clock, and `out.skip` leaves a 0.35 second pause between lines.
 - `timeline.lineStarts[i]` records the clock time of the line's first chunk. Sonic's word times count from the start of the line's audio, so that start time is all the page needs to line them up.
 
 ## What do Sonic's word timestamps look like?
 
-This loop was run from Node against the live API on 2026-10-16 with a token-based client, two lines and two voices (Marian for the narrator, Maya for Mia). Both lines came back in about 0.6 seconds total. The narrator's line produced these timings, in seconds from the start of the line:
+With two lines and two voices (Marian for the narrator, Maya for Mia), the narrator's line produced these timings, in seconds from the start of the line:
 
 ```json
 [
@@ -164,7 +161,7 @@ This loop was run from Node against the live API on 2026-10-16 with a token-base
 ]
 ```
 
-Punctuation stays on the word. The template sets `use_normalized_timestamps: false` so the words follow the text it sent. Sonic also returns `[laughter]` as a timestamped word when the text has one, which the next step skips.
+Punctuation stays on the word. The code sets `use_normalized_timestamps: false` so the words follow the text it sent. Sonic also returns `[laughter]` as a timestamped word when the text has one, which the next step skips.
 
 ## Highlight the word being spoken
 
@@ -225,7 +222,7 @@ export function activeToken(starts: number[], tokenOf: number[], t: number): num
 }
 ```
 
-The same timeline drives replay. The template saves the joined PCM and each line's offset and words, and `replay()` in `lib/narrate.ts` rebuilds `lineStarts` from those offsets. A saved scene plays with the highlight and makes no API calls.
+The same timeline drives replay. Save the joined PCM and each line's offset and words, and rebuild `lineStarts` from those offsets when you play it back. A saved scene then plays with the highlight and makes no API calls.
 
 ## Hear the spoken choice with Ink 2
 
@@ -287,11 +284,10 @@ The player tries to match on `turn.eager_end`, before the end-of-turn silence ha
 ## Limits
 
 - The routes have no auth. Anyone with the URL can spend your credits, and the token route's in-memory rate limit only slows casual abuse. Put the app behind your own login before you deploy.
-- Emotion control is English only. For another language, set `language` in `lib/narrate.ts` and `lib/listen.ts` and drop `generation_config.emotion`.
-- The live test above covered the Sonic loop from Node with a token client. The microphone path and the read-along UI were not part of it.
+- Emotion control is English only. For another language, change `language` in the Sonic context and the Ink 2 socket, and drop `generation_config.emotion`.
+- The Sonic loop was run from Node with a token client. The microphone path and the read-along UI were not tested against the live API.
 
 ## Next steps
 
-- Run the full app, with LLM-written scenes, kid-safety checks and a story library: [examples/story-time](../../../examples/story-time/README.md).
 - Stream speech in a Next.js page with less setup: [Stream text to speech in Next.js](./01-stream-speech.mdx).
 - Read more on tokens: [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).

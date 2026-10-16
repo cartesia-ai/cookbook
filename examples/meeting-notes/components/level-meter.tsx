@@ -5,14 +5,21 @@ import { cn } from "@/lib/utils";
 
 const BARS = 32;
 
-export function LevelMeter({ stream, className }: { stream: MediaStream | null; className?: string }) {
+export function LevelMeter({
+  stream,
+  audioContext,
+  className,
+}: {
+  stream: MediaStream | null;
+  audioContext: AudioContext | null;
+  className?: string;
+}) {
   const bars = useRef<(HTMLSpanElement | null)[]>([]);
 
   useEffect(() => {
-    if (!stream || typeof AudioContext === "undefined") return;
-    const ctx = new AudioContext();
-    const source = ctx.createMediaStreamSource(stream);
-    const analyser = ctx.createAnalyser();
+    if (!stream || !audioContext) return;
+    const source = audioContext.createMediaStreamSource(stream);
+    const analyser = audioContext.createAnalyser();
     analyser.fftSize = 512;
     source.connect(analyser);
     const data = new Uint8Array(analyser.fftSize);
@@ -40,9 +47,8 @@ export function LevelMeter({ stream, className }: { stream: MediaStream | null; 
     return () => {
       cancelAnimationFrame(frame);
       source.disconnect();
-      void ctx.close();
     };
-  }, [stream]);
+  }, [stream, audioContext]);
 
   return (
     <div className={cn("flex h-6 items-center gap-[3px]", className)} aria-hidden>

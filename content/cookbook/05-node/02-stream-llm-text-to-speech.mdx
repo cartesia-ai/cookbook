@@ -12,8 +12,8 @@ This script asks an LLM a question, streams the tokens into Sonic and writes the
 
 ## Prerequisites
 
-- Node 22.13 or newer
-- `pnpm add @cartesia/cartesia-js ws ai @ai-sdk/openai`. The SDK uses the `ws` package for WebSockets in Node. Browsers use their built-in WebSocket.
+- Node 22.22 or newer
+- `npm install @cartesia/cartesia-js ws ai @ai-sdk/openai`. The SDK uses the `ws` package for WebSockets in Node. Browsers use their built-in WebSocket.
 - `CARTESIA_API_KEY` and `OPENAI_API_KEY` set in your shell. `CARTESIA_VOICE_ID` is optional; the script falls back to a public voice. Any AI SDK provider works in place of OpenAI.
 
 ## The script
@@ -86,7 +86,7 @@ function wavHeader(dataLength: number): Buffer {
 }
 ```
 
-Run it with `pnpm dlx tsx speak-llm.mts`. On 2026-10-16 it printed `First audio after 948 ms` for a 15 second answer. That number includes the LLM's time to first token.
+Run it with `npx tsx speak-llm.mts`. The script prints the time to first audio, which includes the LLM's time to first token. Yours depends on your region and the model.
 
 ## How do continuations work?
 
@@ -111,7 +111,7 @@ Call `await ctx.cancel()`. Sonic stops generating for that context, and `receive
 
 ## Play it instead of saving it
 
-The script collects 16-bit PCM because a WAV file needs it. To play audio as it arrives in a browser, ask for `pcm_f32le` and copy each chunk into a Web Audio `AudioBuffer`, scheduled right after the previous one. [Stream text to speech in Next.js](../01-next/01-stream-speech.mdx) shows the scheduling, and the `byo-snippets/speak.ts` file in [examples/voice-chat](../../../examples/voice-chat/README.md) does it over a WebSocket context with barge-in. In a browser, build the client with `new Cartesia({ token })` from a server-minted token. See [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
+The script collects 16-bit PCM because a WAV file needs it. To play audio as it arrives in a browser, ask for `pcm_f32le` and copy each chunk into a Web Audio `AudioBuffer`, scheduled right after the previous one. [Stream text to speech in Next.js](../01-next/01-stream-speech.mdx) shows the scheduling, and the own-LLM section of [Build a browser voice chat](../15-agents/02-voice-chat.mdx) does it over a WebSocket context with barge-in. In a browser, build the client with `new Cartesia({ token })` from a server-minted token. See [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
 
 ## Next steps
 

@@ -77,7 +77,6 @@ export function toPlainText(md: string): string {
     .replace(/^```$/gm, '')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/[*`]+/g, '')
-    // _emphasis_ only; snake_case names keep their underscores.
     .replace(/(^|[^\w])_([^_\n]+)_(?![\w])/g, '$1$2')
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^\s*>\s?/gm, '')

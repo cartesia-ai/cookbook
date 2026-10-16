@@ -51,8 +51,13 @@ export function isSamePage(url: string, loc: { href: string; pathname: string } 
   }
 }
 
-export function sourceHref(s: Source, base: string = location.href): string {
-  const u = new URL(s.url, base);
-  if (s.anchor) u.hash = s.anchor;
-  return u.toString();
+export function sourceHref(s: Source, base: string = location.href): string | null {
+  try {
+    const u = new URL(s.url, base);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    if (s.anchor) u.hash = s.anchor;
+    return u.toString();
+  } catch {
+    return null;
+  }
 }

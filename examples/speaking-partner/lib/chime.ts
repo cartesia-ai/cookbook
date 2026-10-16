@@ -19,6 +19,6 @@ export function playChime(kind: "start" | "finish"): void {
     osc.stop(t0 + notes.length * 0.14 + 0.05);
     osc.onended = () => void ctx.close();
   } catch {
-    // a missing chime must never break the session
+    return;
   }
 }

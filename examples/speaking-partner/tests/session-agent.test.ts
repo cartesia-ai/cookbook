@@ -10,6 +10,12 @@ import {
   pickVoiceId,
   resetToolCache,
   resetVoiceCache,
+  countClientSessions,
+  countLiveSessions,
+  forgetSession,
+  listSessionAgents,
+  rememberClientSession,
+  resetClientSessions,
   STALE_AFTER_MS,
   sweepStaleAgents,
 } from "../lib/session-agent";
@@ -45,6 +51,7 @@ function fakeApi({ voices, ...over }: Partial<Omit<AgentsApi, "voices">> & { voi
 beforeEach(() => {
   resetToolCache();
   resetVoiceCache();
+  resetClientSessions();
 });
 
 describe("voice choice", () => {
@@ -67,6 +74,12 @@ describe("voice choice", () => {
     expect(await pickVoiceId(api, "fr", {})).toBe("v-fr");
     expect(await pickVoiceId(api, "fr", {})).toBe("v-fr");
     expect(calls.voiceListings).toBe(1);
+  });
+
+  it("reads only the first page of voices", async () => {
+    const many = Array.from({ length: 150 }, (_, i) => v(`v-${i}`, `Voice ${i}`, i < 100 ? "en-US" : "fr-FR"));
+    const { api } = fakeApi({ voices: many });
+    await expect(pickVoiceId(api, "fr", {})).rejects.toThrow(/VOICE_ID_FR/);
   });
 
   it("says which variable to set when a language has no voice", async () => {
@@ -158,21 +171,72 @@ describe("deleteSessionAgent", () => {
   });
 });
 
-describe("sweepStaleAgents", () => {
-  it("removes only old agents with our prefix", async () => {
-    const now = Date.parse("2026-10-14T12:00:00Z");
-    const old = new Date(now - STALE_AFTER_MS - 1000).toISOString();
-    const fresh = new Date(now - 60_000).toISOString();
-    const { api, calls } = fakeApi({
-      get: (async () => ({
-        data: [
-          { id: "agent_old", name: `${AGENT_NAME_PREFIX}fr-1`, created_at: old },
-          { id: "agent_fresh", name: `${AGENT_NAME_PREFIX}fr-2`, created_at: fresh },
-          { id: "agent_other", name: "Someone else's agent", created_at: old },
-        ],
-      })) as never,
+describe("listing and sweeping session agents", () => {
+  const now = Date.parse("2026-10-14T12:00:00Z");
+  const old = new Date(now - STALE_AFTER_MS - 1000).toISOString();
+  const fresh = new Date(now - 60_000).toISOString();
+
+  it("reads one list call and keeps only our agents", async () => {
+    const queries: unknown[] = [];
+    const { api } = fakeApi({
+      get: (async (_path: string, query?: unknown) => {
+        queries.push(query);
+        return {
+          summaries: [
+            { id: "agent_a", name: `${AGENT_NAME_PREFIX}fr-1`, created_at: fresh },
+            { id: "agent_b", name: "other", created_at: fresh },
+            { id: "agent_c", name: `${AGENT_NAME_PREFIX}fr-2`, created_at: old },
+          ],
+        };
+      }) as never,
     });
-    expect(await sweepStaleAgents(api, now)).toBe(1);
+    const ours = await listSessionAgents(api);
+    expect(queries).toEqual([undefined]);
+    expect(ours.map((a) => a.id)).toEqual(["agent_a", "agent_c"]);
+    expect(countLiveSessions(ours, now)).toBe(1);
+  });
+
+  it("treats an agent with no created_at as stale", async () => {
+    const { api, calls } = fakeApi();
+    const agents = [{ id: "agent_nodate", name: `${AGENT_NAME_PREFIX}fr-1` }];
+    expect(countLiveSessions(agents, now)).toBe(0);
+    expect(await sweepStaleAgents(api, agents, now)).toBe(1);
+    expect(calls.delete).toEqual(["/v1/agents/agent_nodate"]);
+  });
+
+  it("removes only old agents with our prefix", async () => {
+    const { api, calls } = fakeApi();
+    const agents = [
+      { id: "agent_old", name: `${AGENT_NAME_PREFIX}fr-1`, created_at: old },
+      { id: "agent_fresh", name: `${AGENT_NAME_PREFIX}fr-2`, created_at: fresh },
+      { id: "agent_other", name: "Someone else's agent", created_at: old },
+    ];
+    expect(await sweepStaleAgents(api, agents, now)).toBe(1);
     expect(calls.delete).toEqual(["/v1/agents/agent_old"]);
+  });
+});
+
+describe("per-client session count", () => {
+  const now = Date.parse("2026-10-14T12:00:00Z");
+  const fresh = new Date(now - 60_000).toISOString();
+  const old = new Date(now - STALE_AFTER_MS - 1000).toISOString();
+  const row = (id: string, created_at = fresh) => ({ id, name: `${AGENT_NAME_PREFIX}fr-${id}`, created_at });
+
+  it("counts the live agents a client created", () => {
+    rememberClientSession("1.1.1.1", "agent_a");
+    rememberClientSession("1.1.1.1", "agent_b");
+    rememberClientSession("2.2.2.2", "agent_c");
+    const live = [row("agent_a"), row("agent_b"), row("agent_c")];
+    expect(countClientSessions("1.1.1.1", live, now)).toBe(2);
+    expect(countClientSessions("2.2.2.2", live, now)).toBe(1);
+    expect(countClientSessions("3.3.3.3", live, now)).toBe(0);
+  });
+
+  it("drops agents that ended, went stale, or are gone from the list", () => {
+    rememberClientSession("1.1.1.1", "agent_a");
+    rememberClientSession("1.1.1.1", "agent_b");
+    rememberClientSession("1.1.1.1", "agent_c");
+    forgetSession("agent_a");
+    expect(countClientSessions("1.1.1.1", [row("agent_a"), row("agent_b", old)], now)).toBe(0);
   });
 });

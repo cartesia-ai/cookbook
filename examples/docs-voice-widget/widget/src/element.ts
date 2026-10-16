@@ -269,7 +269,8 @@ export class DocsAgentElement extends HTMLElement {
         blend: dark ? 'normal' : 'multiply',
       });
     } else if (!fromAgent) {
-      location.href = sourceHref(source);
+      const href = sourceHref(source);
+      if (href) location.href = href;
     }
     this.render();
   }
@@ -312,7 +313,8 @@ export class DocsAgentElement extends HTMLElement {
         if (!c) return;
         e.preventDefault();
         if (!isSamePage(c.source.url) && this.client) {
-          window.open(sourceHref(c.source), '_blank', 'noopener');
+          const href = sourceHref(c.source);
+          if (href) window.open(href, '_blank', 'noopener');
           return;
         }
         this.cite(c.id, c.source, false);
@@ -353,7 +355,7 @@ export class DocsAgentElement extends HTMLElement {
     this.$('.chips')!.innerHTML = this.cited
       .map(
         ({ id, source }) =>
-          `<a class="chip${id === this.activeCite ? ' on' : ''}" href="${esc(sourceHref(source))}" data-cite="${esc(id)}" title="${esc(source.title)}">${ICONS.file}<span>${esc(source.heading || source.title)}</span></a>`,
+          `<a class="chip${id === this.activeCite ? ' on' : ''}" href="${esc(sourceHref(source) ?? '#')}" data-cite="${esc(id)}" title="${esc(source.title)}">${ICONS.file}<span>${esc(source.heading || source.title)}</span></a>`,
       )
       .join('');
 

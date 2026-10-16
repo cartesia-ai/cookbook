@@ -1,4 +1,3 @@
-"""A stand-in for cartesia.Cartesia that records requests and returns canned SSE events."""
 from types import SimpleNamespace
 
 SAMPLE_RATE = 44100

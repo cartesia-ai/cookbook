@@ -24,9 +24,9 @@ export function SetupNotice() {
             </li>
           </ol>
         </FormSection>
-        <FormSection title="Written corrections" description="Optional. Set one of these to check each line you say.">
+        <FormSection title="Written corrections" description="Optional. Set these to check each line you say.">
           <p className="text-sm text-muted-foreground">
-            <Code>ANTHROPIC_API_KEY</Code> or <Code>OPENAI_API_KEY</Code>
+            <Code>LLM_MODEL</Code> as provider/model, for example <Code>openai/gpt-5.4-mini</Code>, plus <Code>OPENAI_API_KEY</Code> or <Code>ANTHROPIC_API_KEY</Code> to match
           </p>
         </FormSection>
       </FormPanel>

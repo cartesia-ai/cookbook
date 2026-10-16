@@ -1,4 +1,3 @@
-"""Word timestamps for read-along: a JSON file and a WebVTT file next to each chapter."""
 import json
 import os
 from typing import Dict, List
@@ -18,7 +17,6 @@ def vtt_time(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
 
 def group_cues(words: List[dict], words_per_cue: int = WORDS_PER_CUE) -> List[dict]:
-    """Group words into cues of about words_per_cue words, ending early at a sentence end."""
     cues, current = [], []
     for word in words:
         current.append(word)

@@ -1,19 +1,3 @@
-"""Create or update the receptionist agent, its four tools and its call webhook.
-
-    uv run scripts/setup_agent.py             create, or update what already exists
-    uv run scripts/setup_agent.py --dry-run   print the requests, no key or network needed
-    uv run scripts/setup_agent.py --delete    delete the agent, its tools and its webhook
-
-Safe to run again after you change `.env` or `front_desk/prompt.py`: it reads
-CARTESIA_AGENT_ID from `.env`, updates that agent and the tools attached to it, and only
-creates what is missing. IDs and generated secrets are written back to `.env`.
-
-Tool mode follows PUBLIC_BASE_URL. With it set, the tools are webhook tools that Cartesia
-calls at PUBLIC_BASE_URL/tools/<name>, and the call webhook points at
-PUBLIC_BASE_URL/webhooks/cartesia. Without it, the tools are client tools that only the
-"Try it in the browser" page can run, and there is no call webhook.
-"""
-
 from __future__ import annotations
 
 import json
@@ -32,6 +16,7 @@ from front_desk.tools import TOOL_SPECS, WEBHOOK_CONTEXT  # noqa: E402
 
 ENV_PATH = ROOT / ".env"
 AGENT_NAME_PREFIX = "Front desk"
+
 
 def tool_body(spec: dict[str, Any], s: Settings, tool_secret: str) -> dict[str, Any]:
     common = {
@@ -62,6 +47,7 @@ def tool_body(spec: dict[str, Any], s: Settings, tool_secret: str) -> dict[str, 
         },
         "assignments": [],
     }
+
 
 def agent_body(s: Settings, tool_ids: list[str]) -> dict[str, Any]:
     transfer: dict[str, Any] | None = None
@@ -98,6 +84,7 @@ def agent_body(s: Settings, tool_ids: list[str]) -> dict[str, Any]:
         },
     }
 
+
 def upsert_env(path: Path, key: str, value: str) -> None:
     lines = path.read_text().splitlines() if path.exists() else []
     pattern = re.compile(rf"^\s*{re.escape(key)}\s*=")
@@ -110,6 +97,7 @@ def upsert_env(path: Path, key: str, value: str) -> None:
     path.write_text("\n".join(lines) + "\n")
     path.chmod(0o600)
 
+
 def existing_agent(api: Cartesia, agent_id: str) -> dict[str, Any] | None:
     if not agent_id:
         return None
@@ -121,10 +109,10 @@ def existing_agent(api: Cartesia, agent_id: str) -> dict[str, Any] | None:
             return None
         raise
 
+
 def sync_tools(
     api: Cartesia, s: Settings, agent: dict[str, Any] | None, tool_secret: str
 ) -> tuple[list[str], list[str]]:
-    """Returns (tool ids to attach, old tool ids to delete after the agent no longer uses them)."""
     current: dict[str, dict[str, Any]] = {}
     for ref in ((agent or {}).get("config") or {}).get("tools") or []:
         try:
@@ -152,6 +140,7 @@ def sync_tools(
     retire.extend(t["id"] for t in current.values())
     return keep, retire
 
+
 def sync_webhook(api: Cartesia, s: Settings, env_webhook_id: str) -> str | None:
     if s.tool_mode != "webhook":
         return None
@@ -173,8 +162,10 @@ def sync_webhook(api: Cartesia, s: Settings, env_webhook_id: str) -> str | None:
     print(f"Created webhook {created['id']} -> {url} (secret saved to .env)")
     return str(created["id"])
 
+
 def attach_webhook(api: Cartesia, agent_id: str, webhook_id: str | None) -> None:
     api.request("PATCH", f"/agents/{agent_id}", json={"webhook_id": webhook_id})
+
 
 def delete_all(api: Cartesia, s: Settings, webhook_id: str) -> int:
     agent = existing_agent(api, s.agent_id)
@@ -197,6 +188,7 @@ def delete_all(api: Cartesia, s: Settings, webhook_id: str) -> int:
     for key in ("CARTESIA_AGENT_ID", "CARTESIA_WEBHOOK_ID", "CARTESIA_WEBHOOK_SECRET"):
         upsert_env(ENV_PATH, key, "")
     return 0
+
 
 def main(argv: list[str]) -> int:
     load_env()
@@ -265,6 +257,7 @@ def main(argv: list[str]) -> int:
         f"Done. Tool mode: {s.tool_mode}. Start the app with: uv run uvicorn front_desk.main:app --port 8000"
     )
     return 0
+
 
 if __name__ == "__main__":
     try:

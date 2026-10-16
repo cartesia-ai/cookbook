@@ -13,9 +13,9 @@ The code comes from a voice journal app. You tap record, talk, and the entry is 
 ## Prerequisites
 
 - An Expo SDK 58 app with Expo Router and `"web": { "output": "server" }` in `app.json`, which API routes need
-- `pnpm add @cartesia/cartesia-js expo-audio expo-file-system`
+- `npm install @cartesia/cartesia-js expo-audio expo-file-system`
 - `CARTESIA_API_KEY` in `.env.local`, from [play.cartesia.ai/keys](https://play.cartesia.ai/keys)
-- Node 22.13 or newer
+- Node 22.22 or newer
 
 Do not give the key an `EXPO_PUBLIC_` prefix. Metro inlines `EXPO_PUBLIC_` variables into the app bundle, and anyone with the app could read it. Without the prefix, only server code in `app/api` sees it.
 
@@ -142,10 +142,15 @@ The route checks the upload, wraps it in a `File` with a name and type, and call
 
 ```ts filename="app/api/transcribe+api.ts"
 import { getCartesia } from "@/lib/server/cartesia";
-import { cartesiaError, json } from "@/lib/server/errors";
+import { cartesiaError, json, rateLimited } from "@/lib/server/errors";
 import { MAX_AUDIO_BYTES, STT_MODEL } from "@/lib/limits";
+import { createRateLimiter } from "@/lib/server/rate-limit";
+
+const allow = createRateLimiter(20, 60_000);
 
 export async function POST(req: Request) {
+  const limited = rateLimited(req, allow);
+  if (limited) return limited;
   let form: { get(name: string): unknown };
   try {
     form = (await req.formData()) as unknown as typeof form;
@@ -155,7 +160,7 @@ export async function POST(req: Request) {
   const file = form.get("file");
   if (!(file instanceof Blob)) return json({ error: "Missing audio file" }, 400);
   if (file.size === 0) return json({ error: "The recording is empty" }, 400);
-  if (file.size > MAX_AUDIO_BYTES) return json({ error: "The recording is too large (8 MB limit)" }, 413);
+  if (file.size > MAX_AUDIO_BYTES) return json({ error: "The recording is too large for the hosted limit (4 MB). Keep entries under four minutes." }, 413);
 
   const name = file instanceof File && file.name ? file.name : "entry.m4a";
   try {
@@ -175,7 +180,7 @@ export async function POST(req: Request) {
 
 `cartesiaError` in `lib/server/errors.ts` maps failures to fixed messages ("Cartesia rejected the API key", a rate limit notice, or the status code). It never forwards the provider's error body to the app.
 
-The SDK call is a multipart `POST /stt`. Here is the same request with curl, which we ran on 2026-10-16 against a 3.9 second m4a clip made with Sonic 3.6. It came back in about 0.2 seconds.
+The SDK call is a multipart `POST /stt`. Here is the same request with curl.
 
 ```sh
 curl https://api.cartesia.ai/stt \
@@ -198,12 +203,17 @@ The speak route takes `{ text, voiceId }`, calls `tts.generate`, and returns the
 
 ```ts filename="app/api/speak+api.ts"
 import { getCartesia } from "@/lib/server/cartesia";
-import { cartesiaError, json } from "@/lib/server/errors";
+import { cartesiaError, json, rateLimited } from "@/lib/server/errors";
 import { MAX_SPEAK_CHARS, TTS_MODEL } from "@/lib/limits";
+import { createRateLimiter } from "@/lib/server/rate-limit";
+
+const allow = createRateLimiter(10, 60_000);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(req: Request) {
+  const limited = rateLimited(req, allow);
+  if (limited) return limited;
   const body = await req.json().catch(() => null);
   const text = typeof body?.text === "string" ? body.text.trim() : "";
   const voiceId = typeof body?.voiceId === "string" ? body.voiceId : "";
@@ -273,8 +283,8 @@ React.useEffect(() => {
 
 ## Limits
 
-- The transcribe route rejects files over 8 MB, and the recorder stops at five minutes (`lib/limits.ts`). The speak route reads at most 2,000 characters in one request.
-- The routes have no auth. Anyone who finds the URL can spend your Cartesia credits. Put them behind your own login or a rate limiter before you deploy.
+- The transcribe route rejects files over 4 MB, and the recorder stops at four minutes (`lib/limits.ts`). The speak route reads at most 2,000 characters in one request.
+- Every API route has a per-IP rate limit, kept in memory per process, which only slows casual abuse. The routes have no login, so anyone who finds the URL can spend your Cartesia credits. Put them behind your own auth before you deploy.
 - The template README says the web and native paths were checked in headless Chrome. The native paths compile but were not run on a device.
 - This is batch transcription of a finished recording. For words on screen while you talk, you need Ink 2 over the streaming WebSocket with raw PCM chunks. `expo-audio` 58 has `useAudioStream` for that on iOS and Android, but not on the web.
 

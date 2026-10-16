@@ -1,10 +1,3 @@
-"""Where appointments live: a local calendar (the default) or Cal.com.
-
-LocalCalendar needs nothing but the opening hours in `.env`. Free slots are computed in
-memory from those hours, and bookings are rows in the app's SQLite file, so a booking
-survives a restart. Set CALCOM_API_KEY and CALCOM_EVENT_TYPE_ID to use Cal.com instead.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,8 +13,10 @@ CALCOM_BASE_URL = "https://api.cal.com"
 CALCOM_SLOTS_VERSION = "2024-09-04"
 CALCOM_BOOKINGS_VERSION = "2026-02-25"
 
+
 class CalendarError(Exception):
-    """The calendar could not answer. The message is safe to hand to the LLM."""
+    pass
+
 
 @dataclass
 class Booking:
@@ -29,12 +24,14 @@ class Booking:
     external_id: str = ""
     reason: str = ""
 
+
 class Calendar(Protocol):
     name: str
 
     def open_slots(self, day: date) -> list[datetime]: ...
 
     def book(self, *, start: datetime, name: str, phone: str, service: str, call_id: str) -> Booking: ...
+
 
 class LocalCalendar:
     name = "local"
@@ -85,9 +82,8 @@ class LocalCalendar:
         )
         return Booking(ok=ok, reason="" if ok else "Someone just booked that time.")
 
-class CalComCalendar:
-    """Cal.com API v2 with one API key and one event type. Docs: https://cal.com/docs/api-reference/v2"""
 
+class CalComCalendar:
     name = "calcom"
 
     def __init__(self, settings: Settings, store: Store, client: httpx.Client | None = None):
@@ -154,6 +150,7 @@ class CalComCalendar:
             external_id=uid,
         )
         return Booking(ok=True, external_id=uid)
+
 
 def make_calendar(settings: Settings, store: Store) -> Calendar:
     if settings.calcom_api_key and settings.calcom_event_type_id.isdigit():

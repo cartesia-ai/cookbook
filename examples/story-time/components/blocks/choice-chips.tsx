@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 import { Check } from "lucide-react"
 import { ToggleGroup as ToggleGroupPrimitive } from "radix-ui"
 

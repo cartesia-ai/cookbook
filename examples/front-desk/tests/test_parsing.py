@@ -5,6 +5,7 @@ from front_desk.parsing import parse_date, parse_period, parse_time, spoken_time
 
 FRI = date(2026, 10, 16)
 
+
 def test_dates():
     assert parse_date("2026-10-20", FRI) == date(2026, 10, 20)
     assert parse_date("tomorrow", FRI) == date(2026, 10, 17)
@@ -15,6 +16,7 @@ def test_dates():
     assert parse_date("the 3rd", FRI) == date(2026, 11, 3)
     assert parse_date("January 5", FRI) == date(2027, 1, 5)
     assert parse_date("someday", FRI) is None
+
 
 def test_times():
     assert parse_time("2pm") == time(14)
@@ -27,6 +29,7 @@ def test_times():
     assert parse_period("Saturday afternoon") == (12, 17)
     assert spoken_time(time(13)) == "1 PM"
     assert spoken_time(time(9, 30)) == "9:30 AM"
+
 
 def test_hours():
     h = parse_hours("mon-fri 09:00-17:00; sat 10:00-14:00")

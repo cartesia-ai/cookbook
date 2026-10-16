@@ -11,7 +11,7 @@ Your `CARTESIA_API_KEY` must never reach a browser. Anyone who finds it can spen
 ## Prerequisites
 
 - A Cartesia API key in `CARTESIA_API_KEY`
-- `pnpm add @cartesia/cartesia-js`
+- `npm install @cartesia/cartesia-js`
 
 ## The rules
 
@@ -63,7 +63,7 @@ Call `createBrowserClient()` each time the user starts a recording or a call.
 | `stt` | The speech-to-text endpoints, including the `ink-2` turn detection socket at `/stt/turns/websocket` |
 | `agent` | The Managed Agents WebSocket, see [Connect to a Managed Agent from the browser](../15-agents/01-talk-to-a-managed-agent.mdx) |
 
-The docs list the `stt` grant against `/stt` and `/stt/websocket` only. On 2026-10-16 a token with only `{ stt: true }` also opened `/stt/turns/websocket` (`client.stt.autoFinalize.websocket` with `ink-2`) and got turn events back, so the grant covers it in practice.
+The docs list the `stt` grant against `/stt` and `/stt/websocket` only. A token with only `{ stt: true }` also opens `/stt/turns/websocket` (`client.stt.autoFinalize.websocket` with `ink-2`) and gets turn events back, so the grant covers it in practice. The docs do not promise that yet.
 
 ## Next steps
 

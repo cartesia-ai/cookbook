@@ -1,5 +1,3 @@
-"""Settings from the environment and an optional 0600 key file. The key is never logged."""
-
 from __future__ import annotations
 
 import os
@@ -16,7 +14,7 @@ DEFAULT_VOICE_ID = "47c38ca4-5f35-497b-b1a3-415245fb35e1"
 RETIRED_MODELS = ("sonic-2", "sonic-turbo", "sonic-3-2025-10-27", "sonic-latest", "sonic-english")  # allow-model-id
 
 class ConfigError(Exception):
-    """Bad configuration. The message never contains the API key."""
+    pass
 
 @dataclass(frozen=True)
 class Settings:

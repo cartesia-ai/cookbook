@@ -1,5 +1,3 @@
-"""MCP server: `converse` speaks with Sonic 3.6 and listens with Ink 2."""
-
 from __future__ import annotations
 
 import asyncio
@@ -22,11 +20,22 @@ INSTRUCTIONS = (
     "Read skill text or the tool description for how to use it."
 )
 
+CONVERSE_DESCRIPTION = (
+    "Say `message` out loud, then listen for an answer unless told not to.\n\n"
+    "Call with just `message` to ask something. Set wait_for_response=false to "
+    "narrate without listening; a speak-only call leaves nobody listening. "
+    "Keep messages short and ask one thing at a time. Leave voice, speed and "
+    "listen_duration_max unset unless the user asks. Turn detection ends the "
+    "user's turn, there is no push to talk.\n\n"
+    "The tool returns what the user said. Handle it the way you would a typed "
+    'message. "[no speech heard]" means nobody answered; stop '
+    "asking and wait for typed input."
+)
+
 def _truthy(v: bool | str) -> bool:
     return v if isinstance(v, bool) else str(v).strip().lower() in ("true", "1", "yes", "on")
 
 def describe(exc: BaseException) -> str:
-    """One line for the agent. Status and message only, never headers or keys."""
     status = getattr(exc, "status_code", None)
     if status is not None:
         body = getattr(exc, "message", None) or str(exc)
@@ -46,7 +55,7 @@ def build_server(
     def current() -> Settings:
         return settings or load_settings()
 
-    @mcp.tool
+    @mcp.tool(description=CONVERSE_DESCRIPTION)
     async def converse(
         message: str | None = None,
         wait_for_response: bool | str = True,
@@ -54,18 +63,6 @@ def build_server(
         speed: float | None = None,
         listen_duration_max: float | None = None,
     ) -> str:
-        """Say `message` out loud, then listen for an answer unless told not to.
-
-        Call with just `message` to ask something. Set wait_for_response=false to
-        narrate without listening; a speak-only call leaves nobody listening.
-        Keep messages short and ask one thing at a time. Leave voice, speed and
-        listen_duration_max unset unless the user asks. Turn detection ends the
-        user's turn, there is no push to talk.
-
-        The tool returns what the user said. Handle it the way you would a typed
-        message. "[no speech heard]" means nobody answered; stop
-        asking and wait for typed input.
-        """
         try:
             s = current()
         except ConfigError as exc:
@@ -125,9 +122,8 @@ def build_server(
                     except Exception:
                         pass
 
-    @mcp.tool
+    @mcp.tool(description="List Cartesia voices as `id | name | language` lines.")
     async def list_voices(language: str | None = None, limit: int = 20) -> str:
-        """List Cartesia voices as `id | name | language` lines."""
         try:
             s = current()
         except ConfigError as exc:

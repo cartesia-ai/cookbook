@@ -6,14 +6,14 @@ import sys
 from audiobook_generator.book_parsers.base_book_parser import get_book_parser
 from audiobook_generator.config.general_config import GeneralConfig
 from audiobook_generator.core.audio_tags import AudioTags
-from audiobook_generator.tts_providers.base_tts_provider import get_tts_provider
+from audiobook_generator.tts_providers.cartesia_tts_provider import get_tts_provider
 from audiobook_generator.utils.log_handler import setup_logging
 from audiobook_generator.utils.filename_sanitizer import make_safe_filename
 
 logger = logging.getLogger(__name__)
 
 class ConversionAborted(Exception):
-    """The run stopped before any audio was generated."""
+    pass
 
 NOT_A_TTY_MESSAGE = (
     "Standard input is not a terminal, so the cost prompt cannot be answered. "
@@ -45,7 +45,6 @@ class AudiobookGenerator:
         return f"{self.config}"
 
     def process_chapter(self, idx, title, text, book_parser):
-        """Process a single chapter: write text (if needed) and convert to audio."""
         try:
             logger.info(f"Processing chapter {idx}: {title}")
             tts_provider = get_tts_provider(self.config)
@@ -88,13 +87,10 @@ class AudiobookGenerator:
             return False
 
     def process_chapter_wrapper(self, args):
-        """Wrapper for process_chapter to handle unpacking args for imap."""
         idx, title, text, book_parser = args
         return idx, self.process_chapter(idx, title, text, book_parser)
 
     def run(self):
-        """Generate the audiobook. Returns a process exit code: 0 when every
-        chapter converted, 1 on any failure or abort, 130 on Ctrl+C."""
         try:
             logger.info("Starting audiobook generation...")
             book_parser = get_book_parser(self.config)

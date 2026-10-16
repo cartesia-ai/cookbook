@@ -32,6 +32,17 @@ def test_install_cursor_and_codex_use_temp_home(clean_env):
     assert (clean_env / ".codex" / "config.toml").exists()
     assert TEST_KEY not in (clean_env / ".cursor" / "mcp.json").read_text()
 
+def test_install_cursor_with_broken_json_fails_cleanly(clean_env):
+    p = clean_env / ".cursor" / "mcp.json"
+    p.parent.mkdir(parents=True)
+    p.write_text('{"mcpServers": {"other": ')
+    r = CliRunner().invoke(cli.main, ["install", "cursor"])
+    assert r.exit_code == 1
+    assert "is not valid JSON" in r.output and "Traceback" not in r.output
+    assert isinstance(r.exception, SystemExit)
+    assert p.read_text() == '{"mcpServers": {"other": '
+    assert not list(p.parent.glob("*.bak"))
+
 def test_save_key_writes_0600_file_and_never_prints(clean_env):
     r = CliRunner().invoke(cli.main, ["install", "cursor", "--save-key"])
     assert r.exit_code == 0 and TEST_KEY not in r.output
@@ -77,3 +88,30 @@ def test_serve_speaks_clean_jsonrpc_on_stdout(tmp_path):
     assert tools == {"converse", "list_voices"}
     text = next(o for o in out if o["id"] == 3)["result"]["content"][0]["text"]
     assert text.startswith("[error: CARTESIA_API_KEY is not set")
+
+def test_install_exits_nonzero_when_claude_add_fails(monkeypatch):
+    monkeypatch.setattr(cli.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        cli.subprocess, "run",
+        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr="already exists"),
+    )
+    r = CliRunner().invoke(cli.main, ["install", "claude"])
+    assert r.exit_code == 1
+    assert "claude: failed (already exists)" in r.output
+    assert "install failed for: claude" in r.output
+
+def test_install_all_with_broken_codex_config_changes_nothing(clean_env, monkeypatch):
+    calls = []
+    monkeypatch.setattr(cli.shutil, "which", lambda name: f"/bin/{name}" if name in ("claude", "uv") else None)
+    monkeypatch.setattr(cli.subprocess, "run", lambda cmd, **kw: calls.append(cmd))
+    (clean_env / ".cursor").mkdir()
+    codex = clean_env / ".codex" / "config.toml"
+    codex.parent.mkdir()
+    codex.write_text("[mcp_servers\n")
+    r = CliRunner().invoke(cli.main, ["install", "all", "--save-key"])
+    assert r.exit_code == 1
+    assert "is not valid TOML" in r.output and "Nothing was installed" in r.output
+    assert calls == []
+    assert not (clean_env / ".config" / "cartesia-voice-mode" / "env").exists()
+    assert not (clean_env / ".cursor" / "mcp.json").exists()
+    assert codex.read_text() == "[mcp_servers\n"

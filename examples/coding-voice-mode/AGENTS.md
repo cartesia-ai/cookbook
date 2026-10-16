@@ -14,8 +14,8 @@ A local stdio MCP server (`cartesia-voice`) that gives coding agents a `converse
 - `server.py`: the two tools, `converse` and `list_voices`, and their result strings (`[spoken]`, `[no speech heard]`, `[partial, ...]`, `[error: ...]`). Agents and the skill depend on these exact strings.
 - `tts.py`: Sonic over `/tts/sse`. `stt.py`: Ink 2 over `/stt/turns/websocket` via `client.stt.auto_finalize.websocket`.
 - `config.py`: settings, the 0600 key file at `~/.config/cartesia-voice-mode/env`, the retired model guard.
-- `install.py` and `cli.py`: config writers for Claude Code (`claude mcp add`), Cursor (`mcp.json`) and Codex (`config.toml`).
-- `skill/SKILL.md`: the usage skill. `server.json`: the MCP Registry entry; keep its version in step with `pyproject.toml`.
+- `install.py` and `cli.py`: config writers for Claude Code (`claude mcp add`), Cursor (`mcp.json`) and Codex (`config.toml`). A malformed config raises `ConfigFileError`, which the CLI prints without touching the file.
+- `skill/SKILL.md`: the usage skill. Tool descriptions are `description=` arguments in `server.py` and command help is `help=` in `cli.py`, since the code has no docstrings.
 
 ## Rules
 
@@ -26,7 +26,6 @@ A local stdio MCP server (`cartesia-voice`) that gives coding agents a `converse
 - The mic opens only after playback drains, and one conversation runs at a time (`asyncio.Lock`). There is no barge-in; do not claim one.
 - Codex stops tool calls after 60 seconds unless `tool_timeout_sec` is set, and `converse` can listen for up to 120. `install.py` writes `tool_timeout_sec = 180` and `startup_timeout_sec = 30` for Codex, and `"type": "stdio"` for Cursor.
 - Client config formats change. Check the official MCP docs for Claude Code, Cursor and Codex before editing `install.py`, and test against a temporary `HOME` (`claude mcp get`, `codex mcp get`).
-- No em dashes in any file.
 
 ## Docs
 

@@ -1,7 +1,7 @@
 import { MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it } from "vitest";
 import { clampCorrection, CorrectRequestSchema, correctLine, systemPrompt } from "../lib/corrections";
-import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL, parseModelSpec, resolveModel } from "../lib/model";
+import { llmConfigured, resolveModel } from "../lib/model";
 
 function modelReturning(json: unknown) {
   return new MockLanguageModelV4({
@@ -65,24 +65,29 @@ describe("systemPrompt", () => {
 });
 
 describe("model choice", () => {
-  it("parses provider:model", () => {
-    expect(parseModelSpec("anthropic:claude-x")).toEqual({ provider: "anthropic", id: "claude-x" });
-    expect(parseModelSpec("openai:gpt:odd")).toEqual({ provider: "openai", id: "gpt:odd" });
-    for (const bad of [undefined, "", "claude-x", "azure:gpt-x", "openai:"]) expect(parseModelSpec(bad)).toBeNull();
-  });
-
-  it("is null without a key, so the app can say so instead of failing", () => {
+  it("is null until LLM_MODEL and a usable key exist, so the app can say so instead of failing", () => {
     expect(resolveModel({})).toBeNull();
-    expect(resolveModel({ CORRECTIONS_MODEL: "anthropic:claude-x" })).toBeNull();
+    expect(resolveModel({ ANTHROPIC_API_KEY: "k" })).toBeNull();
+    expect(resolveModel({ LLM_MODEL: "anthropic/claude-x" })).toBeNull();
+    expect(resolveModel({ LLM_MODEL: "claude-x", ANTHROPIC_API_KEY: "k" })).toBeNull();
+    expect(resolveModel({ LLM_MODEL: "google/gemini-x", OPENAI_API_KEY: "k" })).toBeNull();
   });
 
-  it("picks a small default for whichever key is set", () => {
-    expect(resolveModel({ ANTHROPIC_API_KEY: "k" })?.label).toBe(`anthropic:${DEFAULT_ANTHROPIC_MODEL}`);
-    expect(resolveModel({ OPENAI_API_KEY: "k" })?.label).toBe(`openai:${DEFAULT_OPENAI_MODEL}`);
-    expect(resolveModel({ OPENAI_API_KEY: "k", CORRECTIONS_MODEL: "openai:gpt-x" })?.label).toBe("openai:gpt-x");
+  it("uses the direct provider with the bare id when its key is set", () => {
+    const anthropic = resolveModel({ LLM_MODEL: "anthropic/claude-x", ANTHROPIC_API_KEY: "k" });
+    expect(anthropic?.label).toBe("anthropic/claude-x");
+    expect((anthropic?.model as { modelId: string }).modelId).toBe("claude-x");
+    const openai = resolveModel({ LLM_MODEL: " openai/gpt-x ", OPENAI_API_KEY: "k" });
+    expect((openai?.model as { modelId: string }).modelId).toBe("gpt-x");
   });
 
-  it("keeps old-generation ids out of the defaults", () => {
-    for (const id of [DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL]) expect(id).not.toMatch(/claude-3|gpt-3|gpt-4(?!\.1)|instruct|davinci/);
+  it("sends the full id to the AI Gateway when there is no direct key", () => {
+    expect(resolveModel({ LLM_MODEL: "openai/gpt-x", AI_GATEWAY_API_KEY: "k" })?.model).toBe("openai/gpt-x");
+    expect(resolveModel({ LLM_MODEL: "google/gemini-x", VERCEL: "1" })?.model).toBe("google/gemini-x");
+  });
+
+  it("llmConfigured matches resolveModel", () => {
+    expect(llmConfigured({ LLM_MODEL: "openai/gpt-x" })).toBe(false);
+    expect(llmConfigured({ LLM_MODEL: "openai/gpt-x", OPENAI_API_KEY: "k" })).toBe(true);
   });
 });

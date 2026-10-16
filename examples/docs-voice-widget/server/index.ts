@@ -9,7 +9,8 @@ import { createApp } from './app';
 import { mountDemo } from './demo';
 import { openAIEmbedder } from './embeddings';
 import { loadEnvFiles } from './env-file';
-import { parseOrigins } from './guard';
+import { lastForwardedFor, parseOrigins } from './guard';
+import { KEYWORD_MODEL } from './keyword';
 import { DocIndex } from './store';
 import { widgetSource } from './widget-bundle';
 
@@ -58,22 +59,24 @@ const app = createApp({
   embed: openAIEmbedder(env.OPENAI_API_KEY),
   getIndex,
   clientIp: (c) =>
-    (env.TRUST_PROXY === '1' ? c.req.header('x-forwarded-for')?.split(',')[0]?.trim() : undefined) ||
+    (env.TRUST_PROXY === '1' ? lastForwardedFor(c.req.header('x-forwarded-for')) : undefined) ||
     getConnInfo(c).remote.address ||
     'unknown',
   widgetJs: widgetSource(production),
   fontFile: () => (font ??= readFile(fontPath)),
-  hasKeys: { cartesia: Boolean(env.CARTESIA_API_KEY), openai: Boolean(env.OPENAI_API_KEY) },
   extend: env.DEMO_SITE === '0' ? undefined : (a) => mountDemo(a, join(root, 'content')),
 });
 
 serve({ fetch: app.fetch, port }, (info) => {
   const missing = [
     !env.CARTESIA_API_KEY && 'CARTESIA_API_KEY',
-    !env.OPENAI_API_KEY && 'OPENAI_API_KEY',
-    !env.CARTESIA_AGENT_ID && 'CARTESIA_AGENT_ID (run pnpm setup:agent)',
+    !env.CARTESIA_AGENT_ID && 'CARTESIA_AGENT_ID (run npm run setup:agent)',
   ].filter(Boolean);
   console.log(`docs-voice-widget on http://localhost:${info.port}`);
   if (missing.length) console.log(`Missing: ${missing.join(', ')}`);
-  if (!getIndex()) console.log('No index yet. Run pnpm ingest.');
+  const idx = getIndex();
+  if (!idx) console.log('No index yet. Run npm run ingest.');
+  else if (idx.model === KEYWORD_MODEL) console.log('Search: keyword. Set OPENAI_API_KEY and run npm run ingest again for embeddings.');
+  else if (!env.OPENAI_API_KEY) console.log('The index uses OpenAI embeddings but OPENAI_API_KEY is empty. Set it, or run npm run ingest again for keyword search.');
+  else console.log('Search: OpenAI embeddings.');
 });

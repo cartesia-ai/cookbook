@@ -99,7 +99,7 @@ export function CorrectionsPanel({
         title="Written corrections are off"
         description={
           <>
-            Set <code className="font-mono text-xs">ANTHROPIC_API_KEY</code> or <code className="font-mono text-xs">OPENAI_API_KEY</code> on the server to turn them on.
+            Set <code className="font-mono text-xs">LLM_MODEL</code> and its key, <code className="font-mono text-xs">ANTHROPIC_API_KEY</code> or <code className="font-mono text-xs">OPENAI_API_KEY</code>, on the server to turn them on.
           </>
         }
       />

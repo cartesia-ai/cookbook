@@ -17,13 +17,19 @@ ENV_KEYS = [
     "AGENT_MODEL_ID",
     "CARTESIA_VOICE_ID",
     "CARTESIA_WEBHOOK_ID",
+    "DASHBOARD_PASSWORD",
+    "TRUST_PROXY",
+    "UVICORN_HOST",
 ]
+
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch, tmp_path):
-    """Every test starts from defaults and its own database, whatever is in .env."""
     for k in ENV_KEYS:
         monkeypatch.setenv(k, "")
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "test.db"))
     monkeypatch.setenv("BUSINESS_TIMEZONE", "America/Los_Angeles")
+    from front_desk import main
+
+    main._token_hits.clear()
     yield

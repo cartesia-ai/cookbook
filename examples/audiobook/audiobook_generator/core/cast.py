@@ -1,15 +1,3 @@
-"""Voices and text segments for a chapter.
-
-A chapter becomes a list of Segment objects (text plus the voice and the
-emotion it should be read with), which are then merged into chunks small
-enough for one Cartesia request.
-
-In dialogue mode the text is split on quotation marks, each quote is attributed
-to a speaker with a few English patterns ("said Alice", "the Rabbit asked"),
-and each speaker gets a voice from VOICE_POOL. This is a heuristic. It is wrong
-on plenty of real novels, which is why the speaker to voice table is a plain
-JSON file you can edit (see Cast).
-"""
 import json
 import os
 import re
@@ -40,7 +28,6 @@ OTHER_VOICE = "Dana"
 _UUID = re.compile(r"^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$")
 
 def resolve_voice(name_or_id: str) -> str:
-    """Turn a pool name (case-insensitive) or a raw voice id into a voice id."""
     for pool_name, voice_id in VOICE_POOL.items():
         if name_or_id.lower() == pool_name.lower():
             return voice_id
@@ -64,20 +51,12 @@ def split_paragraphs(text: str) -> List[str]:
     return [p for p in parts if p]
 
 def narrator_segments(text: str, narrator_voice_id: str, emotion: Optional[str] = None) -> List[Segment]:
-    """The whole chapter in one voice, one segment per paragraph."""
     return [
         Segment(p, NARRATOR, narrator_voice_id, emotion, i)
         for i, p in enumerate(split_paragraphs(text))
     ]
 
 def chunk_segments(segments: List[Segment], max_chars: int, language: str) -> List[Segment]:
-    """Merge neighbouring segments into request-sized chunks.
-
-    Segments merge when they share paragraph, voice and emotion and the
-    result fits in max_chars. A segment longer than max_chars is split on
-    sentence boundaries. A chunk never spans two paragraphs, so the caller can
-    put a pause between paragraphs.
-    """
     pieces: List[Segment] = []
     for seg in segments:
         if len(seg.text) <= max_chars:
@@ -114,15 +93,6 @@ class Piece:
     text: str
 
 def split_quotes(paragraph: str) -> Tuple[List[Piece], bool]:
-    """Split one paragraph into narration and quote pieces.
-
-    Quote marks are removed from the text. Returns the pieces and whether the
-    paragraph ends inside an open quote (a quote that continues in the next
-    paragraph). Handles curly and straight double quotes, nested single quotes
-    inside them, and curly single quotes when the paragraph has no double ones.
-    Straight single quotes are never treated as quote marks, they are
-    apostrophes too often.
-    """
     pieces: List[Piece] = []
     buf: List[str] = []
     in_quote = False
@@ -210,7 +180,6 @@ def _is_cap(token: str) -> bool:
     return token[:1].isalpha() and token[:1].isupper()
 
 def _name_before(tokens: List[str], verb_idx: int) -> Optional[str]:
-    """Capitalised words just before the verb: 'the White Rabbit said'."""
     i = verb_idx - 1
     if i >= 0 and tokens[i].lower().endswith("ly"):
         i -= 1
@@ -224,7 +193,6 @@ def _name_before(tokens: List[str], verb_idx: int) -> Optional[str]:
     return " ".join(words)
 
 def _name_after(tokens: List[str], verb_idx: int) -> Optional[str]:
-    """'said Alice', 'said the Queen', 'said the king.'"""
     i = verb_idx + 1
     if i >= len(tokens):
         return None
@@ -255,7 +223,6 @@ def _clean_name(name: Optional[str]) -> Optional[str]:
     return " ".join(words) or None
 
 def find_speaker(cue: str) -> Optional[str]:
-    """Return a speaker name from a dialogue tag, or None."""
     tokens = _TOKEN.findall(cue)
     for idx, tok in enumerate(tokens):
         if tok.lower() in _SPEECH_VERBS:
@@ -275,7 +242,6 @@ def emotion_for(cue: str, quote: str) -> Optional[str]:
 _SENTENCE_END = re.compile(r"[.!?]+\s+")
 
 def _sentence_ends(text: str) -> List[int]:
-    """Offsets just after each sentence end. 'Mr. Darcy' does not end a sentence."""
     ends = []
     for m in _SENTENCE_END.finditer(text):
         words = text[: m.start()].split()
@@ -289,9 +255,6 @@ def _first_sentence(text: str) -> str:
     return text[: ends[0]] if ends else text
 
 def _tag_clause(text: str) -> str:
-    """The dialogue tag at the start of a post-quote narration: up to the first
-    comma, semicolon, colon or bracket. In '"No," said Alice, "and no again,"
-    said Bob' this keeps the tag of the first quote apart from the second."""
     sentence = _first_sentence(text)
     m = re.search(r"[,;:(]", sentence[1:])
     return sentence[: m.start() + 1] if m else sentence
@@ -308,12 +271,6 @@ class Utterance:
     paragraph: int
 
 def detect_utterances(text: str, expressive: bool = True) -> List[Utterance]:
-    """Split a chapter (paragraphs joined by PARAGRAPH_BREAK) into utterances.
-
-    expressive turns on emotion and laughter cues. Pass False for languages
-    other than English. The result depends only on the text, so every worker
-    process gets the same speakers.
-    """
     out: List[Utterance] = []
     history: List[str] = []
     last_quote_paragraph = -10
@@ -381,12 +338,6 @@ def speakers_in_order(utterances: List[Utterance]) -> List[str]:
     return seen
 
 class Cast:
-    """Maps speaker names to voice ids. Plain data, safe to rebuild in a worker.
-
-    File format (cast.json):
-        {"narrator": "Archie", "speakers": {"Alice": "Maya", "White Rabbit": "Leo"}}
-    Values are pool names or Cartesia voice ids.
-    """
 
     def __init__(self, narrator: str = DEFAULT_NARRATOR, speakers: Optional[Dict[str, str]] = None):
         self.narrator = narrator
@@ -402,7 +353,6 @@ class Cast:
         return resolve_voice(self.narrator)
 
     def assign(self, name: str) -> str:
-        """Voice for a speaker, handing out the next unused pool voice if new."""
         if name not in self.speakers and name == UNKNOWN_SPEAKER:
             self.speakers[name] = OTHER_VOICE
         if name not in self.speakers:
@@ -438,8 +388,6 @@ def cast_path(output_folder: Optional[str]) -> Optional[str]:
     return os.path.join(output_folder, CAST_FILE_NAME) if output_folder else None
 
 def load_cast(config) -> Cast:
-    """Build the cast for a run: output/cast.json first (so reruns keep their
-    voices), then the user's --cast_file on top, then --voice_name for the narrator."""
     cast = Cast()
     saved = cast_path(getattr(config, "output_folder", None))
     if saved and os.path.isfile(saved):
@@ -458,7 +406,6 @@ def load_cast(config) -> Cast:
 
 def build_segments(text: str, cast: Cast, mode: str = "dialogue", expressive: bool = True,
                    narrator_emotion: Optional[str] = None) -> List[Segment]:
-    """Chapter text to Segments with voices. mode is 'narrator' or 'dialogue'."""
     if mode == "narrator":
         return narrator_segments(text, cast.narrator_voice_id(), narrator_emotion)
     segments = []
@@ -468,7 +415,6 @@ def build_segments(text: str, cast: Cast, mode: str = "dialogue", expressive: bo
     return segments
 
 def scan_speakers(chapters, expressive: bool = True) -> List[str]:
-    """Speakers across (title, text) chapters, in order of first appearance."""
     seen: List[str] = []
     for _title, text in chapters:
         for name in speakers_in_order(detect_utterances(text, expressive=expressive)):

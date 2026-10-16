@@ -20,8 +20,12 @@
     "react": "^19"
   },
   "peerDependenciesMeta": {
-    "@cartesia/cartesia-js": { "optional": true },
-    "react": { "optional": true }
+    "@cartesia/cartesia-js": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@cartesia/cartesia-js": "^4.2.0",
@@ -36,5 +40,8 @@
     "typescript": "~5.9.0",
     "vitest": "^5.0.4",
     "ws": "^8.22.0"
+  },
+  "engines": {
+    "node": ">=22.22"
   }
 }

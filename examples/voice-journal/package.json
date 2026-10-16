@@ -2,6 +2,26 @@
   "name": "@cartesia-cookbook/voice-journal",
   "version": "0.1.0",
   "private": true,
+  "description": "Expo voice journal for iOS, Android and the web: Cartesia ink-whisper transcribes spoken entries and Cartesia Sonic 3.6 reads a weekly recap aloud.",
+  "keywords": [
+    "cartesia",
+    "speech-to-text",
+    "text-to-speech",
+    "stt",
+    "tts",
+    "ink-whisper",
+    "sonic",
+    "journal",
+    "expo",
+    "react-native",
+    "typescript"
+  ],
+  "homepage": "https://github.com/cartesia-ai/cookbook/tree/main/examples/voice-journal#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cartesia-ai/cookbook.git",
+    "directory": "examples/voice-journal"
+  },
   "main": "expo-router/entry",
   "scripts": {
     "dev": "expo start",
@@ -48,7 +68,7 @@
     "vitest": "^5.0.4"
   },
   "engines": {
-    "node": ">=22.13"
+    "node": ">=22.22"
   },
   "license": "Apache-2.0"
 }

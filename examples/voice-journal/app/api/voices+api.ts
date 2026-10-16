@@ -1,9 +1,14 @@
 import { getCartesia } from "@/lib/server/cartesia";
-import { cartesiaError } from "@/lib/server/errors";
+import { cartesiaError, rateLimited } from "@/lib/server/errors";
+import { createRateLimiter } from "@/lib/server/rate-limit";
+
+const allow = createRateLimiter(20, 60_000);
 
 export type VoiceOption = { id: string; name: string; tagline: string };
 
-export async function GET() {
+export async function GET(req: Request) {
+  const limited = rateLimited(req, allow);
+  if (limited) return limited;
   try {
     const page = await getCartesia().voices.list({ limit: 100, is_owner: false });
     const voices: VoiceOption[] = page.data

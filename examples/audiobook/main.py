@@ -4,7 +4,7 @@ from pathlib import Path
 
 from audiobook_generator.config.general_config import GeneralConfig
 from audiobook_generator.core.audiobook_generator import AudiobookGenerator
-from audiobook_generator.tts_providers.base_tts_provider import (
+from audiobook_generator.tts_providers.cartesia_tts_provider import (
     get_supported_tts_providers,
 )
 from audiobook_generator.utils.log_handler import setup_logging, generate_unique_log_path

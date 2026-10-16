@@ -26,10 +26,13 @@ describe("POST /api/token", () => {
 
   it("rate limits per client", async () => {
     vi.stubEnv("CARTESIA_API_KEY", "sk_test");
+    vi.stubEnv("TRUST_PROXY", "1");
     const route = createTokenRoute(createRateLimiter(2, 60_000), async () => "t");
     expect((await route(req())).status).toBe(200);
     expect((await route(req())).status).toBe(200);
-    expect((await route(req())).status).toBe(429);
+    const blocked = await route(req());
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: "Too many requests. Try again in a minute." });
     expect((await route(req("5.6.7.8"))).status).toBe(200);
   });
 
@@ -40,6 +43,6 @@ describe("POST /api/token", () => {
       throw new Error("401 invalid key sk_test");
     })(req());
     expect(res.status).toBe(502);
-    expect(JSON.stringify(await res.json())).not.toContain("sk_test");
+    expect(await res.json()).toEqual({ error: "Could not get a Cartesia token. Check the API key." });
   });
 });

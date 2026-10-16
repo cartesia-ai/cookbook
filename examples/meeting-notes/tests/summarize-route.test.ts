@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ text: "" }));
 
@@ -24,8 +24,18 @@ vi.mock("@/lib/llm", async () => {
 
 import { POST } from "@/app/api/summarize/route";
 
+beforeAll(() => vi.stubEnv("TRUST_PROXY", "1"));
+afterAll(() => vi.unstubAllEnvs());
+
+let ip = 0;
 const post = (body: unknown) =>
-  POST(new Request("http://localhost/api/summarize", { method: "POST", body: JSON.stringify(body) }));
+  POST(
+    new Request("http://localhost/api/summarize", {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "x-forwarded-for": `10.0.0.${++ip}` },
+    }),
+  );
 
 describe("POST /api/summarize", () => {
   it("returns decisions and action items", async () => {

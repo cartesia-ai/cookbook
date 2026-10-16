@@ -1,10 +1,12 @@
 import type { Embedder } from './embeddings';
+import { KEYWORD_MODEL, keywordSearch } from './keyword';
 import type { Chunk, DocIndex } from './store';
 
 export const RESULT_BUDGET_BYTES = 3800;
 export const TOP_K = 4;
 export const SAME_PAGE_BOOST = 0.03;
 export const MAX_QUERY_CHARS = 300;
+export const CANDIDATES = 50;
 
 export interface Source {
   title: string;
@@ -65,6 +67,20 @@ export function packResults(
   return { result: out, sources };
 }
 
+export function boostSamePage(
+  ranked: Array<{ chunk: Chunk; score: number }>,
+  page: string | undefined,
+  k: number,
+): Array<{ chunk: Chunk; score: number }> {
+  if (ranked.length === 0) return [];
+  const top = ranked.reduce((m, r) => (r.score > m ? r.score : m), -Infinity);
+  const bump = SAME_PAGE_BOOST * Math.abs(top);
+  return ranked
+    .map((r) => ({ chunk: r.chunk, score: r.score + (samePage(r.chunk.url, page) ? bump : 0) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k);
+}
+
 export async function searchDocs(
   index: DocIndex,
   embed: Embedder,
@@ -73,7 +89,9 @@ export async function searchDocs(
 ): Promise<SearchResponse> {
   const q = query.trim().slice(0, MAX_QUERY_CHARS);
   if (!q || index.chunks.length === 0) return packResults([], page);
+  if (index.model === KEYWORD_MODEL) {
+    return packResults(boostSamePage(keywordSearch(index.chunks, q, CANDIDATES), page, TOP_K), page);
+  }
   const [vector] = await embed([q]);
-  const ranked = index.search(vector!, TOP_K, (c) => (samePage(c.url, page) ? SAME_PAGE_BOOST : 0));
-  return packResults(ranked, page);
+  return packResults(boostSamePage(index.search(vector!, CANDIDATES), page, TOP_K), page);
 }

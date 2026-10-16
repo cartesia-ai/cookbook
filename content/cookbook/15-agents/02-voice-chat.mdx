@@ -6,33 +6,21 @@ tags: ['agents', 'next', 'voice', 'streaming', 'managed agents']
 
 # Build a browser voice chat with a Managed Agent
 
-This recipe builds a voice chat page. You press a button, talk to an agent, and can cut in while it is speaking. The browser sends microphone audio straight to Cartesia and plays the agent's audio. Your server only creates the agent once and mints a short-lived token for each call, so the API key never reaches the page.
+You press a button, talk to an agent, and can cut in while it is speaking. The browser sends microphone audio straight to Cartesia and plays the agent's audio. Your server creates the agent once and mints a short-lived token for each call, so the API key never reaches the page.
 
-The finished app is in [`examples/voice-chat`](../../../examples/voice-chat/README.md). The folder runs on its own. The UI is shadcn/ui components in `components/ui/`, and the WebSocket client in `lib/agents-web/` is a copy of [`packages/agents-web`](../../../packages/agents-web/README.md).
+This recipe explains the four pieces that make that work: the agent config, the token route, the browser connection, and barge-in. It ends with a sketch of the same loop using your own LLM. To run the finished app, follow the [`examples/voice-chat`](../../../examples/voice-chat/README.md) README.
 
 ## Prerequisites
 
 - A Cartesia API key
-- Node 22.13 or newer and pnpm 10
-- A Next.js 16 app, or the example from this repo
-- The basics of the agent connection from [Connect to a Managed Agent from the browser](./01-talk-to-a-managed-agent.mdx)
+- Node 22.22 or newer
+- The agent connection basics from [Connect to a Managed Agent from the browser](./01-talk-to-a-managed-agent.mdx)
 
 Agent LLM usage is billed to your Cartesia account.
 
-The managed variant was run against the live API on 2026-10-14: agent creation, the token route, and a WebSocket session with a spoken question, a reply, and an interruption of the greeting. The browser microphone path was not tested with a real device, and the own-LLM code is typechecked only.
-
 ## Create the agent
 
-A Managed Agent is created once, with a system prompt and a voice. The setup script does it and writes the id to `.env.local`.
-
-```sh
-cd examples/voice-chat
-pnpm install
-cp .env.example .env.local   # add CARTESIA_API_KEY
-pnpm setup:agent
-```
-
-`@cartesia/cartesia-js` 4.2.0 has no typed method for creating a Managed Agent. Its `agents` resource still describes the older agent shape. The script therefore uses the client's generic `post`, which keeps the auth header, the retries and the `Cartesia-Version` header. The response type is declared next to the call.
+A Managed Agent is created once, with a system prompt, a voice and an LLM. The template's setup script sends this body to `POST /v1/agents` and saves the returned id.
 
 ```ts filename="scripts/setup-agent.ts"
 export function buildBody(env: Env) {
@@ -53,30 +41,15 @@ export function buildBody(env: Env) {
 }
 ```
 
-The create call itself is one line. `AGENTS_PATH` is `/v1/agents`, and the default model is `claude-haiku-4.5`, both set in `scripts/paths.ts`.
+`@cartesia/cartesia-js` 4.2.0 has no typed method for the Managed Agents create call, so the script uses the client's generic `client.post(AGENTS_PATH, { body })`, which keeps the auth, retry and `Cartesia-Version` headers.
 
-```ts filename="scripts/setup-agent.ts"
-agent = await client.post<CreatedAgent>(AGENTS_PATH, { body: buildBody(env) });
-```
+Model ids change. Check `GET /v1/agents/models` and set `AGENT_MODEL_ID` from that list rather than trusting the default. The agent speaks with Sonic 3.6 because that is the platform default; the config takes a voice id but no text to speech model.
 
-The real script also checks that the voice exists (`client.voices.get`) and that the model id is in `GET /v1/agents/models`, and it stops with the list of available ids if it is not. Model ids change, so set `AGENT_MODEL_ID` from that list rather than trusting the default. It reuses the saved agent on a second run, and `--dry-run` prints the request without a key.
-
-Two details about the config:
-
-- The agent speaks with Sonic 3.6 because that is the platform default. The config has a voice id but no text to speech model field, so there is nothing to set.
-- Write the prompt for the ear. One or two short sentences, no lists or markdown, numbers spelled out, one question at a time. Those rules are in `scripts/prompt.ts`.
+Write the prompt for the ear: one or two short sentences, no lists or markdown, numbers spelled out, one question at a time.
 
 ## Mint a token
 
 The browser needs a token to open the WebSocket. This route creates one that lasts 60 seconds and carries only the `agent` grant, so it cannot be used for speech synthesis or transcription.
-
-```ts filename="app/api/token/route.ts"
-import { createTokenRoute } from "../../../lib/token-handler";
-
-export const POST = createTokenRoute();
-```
-
-`createTokenRoute` wraps the `createAgentTokenHandler` helper from the vendored client.
 
 ```ts filename="lib/token-handler.ts"
 export function createTokenRoute(allow = createRateLimiter(10, 60_000)) {
@@ -102,20 +75,15 @@ export function createTokenRoute(allow = createRateLimiter(10, 60_000)) {
 }
 ```
 
-It returns a plain 503 when `CARTESIA_API_KEY` is missing, and it answers 429 after 10 requests a minute per address. That limit lives in memory on one server instance, and `x-forwarded-for` can be spoofed unless a trusted proxy sets it, so treat it as a demo guard. Before you deploy, replace `authorize` with your own session check, as in [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx). Anyone who can call this route can start calls on your account.
+`app/api/token/route.ts` is one line, `export const POST = createTokenRoute();`. The rate limit lives in memory on one server instance and keys on `x-forwarded-for`, which a client can spoof unless a trusted proxy sets it. Treat it as a demo guard and replace `authorize` with your own session check, as in [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx). Anyone who can call this route can start calls on your account.
 
 The agent id is not secret. The page reads `CARTESIA_AGENT_ID` on the server and passes it down as a prop.
 
 ## Connect from the browser
 
-`useCartesiaAgent` does the work: it asks for the microphone, opens the socket, sends `session_create` first, streams microphone audio in 40 ms chunks, plays the agent's audio, and drops queued audio the moment the agent is interrupted.
+`useCartesiaAgent` (from [`packages/agents-web`](../../../packages/agents-web/README.md)) asks for the microphone, opens the socket, sends `session_create` first, streams 16 kHz microphone audio, plays the agent's audio, and drops queued audio the moment the agent is interrupted.
 
 ```tsx filename="components/voice-chat.tsx"
-"use client";
-
-import { useCartesiaAgent } from "@/lib/agents-web/react";
-import { VoiceChatView } from "./voice-chat-view";
-
 async function getToken(): Promise<string> {
   const res = await fetch("/api/token", { method: "POST" });
   const body = (await res.json().catch(() => ({}))) as { token?: string; error?: string };
@@ -123,34 +91,10 @@ async function getToken(): Promise<string> {
   return body.token;
 }
 
-export function VoiceChat({ agentId }: { agentId: string }) {
-  const agent = useCartesiaAgent({
-    agentId,
-    getToken,
-    // Echo cancellation is the default in agents-web; the 16 kHz input format is too.
-    // outputDelivery stays "as_available": the client owns the playback queue, which is
-    // what lets it drop audio the moment the agent is interrupted.
-  });
-
-  return (
-    <VoiceChatView
-      status={agent.status}
-      messages={agent.messages}
-      userSpeaking={agent.isSpeaking.user}
-      agentSpeaking={agent.isSpeaking.agent}
-      muted={agent.muted}
-      error={agent.error ? { code: agent.error.code, message: agent.error.message } : null}
-      onStart={() => void agent.start().catch(() => {})}
-      onStop={() => void agent.stop()}
-      onToggleMute={() => agent.setMuted(!agent.muted)}
-    />
-  );
-}
+const agent = useCartesiaAgent({ agentId, getToken });
 ```
 
-Call `start()` from a click. Browsers only allow the microphone and audio playback after a user gesture. `getToken` runs once per `start()`, so a retry always gets a fresh token.
-
-The component is split in two. `components/voice-chat.tsx` holds the hook and `components/voice-chat-view.tsx` takes plain props, so the tests render every state (connecting, speaking, interrupted, error) without a socket.
+The template's view takes plain props (`agent.status`, `agent.messages`, `agent.isSpeaking`, `agent.muted`, `agent.error`), so its tests render every state without a socket. Call `start()` from a click, because browsers only allow the microphone and audio playback after a user gesture. `getToken` runs once per `start()`, so a retry always gets a fresh token. Output delivery stays at `as_available`, which means the client owns the playback queue and can empty it on interruption.
 
 These are the server events the client handles for you.
 
@@ -165,67 +109,29 @@ These are the server events the client handles for you.
 
 ## Captions and barge-in
 
-Assistant text streams in word by word as the agent speaks. Each `turn_output_text_delta` is appended as is, because the deltas already contain their spaces. When the turn ends, the server's final `text` replaces the streamed text.
+Assistant text streams in as the agent speaks. Append each `turn_output_text_delta` as is, because the deltas already contain their spaces. When the turn ends, the server's final `text` replaces the streamed text.
 
-Your own words are different. The service sends user text only when your turn ends, in `turn_ended`. While you are speaking, the example shows animated dots, then the text when the turn closes. If you need partial user captions, use your own LLM as described below, where Ink-2 sends them.
+Your own words arrive only when your turn ends, in `turn_ended`. The template shows animated dots while you speak. If you need partial user captions, use your own LLM as below, where Ink 2 sends them.
 
-Barge-in is handled in two places. The service stops generating when it hears you and sends `audio_output_clear`, and the client empties its playback queue. The assistant turn then ends with `interrupted: true`, and its `text` holds only what the agent actually said. Replacing the streamed text with it cuts the bubble to the spoken words. The example adds a small "interrupted" tag under it.
+Barge-in happens in two places. The service stops generating when it hears you and sends `audio_output_clear`, and the client empties its playback queue. The assistant turn then ends with `interrupted: true`, and its `text` holds only what the agent actually said, so replacing the streamed text cuts the bubble to the spoken words.
 
-Use headphones. Without echo cancellation the microphone hears the speakers and the agent interrupts itself. The client asks the browser for echo cancellation, noise suppression and automatic gain, which helps but is not perfect.
+Use headphones. The client asks the browser for echo cancellation, which helps, but on speakers the agent can still hear and interrupt itself.
 
 ## Use your own LLM
 
-The managed agent picks the LLM from Cartesia's list. If you want any other model, or full control of the loop, run the pieces yourself: Ink-2 for speech to text, your model through the AI SDK, and Sonic 3.6 for speech. This is a design with typechecked code, not a second app. It has not been run against the live API, so test it before you rely on it.
+The managed agent picks the LLM from Cartesia's list. For any other model, or full control of the loop, run the pieces yourself: Ink 2 for speech to text, your model behind a streaming route, and Sonic 3.6 for speech. The browser talks to Cartesia with a token minted the same way as above, but with `grants: { stt: true, tts: true }` instead of `agent`.
 
-Everything talks to Cartesia from the browser with a token that has the `stt` and `tts` grants. The code lives in [`examples/voice-chat/byo-snippets`](../../../examples/voice-chat/byo-snippets/speak.ts), which the template typechecks but does not run. In your app, put `token-route.ts` at `app/api/token/route.ts` (the session fetches `/api/token`), `chat-route.ts` at `app/api/chat/route.ts`, and the other four files in `lib/`.
+The code below is a sketch for this path. It is not part of the voice-chat template, which uses the managed agent. The [pocket interpreter](../../../examples/pocket-interpreter) template runs the same Ink 2, LLM and Sonic loop in full.
 
-```ts filename="byo-snippets/token-route.ts"
-import Cartesia from "@cartesia/cartesia-js";
+Listening sends microphone chunks to `client.stt.autoFinalize.websocket` and turns its events into turns. `startMic` runs an `AudioWorklet` and sends Float32 chunks of about 100 ms at the context's sample rate. `turn.update` gives partial text for the user. On `turn.end`, use `transcript` exactly as it is.
 
-export async function POST(): Promise<Response> {
-  const apiKey = process.env.CARTESIA_API_KEY;
-  if (!apiKey) {
-    return Response.json({ error: "CARTESIA_API_KEY is not set." }, { status: 503 });
-  }
-  const client = new Cartesia({ apiKey });
-  const { token } = await client.accessToken.create({
-    grants: { stt: true, tts: true },
-    expires_in: 60,
-  });
-  return Response.json({ token }, { headers: { "Cache-Control": "no-store" } });
-}
-```
+```ts
+import type Cartesia from "@cartesia/cartesia-js";
 
-Your model sits behind a route that streams text. Set `LLM_MODEL` to a model id your AI SDK setup accepts.
-
-```ts filename="byo-snippets/chat-route.ts"
-import { streamText, type LanguageModel } from "ai";
-
-const model: LanguageModel = process.env.LLM_MODEL as string;
-
-const SYSTEM = "You are a voice assistant. Reply in one or two short sentences. No markdown, no lists.";
-
-export async function POST(req: Request): Promise<Response> {
-  const { messages } = (await req.json()) as {
-    messages: { role: "user" | "assistant"; content: string }[];
-  };
-  const result = streamText({
-    model,
-    system: SYSTEM,
-    messages,
-    abortSignal: req.signal,
-  });
-  return result.toTextStreamResponse();
-}
-```
-
-Listening has two parts. The first captures the microphone as Float32 in 100 ms chunks. The second sends those chunks to `client.stt.autoFinalize.websocket` with the `ink-2` model and turns the events into captions. `turn.update` gives live partial text for the user. On `turn.end`, append `transcript` exactly as it is, without trimming or adding spaces.
-
-```ts filename="byo-snippets/mic.ts"
 const CHUNK_MS = 100;
 
-export async function startMic(audioCtx: AudioContext, onChunk: (chunk: ArrayBuffer) => void) {
-  const workletSource = `
+async function startMic(audioCtx: AudioContext, onChunk: (chunk: ArrayBuffer) => void) {
+  const worklet = `
     class PCMCapture extends AudioWorkletProcessor {
       process(inputs) {
         const ch = inputs[0]?.[0];
@@ -233,30 +139,23 @@ export async function startMic(audioCtx: AudioContext, onChunk: (chunk: ArrayBuf
         return true;
       }
     }
-    registerProcessor('pcm-capture', PCMCapture);
-  `;
-  const url = URL.createObjectURL(new Blob([workletSource], { type: "application/javascript" }));
+    registerProcessor("pcm-capture", PCMCapture);`;
+  const url = URL.createObjectURL(new Blob([worklet], { type: "application/javascript" }));
   await audioCtx.audioWorklet.addModule(url);
   URL.revokeObjectURL(url);
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-  });
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true } });
   const source = audioCtx.createMediaStreamSource(stream);
   const node = new AudioWorkletNode(audioCtx, "pcm-capture");
-
-  const chunkSamples = Math.round((audioCtx.sampleRate * CHUNK_MS) / 1000);
+  const size = Math.round((audioCtx.sampleRate * CHUNK_MS) / 1000);
   let pending = new Float32Array(0);
   node.port.onmessage = (e: MessageEvent<Float32Array>) => {
     const joined = new Float32Array(pending.length + e.data.length);
     joined.set(pending);
     joined.set(e.data, pending.length);
-    let offset = 0;
-    while (joined.length - offset >= chunkSamples) {
-      onChunk(joined.slice(offset, offset + chunkSamples).buffer);
-      offset += chunkSamples;
-    }
-    pending = joined.slice(offset);
+    let at = 0;
+    for (; joined.length - at >= size; at += size) onChunk(joined.slice(at, at + size).buffer);
+    pending = joined.slice(at);
   };
   source.connect(node);
 
@@ -268,11 +167,6 @@ export async function startMic(audioCtx: AudioContext, onChunk: (chunk: ArrayBuf
     },
   };
 }
-```
-
-```ts filename="byo-snippets/listen.ts"
-import type Cartesia from "@cartesia/cartesia-js";
-import { startMic } from "./mic";
 
 export interface ListenHandlers {
   onTurnStart(): void;
@@ -310,222 +204,41 @@ export async function listen(client: Cartesia, audioCtx: AudioContext, handlers:
 }
 ```
 
-Speaking opens one text to speech context per reply. The sentence splitter lets the first sentence start playing while the model is still writing the rest. Chunks are scheduled back to back on the Web Audio clock. With `add_timestamps` on, you know which words have been played, which you need for barge-in.
+Speaking opens one text to speech context per reply on a shared `client.tts.websocket()`. Split the LLM stream into sentences and push each one as it completes, so the first sentence plays while the model is still writing. With `max_buffer_delay_ms: 0`, Sonic starts on each push instead of waiting for more text. With `add_timestamps`, you know which words have played.
 
-```ts filename="byo-snippets/speak.ts"
-import type Cartesia from "@cartesia/cartesia-js";
-
-const SAMPLE_RATE = 44100;
-
-export function takeSentences(buffer: string): { sentences: string[]; rest: string } {
-  const sentences: string[] = [];
-  let rest = buffer;
-  for (;;) {
-    const m = rest.match(/^([\s\S]*?[.!?])\s+/);
-    if (!m) break;
-    sentences.push(m[1]!);
-    rest = rest.slice(m[0].length);
-  }
-  return { sentences, rest };
-}
-
-export interface Speaker {
-  speak(text: AsyncIterable<string>, onWords?: (spoken: string) => void): Promise<void>;
-  cancel(): Promise<string>;
-  readonly speaking: boolean;
-}
-
-export async function createSpeaker(client: Cartesia, audioCtx: AudioContext, voice: string): Promise<Speaker> {
-  const ws = await client.tts.websocket();
-  ws.on("error", (err) => console.error(err.message));
-
-  let ctx: ReturnType<typeof ws.context> | null = null;
-  let sources: AudioBufferSourceNode[] = [];
-  let nextStart = 0;
-  let replyStart = 0;
-  let words: { word: string; start: number }[] = [];
-  let speaking = false;
-
-  const spokenSoFar = () => {
-    const t = audioCtx.currentTime - replyStart;
-    return words.filter((w) => w.start <= t).map((w) => w.word).join(" ");
-  };
-
-  return {
-    get speaking() {
-      return speaking;
-    },
-
-    async speak(text, onWords) {
-      const current = ws.context({
-        model_id: "sonic-3.6",
-        voice,
-        output_format: { container: "raw", encoding: "pcm_f32le", sample_rate: SAMPLE_RATE },
-        language: "en",
-        add_timestamps: true,
-        max_buffer_delay_ms: 0,
-      });
-      ctx = current;
-      sources = [];
-      words = [];
-      speaking = true;
-      nextStart = Math.max(nextStart, audioCtx.currentTime);
-      replyStart = nextStart;
-
-      const playing = (async () => {
-        for await (const event of current.receive()) {
-          if (event.type === "chunk" && event.audio) {
-            const floats = new Float32Array(event.audio.buffer, event.audio.byteOffset, event.audio.byteLength / 4);
-            const buffer = audioCtx.createBuffer(1, floats.length, SAMPLE_RATE);
-            buffer.getChannelData(0).set(floats);
-            const source = audioCtx.createBufferSource();
-            source.buffer = buffer;
-            source.connect(audioCtx.destination);
-            const at = Math.max(nextStart, audioCtx.currentTime);
-            source.start(at);
-            nextStart = at + buffer.duration;
-            sources.push(source);
-          } else if (event.type === "timestamps" && event.word_timestamps) {
-            const w = event.word_timestamps;
-            w.words.forEach((word, i) => words.push({ word, start: w.start[i] ?? 0 }));
-            onWords?.(spokenSoFar());
-          } else if (event.type === "error") {
-            console.error(event.title, event.message);
-          }
-        }
-        speaking = false;
-      })();
-
-      let buffer = "";
-      for await (const piece of text) {
-        buffer += piece;
-        const { sentences, rest } = takeSentences(buffer);
-        buffer = rest;
-        for (const transcript of sentences) await current.push({ transcript });
-      }
-      if (buffer.trim()) await current.push({ transcript: buffer });
-      await current.no_more_inputs();
-      await playing;
-    },
-
-    async cancel() {
-      const spoken = spokenSoFar();
-      await ctx?.cancel();
-      for (const s of sources) {
-        s.stop();
-        s.disconnect();
-      }
-      sources = [];
-      nextStart = audioCtx.currentTime;
-      speaking = false;
-      return spoken;
-    },
-  };
+```ts
+const current = ws.context({
+  model_id: "sonic-3.6",
+  voice,
+  output_format: { container: "raw", encoding: "pcm_f32le", sample_rate: 44100 },
+  language: "en",
+  add_timestamps: true,
+  max_buffer_delay_ms: 0,
+});
+for await (const event of current.receive()) {
+  if (event.type === "chunk" && event.audio) scheduleOnWebAudioClock(event.audio);
+  else if (event.type === "timestamps" && event.word_timestamps) recordWords(event.word_timestamps);
 }
 ```
 
-The session ties them together. When Ink-2 reports `turn.start` while the agent is still talking, the session aborts the LLM request, cancels the TTS context with `ctx.cancel()`, stops every scheduled audio node, and cuts the assistant message to the words already spoken.
+In that loop, push sentences with `current.push({ transcript })` and finish with `current.no_more_inputs()`. `scheduleOnWebAudioClock` and `recordWords` stand for your own playback and bookkeeping.
 
-```ts filename="byo-snippets/session.ts"
-import Cartesia from "@cartesia/cartesia-js";
-import { listen } from "./listen";
-import { createSpeaker } from "./speak";
+Barge-in is your job now. When Ink 2 reports `turn.start` while the agent is talking, abort the LLM request, call `current.cancel()`, stop every scheduled `AudioBufferSourceNode`, and cut the assistant message to the words whose timestamp is before the current playback time. That last step keeps the conversation history honest, so the LLM does not think it said things the user never heard.
 
-type Message = { role: "user" | "assistant"; content: string };
-
-async function* readText(res: Response): AsyncGenerator<string> {
-  const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) return;
-    yield value;
-  }
-}
-
-export async function startVoiceChat(opts: {
-  voice: string;
-  onCaption(text: string): void;
-  onMessages(messages: Message[]): void;
-}) {
-  const { token } = await (await fetch("/api/token", { method: "POST" })).json();
-  const client = new Cartesia({ token });
-  const audioCtx = new AudioContext();
-  const speaker = await createSpeaker(client, audioCtx, opts.voice);
-
-  const messages: Message[] = [];
-  let llm: AbortController | null = null;
-
-  const bargeIn = async () => {
-    if (!speaker.speaking && !llm) return;
-    llm?.abort();
-    llm = null;
-    const spoken = await speaker.cancel();
-    const last = messages[messages.length - 1];
-    if (last?.role === "assistant") last.content = spoken;
-    opts.onMessages([...messages]);
-  };
-
-  const listening = await listen(client, audioCtx, {
-    onTurnStart: () => void bargeIn(),
-    onPartial: opts.onCaption,
-    onTurnEnd: async (transcript) => {
-      opts.onCaption("");
-      messages.push({ role: "user", content: transcript });
-      messages.push({ role: "assistant", content: "" });
-      opts.onMessages([...messages]);
-
-      const controller = new AbortController();
-      llm = controller;
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: messages.slice(0, -1) }),
-          signal: controller.signal,
-        });
-        await speaker.speak(readText(res), (spoken) => {
-          messages[messages.length - 1]!.content = spoken;
-          opts.onMessages([...messages]);
-        });
-      } catch (err) {
-        if ((err as Error).name !== "AbortError") throw err;
-      } finally {
-        if (llm === controller) llm = null;
-      }
-    },
-  });
-
-  return {
-    async stop() {
-      listening.stop();
-      await bargeIn();
-      await audioCtx.close();
-    },
-  };
-}
-```
-
-How the two approaches compare:
-
-- The managed agent is fewer moving parts. You run one token route, the service owns turn taking, and the LLM comes from Cartesia's list. Custom retrieval has to go through webhook or client tools.
-- Your own LLM gives you any model and every step of the loop. You also own the turn logic, the barge-in code above, the cost of each service, and the browser audio details.
-
-With the managed agent the service does the equivalent of that barge-in work on its side, and the client only empties its playback queue.
+The trade is plain. The managed agent is one token route, and the service owns turn taking. Your own LLM gives you any model and every step of the loop, and you own the turn logic, barge-in, and the cost of each service.
 
 ## Troubleshooting
 
-- **The page says "Create the agent first".** `CARTESIA_AGENT_ID` is not set. Run `pnpm setup:agent` and restart the server.
-- **The token request fails with 503.** `CARTESIA_API_KEY` is missing from `.env.local`.
 - **The call closes right away with 1008.** The service rejected the first event or the token. Check that the token is fresh and the agent id belongs to the account that minted it.
-- **The call ends after two minutes of silence.** The service closes a session that gets no client event for 120 seconds. The client keeps sending silence while the microphone is muted, so this means something stopped the page, such as a suspended tab.
-- **The agent answers itself or cuts out.** Echo. Use headphones.
-- **Audio sounds garbled or fast.** If you write your own client, the sample rate you declare in `input_format` must match the audio you send. The `agents-web` client resamples to 16 kHz for you.
-- **The microphone is blocked.** Allow it for the site in the browser. It needs HTTPS or `localhost`.
-- **A `model_sunsetted` error in the own-LLM variant.** The text to speech model id you passed has been retired. Use `sonic-3.6`.
+- **The call ends after two minutes of silence.** The service closes a session that gets no client event for 120 seconds. The client sends silence while muted, so this usually means the tab was suspended.
+- **The microphone is blocked.** The page needs HTTPS or `localhost`.
+
+## Limits
+
+The managed path was run against the live API: agent creation, the token route, and a session with a spoken question, a reply and an interruption. The browser microphone path was not tested on a real device. The own-LLM snippets typecheck against `@cartesia/cartesia-js` 4.2.0 but were not run against the live API, so test them before you rely on them.
 
 ## Next steps
 
-- Give the agent a client tool: handle `client_tool_call` with the `tools` option of the hook, as in the [package README](../../../packages/agents-web/README.md).
-- Attach a phone number to the same agent. The Cartesia docs on phone numbers cover it.
-- Read [Connect to a Managed Agent from the browser](./01-talk-to-a-managed-agent.mdx) for the raw events.
+- Give the agent a client tool with the `tools` option of the hook, as in the [package README](../../../packages/agents-web/README.md).
+- Attach a phone number to the same agent. [Build an AI receptionist](../20-telephony/01-ai-receptionist-that-books-appointments.mdx) shows how.
 - Read [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx) before you deploy.

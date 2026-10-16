@@ -47,7 +47,7 @@ try {
   upsertEnv(localPath, 'CARTESIA_AGENT_ID', agent.id);
   upsertEnv(localPath, 'CARTESIA_TOOL_IDS', created.join(','));
   console.log(`Created agent ${agent.id} and saved it to .env.local.`);
-  console.log('Next: pnpm ingest, then pnpm dev.');
+  console.log('Next: npm run ingest, then npm run dev.');
 } catch (err) {
   console.error(`Setup failed (${status(err) ?? 'network'}): ${brief(err)}`);
   for (const id of created) await client.delete(`/v1/agents/tools/${id}`).catch(() => {});

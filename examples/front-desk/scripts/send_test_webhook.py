@@ -1,15 +1,3 @@
-"""Replay a recorded-shape call to your webhook, so the dashboard has a phone call to show.
-
-    uv run scripts/send_test_webhook.py                       # http://localhost:8000
-    uv run scripts/send_test_webhook.py --url http://localhost:4511/webhooks/cartesia
-
-It sends call_started, one call_turn per transcript turn, call_completed and
-post_call_analysis, built from tests/fixtures/*.json, with the same headers and envelope
-Cartesia uses. It signs nothing, because Cartesia does not sign: it sends your
-CARTESIA_WEBHOOK_SECRET in `x-webhook-secret` and your CARTESIA_AGENT_ID in the envelope.
-Run it twice and the second run is ignored as a retry, by `webhook_request_id`.
-"""
-
 from __future__ import annotations
 
 import copy
@@ -25,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 from front_desk.config import load_env  # noqa: E402
 
 FIXTURES = ROOT / "tests" / "fixtures"
+
 
 def events(agent_id: str) -> list[dict]:
     completed = json.loads((FIXTURES / "call_completed.json").read_text())
@@ -58,6 +47,7 @@ def events(agent_id: str) -> list[dict]:
     out.append(analysis | {"agent_id": agent_id})
     return copy.deepcopy(out)
 
+
 def main(argv: list[str]) -> int:
     load_env()
     url = argv[argv.index("--url") + 1] if "--url" in argv else "http://localhost:8000/webhooks/cartesia"
@@ -74,6 +64,7 @@ def main(argv: list[str]) -> int:
                 return 1
     print(f"Open http://{httpx.URL(url).netloc.decode()}/calls/{ev['call_id']}")
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

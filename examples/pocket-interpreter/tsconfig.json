@@ -38,6 +38,7 @@
     "lib",
     "tests",
     "vitest.config.ts",
+    "proxy.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "AI receptionist on a Cartesia Managed Agent: answers calls, books appointments, takes messages, and logs every call with transcript and latency."
 readme = "README.md"
 license = "Apache-2.0"
+keywords = ["cartesia", "voice-agent", "managed-agents", "receptionist", "telephony", "appointment-booking", "fastapi", "text-to-speech", "speech-to-text"]
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1",

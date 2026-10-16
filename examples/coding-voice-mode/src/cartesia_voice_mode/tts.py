@@ -1,5 +1,3 @@
-"""Sonic 3.6 over SSE. One request per sentence group, PCM written as it arrives."""
-
 from __future__ import annotations
 
 import base64
@@ -23,7 +21,6 @@ class TtsStats:
     chars: int = 0
 
 def split_text(text: str, limit: int = MAX_CHUNK_CHARS) -> list[str]:
-    """Split on sentence ends into pieces of at most `limit` characters."""
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     out: list[str] = []
     cur = ""

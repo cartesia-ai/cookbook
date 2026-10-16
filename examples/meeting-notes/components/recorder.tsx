@@ -80,7 +80,7 @@ export function Recorder() {
                 <span className="sr-only">Recording,</span>
                 <span className="text-[1.75rem] leading-8 font-semibold tabular-nums">{formatDuration(rec.seconds)}</span>
               </div>
-              <LevelMeter stream={rec.stream} />
+              <LevelMeter stream={rec.stream} audioContext={rec.audioContext} />
               <span className="text-xs text-muted-foreground tabular-nums">
                 {formatBytes(rec.bytes)} of {formatBytes(RECORD_STOP_BYTES)} · stops at {formatDuration(MAX_RECORD_SECONDS)}
               </span>

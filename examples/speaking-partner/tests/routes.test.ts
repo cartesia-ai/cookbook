@@ -1,23 +1,29 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   posts: [] as [string, unknown][],
   deletes: [] as string[],
   agentName: "speaking-partner-session-fr-x",
+  agents: [] as { id: string; name: string; created_at: string }[],
+  nextId: 0,
+  tokenStatus: 200,
 }));
 
 vi.mock("next/server", () => ({ after: (fn: () => unknown) => void fn() }));
 vi.mock("@/lib/agents-web/server", () => ({
-  createAgentTokenHandler: (o: { authorize: (r: Request) => boolean }) => async (req: Request) =>
-    o.authorize(req) ? Response.json({ token: "tok_test" }) : Response.json({ error: "unauthorized" }, { status: 401 }),
+  createAgentTokenHandler: () => async () =>
+    state.tokenStatus === 200 ? Response.json({ token: "tok_test" }) : Response.json({ error: "upstream" }, { status: state.tokenStatus }),
 }));
 vi.mock("../lib/agents-api", async (orig) => ({
   ...(await orig<typeof import("../lib/agents-api")>()),
   createAgentsApi: () => ({
-    get: async (path: string) => (path.endsWith("/tools") ? { data: [] } : path === "/v1/agents" ? { data: [] } : { name: state.agentName }),
+    get: async (path: string) => (path.endsWith("/tools") ? { data: [] } : path === "/v1/agents" ? { summaries: state.agents } : { name: state.agentName }),
     post: async (path: string, body: unknown) => {
       state.posts.push([path, body]);
-      return { id: path.endsWith("/tools") ? "agent_tool_x" : "agent_session12345" };
+      if (path.endsWith("/tools")) return { id: "agent_tool_x" };
+      const id = `agent_session${String(++state.nextId).padStart(5, "0")}`;
+      state.agents.push({ id, name: `speaking-partner-session-fr-${id}`, created_at: new Date().toISOString() });
+      return { id };
     },
     delete: async (path: string) => void state.deletes.push(path),
     voices: async function* () {
@@ -40,8 +46,16 @@ beforeEach(() => {
   state.posts.length = 0;
   state.deletes.length = 0;
   state.agentName = "speaking-partner-session-fr-x";
+  state.agents = [];
+  state.nextId = 0;
+  state.tokenStatus = 200;
   process.env.CARTESIA_API_KEY = "test-key-not-real";
+  process.env.TRUST_PROXY = "1";
   vi.resetModules();
+});
+
+afterEach(() => {
+  delete process.env.TRUST_PROXY;
 });
 
 async function sessionRoute() {
@@ -53,7 +67,7 @@ describe("POST /api/session", () => {
     const res = await (await sessionRoute())(post("/api/session", good));
     expect(res.status).toBe(200);
     const text = await res.text();
-    expect(JSON.parse(text)).toEqual({ agentId: "agent_session12345" });
+    expect(JSON.parse(text)).toEqual({ agentId: "agent_session00001" });
     expect(text).not.toContain("test-key-not-real");
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(state.posts.some(([p]) => p === "/v1/agents")).toBe(true);
@@ -84,11 +98,38 @@ describe("POST /api/session", () => {
     expect(res.status).toBe(422);
   });
 
-  it("limits each address to 6 sessions a minute", async () => {
+  it("limits each address to 10 session requests a minute", async () => {
     const route = await sessionRoute();
-    for (let i = 0; i < 6; i++) expect((await route(post("/api/session", good, "5.5.5.5"))).status).toBe(200);
-    expect((await route(post("/api/session", good, "5.5.5.5"))).status).toBe(429);
+    for (let i = 0; i < 10; i++) {
+      expect((await route(post("/api/session", good, "5.5.5.5"))).status).not.toBe(429);
+      state.agents.length = 0;
+    }
+    const res = await route(post("/api/session", good, "5.5.5.5"));
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "Too many requests. Try again in a minute." });
     expect((await route(post("/api/session", good, "6.6.6.6"))).status).toBe(200);
+  });
+
+  it("allows two live sessions per address and frees a slot when one ends", async () => {
+    const route = await sessionRoute();
+    const end = (await import("../app/api/session/end/route")).POST;
+    const first = await (await route(post("/api/session", good, "4.4.4.4"))).json();
+    expect((await route(post("/api/session", good, "4.4.4.4"))).status).toBe(200);
+    const third = await route(post("/api/session", good, "4.4.4.4"));
+    expect(third.status).toBe(503);
+    expect((await third.json()).error).toBe("You already have 2 practice sessions open. End one and try again.");
+    expect((await route(post("/api/session", good, "8.8.8.8"))).status).toBe(200);
+    expect((await end(post("/api/session/end", { agentId: first.agentId }, "4.4.4.4"))).status).toBe(200);
+    expect((await route(post("/api/session", good, "4.4.4.4"))).status).toBe(200);
+  });
+
+  it("refuses a new session when 10 live session agents already exist", async () => {
+    const now = new Date().toISOString();
+    state.agents = Array.from({ length: 10 }, (_, i) => ({ id: `agent_live${i}`, name: `speaking-partner-session-fr-${i}`, created_at: now }));
+    const res = await (await sessionRoute())(post("/api/session", good));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("Too many practice sessions are running right now. Try again in a few minutes.");
+    expect(state.posts.some(([p]) => p === "/v1/agents")).toBe(false);
   });
 });
 
@@ -112,15 +153,33 @@ describe("POST /api/session/end", () => {
     expect((await (await end())(post("/api/session/end", { agentId: "../agents" }))).status).toBe(400);
     expect((await (await end())(post("/api/session/end", "not json", "1.1.1.1", true))).status).toBe(400);
   });
+
+  it("limits each address to 20 calls a minute", async () => {
+    const route = await end();
+    for (let i = 0; i < 20; i++) await route(post("/api/session/end", { agentId: "agent_abcdefghij1234" }, "7.7.7.7"));
+    const res = await route(post("/api/session/end", { agentId: "agent_abcdefghij1234" }, "7.7.7.7"));
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "Too many requests. Try again in a minute." });
+  });
 });
 
 describe("POST /api/token", () => {
   it("returns a token, 503 without a key, and 429 past the limit", async () => {
     const route = (await import("../app/api/token/route")).POST;
     expect(await (await route(post("/api/token", {}, "2.2.2.2"))).json()).toEqual({ token: "tok_test" });
-    for (let i = 0; i < 11; i++) await route(post("/api/token", {}, "2.2.2.2"));
-    expect((await route(post("/api/token", {}, "2.2.2.2"))).status).toBe(429);
+    for (let i = 0; i < 9; i++) await route(post("/api/token", {}, "2.2.2.2"));
+    const blocked = await route(post("/api/token", {}, "2.2.2.2"));
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: "Too many requests. Try again in a minute." });
     delete process.env.CARTESIA_API_KEY;
     expect((await route(post("/api/token", {}, "3.3.3.3"))).status).toBe(503);
+  });
+
+  it("maps an upstream 401 to a fixed 502, not a rate limit", async () => {
+    const route = (await import("../app/api/token/route")).POST;
+    state.tokenStatus = 401;
+    const res = await route(post("/api/token", {}, "2.2.2.2"));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "Could not get a Cartesia token. Check the API key." });
   });
 });

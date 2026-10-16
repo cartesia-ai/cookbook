@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ outputs: [] as string[], prompts: [] as string[] }));
 
@@ -27,8 +27,18 @@ vi.mock("@/lib/llm", async () => {
 
 import { CHECKER_DOWN, NAME_NOT_OK, POST, SCENE_NOT_OK } from "@/app/api/scene/route";
 
-const post = (body: unknown) =>
-  POST(new Request("http://localhost/api/scene", { method: "POST", body: JSON.stringify(body) }));
+beforeAll(() => vi.stubEnv("TRUST_PROXY", "1"));
+afterAll(() => vi.unstubAllEnvs());
+
+let client = 0;
+const post = (body: unknown, ip = `10.0.0.${++client}`) =>
+  POST(
+    new Request("http://localhost/api/scene", {
+      method: "POST",
+      headers: { "x-forwarded-for": ip },
+      body: JSON.stringify(body),
+    }),
+  );
 
 const scene = (choices: string[], text = "The moon smiled at Mia.") =>
   JSON.stringify({
@@ -147,5 +157,13 @@ describe("POST /api/scene", () => {
     expect((await post({ ...first, age: "13" })).status).toBe(400);
     expect((await post({ ...first, history: [{ lines: [], choices: ["a", "b"], chosen: 5 }] })).status).toBe(400);
     expect(state.prompts).toHaveLength(0);
+  });
+
+  it("rate limits each client", async () => {
+    for (let i = 0; i < 10; i++) expect((await post({}, "9.9.9.9")).status).toBe(400);
+    const res = await post({}, "9.9.9.9");
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "Too many requests. Try again in a minute." });
+    expect((await post({}, "9.9.9.8")).status).toBe(400);
   });
 });

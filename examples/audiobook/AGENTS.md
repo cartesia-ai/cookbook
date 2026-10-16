@@ -4,18 +4,20 @@ EPUB to audiobook with Cartesia Sonic 3.6. Python 3.12 (`.python-version`), uv, 
 
 ## Commands (run from this folder)
 
-- Install: `uv sync`. Preview with no key: `uv run python main.py examples/alice_sample.epub out --preview --no_prompt`.
+- Install: `uv sync`. Preview with no key: `uv run python main.py samples/alice_sample.epub out --preview --no_prompt`.
 - Web app: `uv run python main_ui.py` (http://127.0.0.1:7860).
-- Tests, with the key unset so nothing goes live by accident: `env -u CARTESIA_API_KEY uv run python -m unittest discover -s tests -t . -p "*_test.py"`. No pytest.
-- Lint: `uv run --with ruff ruff check --isolated --select E9,F,B audiobook_generator/core audiobook_generator/tts_providers`.
-- Live: `uv run python scripts/live_smoke.py` (one short request; `--list-voices` lists voices). Live runs cost about 1 credit per character; keep them short and write audio outside the repo.
+- Tests: `uv run pytest`. `tests/conftest.py` unsets `CARTESIA_API_KEY` so nothing goes live by accident.
+- Lint: `uv run --with ruff ruff check --isolated --select E9,F,B audiobook_generator/core audiobook_generator/tts_providers audiobook_generator/ui tests main.py main_ui.py`.
+- Live runs cost about 1 credit per character. Keep them short and write audio outside the repo.
 
 ## Files
 
 - `audiobook_generator/tts_providers/cartesia_tts_provider.py`: the only file that calls Cartesia.
 - `audiobook_generator/core/cast.py`: speaker detection, voice pool, emotion and laughter cues, `PARAGRAPH_BREAK`.
 - `audiobook_generator/core/readalong.py`: `.timings.json` and `.vtt`.
-- `audiobook_generator/ui/web_ui.py` and `ui/theme.py`: the Gradio app and its kit-based theme.
+- `audiobook_generator/ui/web_ui.py` and `ui/theme.py`: the Gradio 6 app and its kit-based theme. Theme and CSS go to `launch()`, not `gr.Blocks()`. The log panel is a `gr.Textbox` that a `gr.Timer` refreshes from the log file every second while a run is going. Start turns the timer on; the first tick after the run ends reads the log once more and turns it off.
+- `samples/`: the sample EPUB, its source text and a sample cast file. `scripts/make_sample_epub.py` rebuilds the EPUB.
+- `readalong.html`: a static page that plays an mp3 with its `.timings.json`. Nothing generates it.
 
 ## Rules
 
@@ -27,11 +29,11 @@ EPUB to audiobook with Cartesia Sonic 3.6. Python 3.12 (`.python-version`), uv, 
 - `INPUT_ORDER` in `ui/web_ui.py` must match the parameters of `process_ui_form`. `tests/ui_test.py` checks it.
 - Emotion goes only on English dialogue unless the user passes `--cartesia_emotion`. Emotion is a beta model feature.
 - Never write a key, a header or a full request to logs, docs or tests. Tests use a fake key and assert it never appears.
-- Do not add other speech providers or a Docker path. No em dashes.
+- Do not add other speech providers or a Docker path.
 
 ## Verify a change
 
-Run the tests and lint above, then a `--preview` run on the sample. For provider changes, also run `scripts/live_smoke.py` once with a key.
+Run the tests and lint above, then a `--preview` run on the sample. For provider changes, also convert one short chapter with a key (`--chapter_start 1 --chapter_end 1`).
 
 ## Docs
 

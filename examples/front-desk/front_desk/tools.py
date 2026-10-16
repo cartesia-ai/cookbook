@@ -1,11 +1,3 @@
-"""The four receptionist tools: what the agent sees, and what runs when it calls them.
-
-`TOOL_SPECS` is the single definition. `scripts/setup_agent.py` turns each spec into a
-Cartesia webhook tool (when PUBLIC_BASE_URL is set) or a client tool (when it is not), and
-the routes in `main.py` call `run_tool` either way. Results are short JSON strings, well
-under Cartesia's 4096 byte limit for a tool result.
-"""
-
 from __future__ import annotations
 
 import json
@@ -94,12 +86,15 @@ WEBHOOK_CONTEXT = {
     "call_direction": "system__call_direction",
 }
 
+
 def _s(params: dict[str, Any], key: str, limit: int = 200) -> str:
     v = params.get(key)
     return str(v).strip()[:limit] if v is not None else ""
 
+
 def _json(obj: dict[str, Any]) -> str:
     return json.dumps(obj, separators=(",", ":"))
+
 
 class Tools:
     def __init__(self, settings: Settings, store: Store, calendar: Calendar, now: datetime | None = None):
