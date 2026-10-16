@@ -1,0 +1,13 @@
+{% from "_icons.html" import icon %}
+{% if not setup.key or not setup.agent %}
+<div class="alert" role="status">
+  {{ icon("info") }}
+  <div>
+    <p class="alert-title">Finish setup</p>
+    <p class="alert-body">
+      {% if not setup.key %}Add <code>CARTESIA_API_KEY</code> to <code>.env</code>, then run{% else %}Run{% endif %}
+      <code>uv run scripts/setup_agent.py</code> to create the receptionist, and restart the server.
+    </p>
+  </div>
+</div>
+{% endif %}

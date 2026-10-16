@@ -1,0 +1,53 @@
+name: Bug in a template or recipe
+description: Something in examples/ or content/cookbook does not run or does the wrong thing.
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: where
+    attributes:
+      label: Template or recipe
+      options:
+        - voice-chat
+        - speaking-partner
+        - docs-voice-widget
+        - coding-voice-mode
+        - article-to-podcast
+        - audiobook
+        - story-time
+        - meeting-notes
+        - pocket-interpreter
+        - front-desk
+        - voice-journal
+        - A recipe in content/cookbook
+        - Repo tooling or docs
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you saw instead. Paste the exact error.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. pnpm dlx create-next-app --example ... my-app
+        2. cp .env.example .env.local
+        3. pnpm dev
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: OS, browser, Node or Python version, and the SDK version (@cartesia/cartesia-js or cartesia).
+  - type: checkboxes
+    id: secrets
+    attributes:
+      label: Before you post
+      options:
+        - label: I removed API keys, access tokens and agent ids from everything above.
+          required: true

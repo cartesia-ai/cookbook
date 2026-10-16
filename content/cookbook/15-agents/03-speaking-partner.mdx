@@ -1,0 +1,263 @@
+---
+title: Build an AI language speaking partner with a Managed Agent
+description: Practice speaking a language with a Cartesia Managed Agent and get written corrections after every line, using Next.js.
+tags: ['agents', 'next', 'voice', 'language learning', 'managed agents']
+---
+
+# Build an AI language speaking partner with a Managed Agent
+
+This recipe builds a speaking partner. You pick the language you speak and the one you are learning, choose a role play such as ordering a coffee, and talk to a Cartesia Managed Agent that plays the other person. A side panel writes down what to fix after every line you say.
+
+The finished app is in [`examples/speaking-partner`](../../../examples/speaking-partner/README.md). It is self-contained: the UI is shadcn/ui components in `components/ui`, and the WebSocket client is copied into `lib/agents-web` (from [`packages/agents-web`](../../../packages/agents-web/README.md)), so you can deploy or clone just that folder. The missions and the two teaching modes come from an Apache-2.0 open-source app, and the credit is at the end.
+
+## Prerequisites
+
+- A Cartesia API key
+- Node 22.13 or newer and pnpm 10
+- Optional, for the corrections panel: an Anthropic or OpenAI API key
+- The basics of the agent connection from [Connect to a Managed Agent from the browser](./01-talk-to-a-managed-agent.mdx)
+
+Both of your languages must be one of English, Spanish, French, Hindi or Japanese. Those are the languages Ink-2 transcribes, and you speak both of them: the one you learn, and your own when the partner explains something in Teacher mode. The partner's voice is a Sonic 3.6 voice that speaks the target language natively, picked from the voice list.
+
+Agent LLM usage is billed to your Cartesia account, and each spoken line costs one small call to the corrections model you configure.
+
+The agent half was run against the live API on 2026-10-14: for each of the five languages the server created an agent, a browser-style token opened the WebSocket, the service sent `session_ready`, and the agent was deleted. Short conversations in Spanish, French, Japanese and Hindi were also run with Sonic-generated speech in place of a microphone: Ink-2 transcribed them, the partner answered in the target language, and in one run it called `complete_mission` with the expected parameters. A real microphone, the quality of the spoken partner and the corrections model were not tested live. Details are in the example README.
+
+## Why the server creates an agent for every session
+
+A mission has a role, a scenario, a mode and two languages. Managed Agents have a feature built for this, dynamic variables, but a browser access token cannot send them. The service closes the socket with `dynamic_variables_not_allowed`. Only a connection that uses your API key can set them, and that key must never reach the browser.
+
+So the server writes the session into the instructions. When you pick a mission, the page asks the server for an agent. The server builds the prompt, creates a temporary agent that carries it, and returns the agent id. Creating an agent took about 130 to 550 ms when we measured it. The browser then gets a 60 second token and connects to that agent. When you leave the session, the server deletes the agent.
+
+```ts filename="lib/session-agent.ts"
+export function buildAgentBody(input: CreateInput, voiceId: string, toolId: string, env: Env = process.env, now = Date.now()) {
+  const mission = getMission(input.missionId);
+  if (!mission) throw new SessionAgentError("Unknown mission.", "bad_mission");
+  return {
+    name: `${AGENT_NAME_PREFIX}${input.target}-${now.toString(36)}`,
+    description: "Temporary agent from examples/speaking-partner. Deleted when the session ends.",
+    config: {
+      instructions: buildInstructions({ target: input.target, native: input.native, mission, mode: input.mode }),
+      initial_message: null, // the learner speaks first
+      model: { id: env.AGENT_MODEL_ID || DEFAULT_AGENT_MODEL },
+      language: { primary: input.target },
+      audio: { output: { voice_id: voiceId } },
+      speculative_generation: true,
+      turn: { inactivity_check_in_secs: 10, inactivity_end_call_secs: 60 },
+      tools: [{ id: toolId }],
+    },
+  };
+}
+```
+
+```ts filename="lib/session-agent.ts"
+export async function createSessionAgent(api: AgentsApi, input: CreateInput, env: Env = process.env): Promise<string> {
+  if (!getMission(input.missionId)) throw new SessionAgentError("Unknown mission.", "bad_mission");
+  const [voiceId, toolId] = await Promise.all([pickVoiceId(api, input.target, env), ensureCompleteTool(api, env)]);
+  const created = await api.post<{ id?: string }>(AGENTS_PATH, buildAgentBody(input, voiceId, toolId, env));
+  if (!created.id) throw new SessionAgentError("The API answered without an agent id.", "upstream");
+  return created.id;
+}
+```
+
+The agent name starts with `speaking-partner-session-`. The delete route checks that prefix before it deletes anything, so the route cannot be used against your other agents. Tabs that close without a goodbye are covered by a sweep that removes session agents older than 30 minutes.
+
+```ts filename="lib/session-agent.ts"
+export async function deleteSessionAgent(api: AgentsApi, agentId: string): Promise<"deleted" | "missing"> {
+  if (!AGENT_ID_RE.test(agentId)) throw new SessionAgentError("Bad agent id.", "bad_id");
+  let agent: { name?: string };
+  try {
+    agent = await api.get<{ name?: string }>(`${AGENTS_PATH}/${agentId}`);
+  } catch (err) {
+    if (statusOf(err) === 404) return "missing";
+    throw err;
+  }
+  if (!agent.name?.startsWith(AGENT_NAME_PREFIX)) throw new SessionAgentError("Not a speaking-partner session agent.", "not_ours");
+  try {
+    await api.delete(`${AGENTS_PATH}/${agentId}`);
+  } catch (err) {
+    if (statusOf(err) === 404) return "missing";
+    throw err;
+  }
+  return "deleted";
+}
+```
+
+If you would rather not create agents per request, there are three other ways to get the same result. One agent for every language, mission and mode is 5 x 9 x 2 = 90 agents to keep in sync. A generic agent per language drops the mission from the prompt, which is most of the point. A small WebSocket proxy that holds your API key can send dynamic variables, but it is a second server to run. The per-session agent needs none of that, at the cost of one extra request before the call starts.
+
+## Gate the routes before you deploy
+
+`/api/session` creates agents on your account and `/api/token` hands out the ability to call them. The example limits each address with a small in-memory counter, which only slows down casual abuse and is not shared between server instances. Put both routes behind your own session check. See [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
+
+```ts filename="app/api/session/route.ts"
+export async function POST(req: Request): Promise<Response> {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    return Response.json({ error: "CARTESIA_API_KEY is not set. Add it to .env.local and restart." }, { status: 503, headers });
+  }
+  if (!allow(clientKey(req))) {
+    return Response.json({ error: "Too many sessions from this network. Try again in a minute." }, { status: 429, headers });
+  }
+  const parsed = Body.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "Bad request." }, { status: 400, headers });
+
+  const api = createAgentsApi(apiKey);
+  try {
+    const agentId = await createSessionAgent(api, parsed.data);
+    after(() => sweepStaleAgents(api).catch(() => undefined));
+    return Response.json({ agentId }, { headers });
+  } catch (err) {
+    if (err instanceof SessionAgentError && (err.code === "no_voice" || err.code === "bad_mission")) {
+      return Response.json({ error: err.message }, { status: 422, headers });
+    }
+    return Response.json({ error: "Could not create the session." }, { status: 502, headers });
+  }
+}
+```
+
+```ts filename="app/api/token/route.ts"
+import { createAgentTokenHandler } from "@/lib/agents-web/server";
+import { clientKey, getApiKey } from "../../../lib/env";
+import { createRateLimiter } from "../../../lib/rate-limit";
+
+const headers = { "Cache-Control": "no-store" };
+const allow = createRateLimiter(12, 60_000);
+
+export async function POST(req: Request): Promise<Response> {
+  const apiKey = getApiKey();
+  if (!apiKey) return Response.json({ error: "CARTESIA_API_KEY is not set." }, { status: 503, headers });
+  const res = await createAgentTokenHandler({ apiKey, expiresIn: 60, authorize: (r) => allow(clientKey(r)) })(req);
+  if (res.status === 401) return Response.json({ error: "Too many requests. Try again in a minute." }, { status: 429, headers });
+  return res;
+}
+```
+
+## Write the prompt for the ear
+
+The prompt has the usual four parts: identity, speaking rules, the mode, and what to do at the end. The speaking rules matter most. The partner talks, so it gets one or two short sentences and no lists or markdown. The mode text is where Teacher and Immersive differ.
+
+Immersive mode has one rule worth copying from the original app. If you ask for help in your own language, the partner does not just answer. It tells you how to say it in the target language and waits until you say it.
+
+```ts filename="lib/prompts.ts"
+const IMMERSIVE = (target: string, native: string) => `# Immersive mode
+Play the role naturally, like a real person who happens to understand ${native} but wants to talk in ${target}. Do not act as an AI assistant.
+Be helpful but strict about practice: you cannot move the scene forward unless the learner speaks ${target} themselves.
+No free rides: if the learner asks for help in ${native}, for example to repeat something or to translate, do not just answer. Tell them in ${native} how to say it in ${target}, give the ${target} phrase, and wait until they say it. Do not continue the scene before they try.
+Feedback and translations are the only things you say in ${native}.`;
+```
+
+## Finish with a client tool
+
+When you reach the goal of the scene, the partner says goodbye and calls `complete_mission` with a score and three pointers. This is a client tool, so it runs in the browser. It is async and expects no response, so nothing has to be sent back. One tool serves every session agent, and the server creates it the first time it is needed.
+
+```ts filename="lib/prompts.ts"
+export function completeMissionToolBody() {
+  return {
+    type: "client",
+    name: COMPLETE_TOOL_NAME,
+    description:
+      "Call once when the learner has reached the goal of the scene, after saying goodbye. Gives a score and three feedback pointers.",
+    pre_tool_speech: "off",
+    execution_mode: "async",
+    expects_response: false,
+    parameters: {
+      type: "object",
+      properties: {
+        score: {
+          type: "integer",
+          description: "0 in teacher mode. Otherwise 1 (struggled), 2 (intelligible with errors) or 3 (fluent).",
+        },
+        feedback_pointers: {
+          type: "array",
+          items: { type: "string" },
+          description: "Three short points in the learner's native language.",
+        },
+      },
+      required: ["score", "feedback_pointers"],
+    },
+  };
+}
+```
+
+The hook runs the handler for you. The service sends audio faster than it plays, so when the tool call arrives the goodbye is usually still queued in the browser. In one test, 32 seconds of speech arrived within 3.4 seconds. A fixed delay would cut it off, so the page waits until playback drains (at most 20 seconds), plays a chime, closes the call and shows the summary.
+
+```ts filename="components/session-view.tsx"
+  const agent = useCartesiaAgent({
+    agentId,
+    getToken: fetchToken,
+    tools: {
+      [COMPLETE_TOOL_NAME]: (params) => {
+        if (completion.current) return;
+        completion.current = parseCompletion(params);
+        setCompleted(true);
+      },
+    },
+  });
+```
+
+## Check every line with a second model
+
+A Managed Agent has no side channel to its own LLM, so the written corrections come from a separate call. When a turn of yours ends, the page sends the final text to `/api/correct`, one line at a time, and the route asks a small model for a structured answer. Your own words arrive in `turn_ended`, not while you speak, so the panel updates a beat after you stop.
+
+```ts filename="lib/corrections.ts"
+export const CorrectionSchema = z.object({
+  hasIssue: z.boolean().describe("true only if the learner made a real mistake"),
+  corrected: z.string().describe("The line corrected, in the target language. Equal to the input when there is no issue."),
+  explanation: z.string().describe("One or two short sentences in the learner's native language. Empty when there is no issue."),
+  category: z.enum(CATEGORIES),
+});
+```
+
+```ts filename="lib/corrections.ts"
+export async function correctLine(model: LanguageModel, req: CorrectRequest, signal?: AbortSignal): Promise<Correction> {
+  const context = [
+    req.mission ? `Scene: ${req.mission}` : "",
+    req.recent?.length ? `Earlier lines from the learner:\n${req.recent.map((r) => `- ${r}`).join("\n")}` : "",
+    `Line to check:\n${req.text}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const { output } = await generateText({
+    model,
+    system: systemPrompt(req.target, req.native),
+    prompt: context,
+    output: Output.object({ schema: CorrectionSchema }),
+    maxOutputTokens: 2000,
+    providerOptions: { openai: { reasoningEffort: "minimal" } },
+    abortSignal: signal,
+  });
+  return clampCorrection(output, req.text);
+}
+```
+
+The model sees text from speech recognition, not text you typed, so the prompt tells it to ignore punctuation, capital letters and anything that looks like a recognition error, and to answer `hasIssue: false` when unsure. A reply that "fixes" nothing is dropped. If the call fails, the card says so and offers a retry. It never shows a made-up pass. Your lines go to the model provider you configured, and the route logs nothing.
+
+## Pick a voice for the language
+
+The voice list says which accents each voice speaks natively. The server keeps the voices that are native in the target language, prefers friendlier descriptions, and breaks ties by name, so the pick is stable. Set `VOICE_ID_FR` and the like to choose your own.
+
+```ts filename="lib/session-agent.ts"
+export function chooseVoice(voices: VoiceSummary[], code: LanguageCode): VoiceSummary | undefined {
+  return voices
+    .filter((v) => isNative(v, code))
+    .sort((a, b) => warmth(b) - warmth(a) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))[0];
+}
+```
+
+## Run it
+
+```sh
+cd examples/speaking-partner
+pnpm install                       # add --ignore-workspace if you copied this folder out of the repo
+cp .env.example .env.local         # then fill in CARTESIA_API_KEY and one LLM key
+pnpm dev
+```
+
+Open http://localhost:3000, pick languages and a mission, then press Start speaking. Use headphones, or the partner can hear itself. `pnpm live` and `pnpm live:talk es` run the agent half against the real API without a microphone, and `pnpm test` runs the rest against local mocks.
+
+## What to try next
+
+- Add more missions in `data/missions.json`. The routes take a mission id, so the browser cannot send free text into the prompt.
+- Pin a voice per language with `VOICE_ID_<LANG>` and listen to the result.
+- Languages beyond the five need a different pipeline, for example `ink-whisper` with your own LLM and Sonic. [Build a browser voice chat with a Managed Agent](./02-voice-chat.mdx) describes the bring-your-own-LLM variant.
+

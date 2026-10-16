@@ -1,0 +1,73 @@
+---
+title: Use Cartesia from the browser without exposing your API key
+description: Keep your API key on the server and give the browser a token that expires in 60 seconds.
+tags: ['auth', 'next', 'browser']
+---
+
+# Use Cartesia from the browser without exposing your API key
+
+Your `CARTESIA_API_KEY` must never reach a browser. Anyone who finds it can spend your credits. When a page needs to call Cartesia directly, for example to stream microphone audio, your server mints a short-lived access token and the page uses that instead.
+
+## Prerequisites
+
+- A Cartesia API key in `CARTESIA_API_KEY`
+- `pnpm add @cartesia/cartesia-js`
+
+## The rules
+
+- The key lives in server environment variables only.
+- Tokens last 60 seconds. The API allows up to 3600, but a token ends up in a WebSocket URL as a query parameter, and URLs get logged. Short lives limit the damage.
+- Grant only what the page needs. The grants are `tts`, `stt` and `agent`.
+- Gate the token route with your own session check or a rate limit. The route hands out spending power, so treat it like a login-protected endpoint.
+
+## Server: mint the token
+
+```ts filename="app/api/cartesia-token/route.ts"
+import Cartesia from '@cartesia/cartesia-js';
+
+const client = new Cartesia({ apiKey: process.env.CARTESIA_API_KEY });
+
+export async function POST() {
+  const { token } = await client.accessToken.create({
+    grants: { tts: true, stt: true },
+    expires_in: 60,
+  });
+  return Response.json({ token });
+}
+```
+
+Return the token in the JSON body. Do not put it in an httpOnly cookie. Browser JavaScript cannot read those, and it needs the token to build a WebSocket URL.
+
+## Browser: fetch a fresh token for every connection
+
+Because a token lives 60 seconds, don't fetch it once at page load. Fetch it right before you connect.
+
+```tsx filename="lib/cartesia-client.ts"
+import Cartesia from '@cartesia/cartesia-js';
+
+export async function createBrowserClient() {
+  const res = await fetch('/api/cartesia-token', { method: 'POST' });
+  if (!res.ok) throw new Error(`Token request failed: ${res.status}`);
+  const { token } = await res.json();
+  return new Cartesia({ token });
+}
+```
+
+Call `createBrowserClient()` each time the user starts a recording or a call.
+
+## Which grant to ask for
+
+| Grant | Use it for |
+| --- | --- |
+| `tts` | Any text-to-speech endpoint |
+| `stt` | The speech-to-text endpoints, including the `ink-2` turn detection socket at `/stt/turns/websocket` |
+| `agent` | The Managed Agents WebSocket, see [Connect to a Managed Agent from the browser](../15-agents/01-talk-to-a-managed-agent.mdx) |
+
+The docs list the `stt` grant against `/stt` and `/stt/websocket` only. On 2026-10-16 a token with only `{ stt: true }` also opened `/stt/turns/websocket` (`client.stt.autoFinalize.websocket` with `ink-2`) and got turn events back, so the grant covers it in practice.
+
+## Next steps
+
+- [Stream text to speech in Next.js](../01-next/01-stream-speech.mdx)
+- [Connect to a Managed Agent from the browser](../15-agents/01-talk-to-a-managed-agent.mdx)
+
+The token route is adapted from the Next.js example in [cartesia-js](https://github.com/cartesia-ai/cartesia-js) (Apache-2.0), with the lifetime cut from 300 to 60 seconds.

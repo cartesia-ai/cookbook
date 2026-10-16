@@ -1,0 +1,169 @@
+---
+title: Turn an article into a podcast in Next.js
+description: Fetch an article, have a model write a two-host script, voice each line with Sonic 3.6, and play one episode with a synced transcript.
+tags: ['next', 'tts', 'ai-sdk']
+---
+
+# Turn an article into a podcast in Next.js
+
+This recipe builds a small app that takes a link or pasted text and returns a two-host episode. A language model writes the script as JSON. Sonic 3.6 voices each line with one of two voices. The route joins the audio into one WAV file, and the page plays it next to a transcript that highlights the current line.
+
+The full app is in [`examples/article-to-podcast`](../../../examples/article-to-podcast). The snippets below are copied from it.
+
+## Prerequisites
+
+- A Next.js App Router app
+- `pnpm add @cartesia/cartesia-js ai zod @mozilla/readability jsdom`, plus a provider package such as `@ai-sdk/anthropic`
+- `CARTESIA_API_KEY` and one language model key in `.env.local`. See the example's `.env.example`.
+
+## How it fits together
+
+The `/api/script` route fetches the page, extracts the article, and asks the model for a script. The `/api/audio` route voices every line, joins the audio and returns a WAV file. The page calls the two routes in order, so you can read the script while the audio renders. The browser never talks to Cartesia, so no access token is needed. If you move audio calls into the browser, see [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
+
+## Extract the article
+
+Readability needs a DOM. jsdom provides one, with scripts and subresource loading left off.
+
+```ts filename="lib/extract.ts"
+export function parseArticle(html: string, url: string): Article {
+  const dom = new JSDOM(html, { url, virtualConsole: new VirtualConsole() });
+  const parsed = new Readability(dom.window.document).parse();
+  dom.window.close();
+  const text = cleanText(parsed?.textContent ?? "");
+  if (!parsed || text.length < MIN_ARTICLE_CHARS) throw new UnreadablePageError();
+  const { text: body, truncated } = limit(text);
+  const host = new URL(url).hostname;
+  return { title: parsed.title?.trim() || host, source: parsed.siteName?.trim() || host, text: body, truncated };
+}
+```
+
+The example fetches the page with a guarded `node:http` request that checks the resolved address inside the connection, so a hostname cannot be rebound to a private address after the check. Read `lib/safe-fetch.ts` before you accept links from strangers. Pages that need JavaScript to render will not parse, so the app asks for pasted text in that case.
+
+## Write the script
+
+`generateObject` is deprecated. Use `generateText` with `Output.object`, and read the parsed value from `result.output`.
+
+```ts filename="lib/script.ts"
+async function generatePart(model: LanguageModel, o: Options, material: string, index: number, total: number, previous: ScriptLine[], signal?: AbortSignal) {
+  const request = () =>
+    generateText({
+      model,
+      temperature: o.creativity,
+      system: buildSystemPrompt(o),
+      prompt: buildUserPrompt(o, material, { index, total, previous }),
+      output: Output.object({ schema: ScriptSchema }),
+      maxRetries: 2,
+      abortSignal: signal,
+    });
+  try {
+    return (await request()).output;
+  } catch (err) {
+    if (!NoObjectGeneratedError.isInstance(err)) throw err;
+    return (await request()).output;
+  }
+}
+```
+
+The system prompt asks for plain spoken prose and treats the article as untrusted material. After generation, a normalizer merges runs from one speaker, splits lines over 400 characters, strips markdown characters and keeps at most two `[laughter]` tags. Long articles are cut into parts, and each part sees the last six lines of the one before it. The chunk sizing follows [Podcastfy](https://github.com/souzatharsis/podcastfy).
+
+## Voice each line
+
+Call `client.tts.generate` once per line, with the voice for that speaker.
+
+```ts filename="lib/tts.ts"
+export async function renderLine(
+  client: TtsClient,
+  line: ScriptLine,
+  o: Pick<Options, "outputLanguage">,
+  voices: Record<Speaker, string>,
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
+  const res = await client.tts.generate(
+    {
+      model_id: TTS_MODEL,
+      transcript: line.text,
+      voice: { mode: "id", id: voices[line.speaker] },
+      language: languageCode(o),
+      output_format: { container: "raw", encoding: "pcm_s16le", sample_rate: SAMPLE_RATE },
+    },
+    { signal },
+  );
+  return new Uint8Array(await res.arrayBuffer());
+}
+```
+
+The example runs four calls at a time and keeps the results in order. If one line fails, the whole episode fails and the error names the line.
+
+### Why raw PCM
+
+With `container: 'raw'` and `pcm_s16le` at 24 kHz, each line is plain samples. Joining lines is a byte copy, and a line's duration is `bytes / 2 / 24000`, so you know exactly when each line starts. Per-line mp3 or WAV files would need header handling and would give only approximate times.
+
+Voicing each line alone loses some tone from line to line, because the model never hears the neighbors. Short gaps between lines (350 ms when the speaker changes, 180 ms otherwise) hide most of that.
+
+## Assemble the file
+
+```ts filename="lib/wav.ts"
+export function wavHeader(dataLength: number, sampleRate = SAMPLE_RATE, channels = 1, bitDepth = 16): Uint8Array {
+  const header = new Uint8Array(44);
+  const view = new DataView(header.buffer);
+  const ascii = (offset: number, text: string) => {
+    for (let i = 0; i < text.length; i++) header[offset + i] = text.charCodeAt(i);
+  };
+  const blockAlign = (channels * bitDepth) / 8;
+  ascii(0, "RIFF");
+  view.setUint32(4, 36 + dataLength, true);
+  ascii(8, "WAVE");
+  ascii(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitDepth, true);
+  ascii(36, "data");
+  view.setUint32(40, dataLength, true);
+  return header;
+}
+
+export function concatPcm(parts: Uint8Array[], gapsMs: number[]): { pcm: Uint8Array; starts: number[]; duration: number } {
+  const pieces: Uint8Array[] = [];
+  const starts: number[] = [];
+  let bytes = 0;
+  parts.forEach((part, i) => {
+    if (i > 0) {
+      const gap = silence(gapsMs[i] ?? 0);
+      pieces.push(gap);
+      bytes += gap.byteLength;
+    }
+    starts.push(pcmDuration(bytes));
+    pieces.push(part);
+    bytes += part.byteLength;
+  });
+  const pcm = new Uint8Array(bytes);
+  let offset = 0;
+  for (const p of pieces) {
+    pcm.set(p, offset);
+    offset += p.byteLength;
+  }
+  return { pcm, starts, duration: pcmDuration(bytes) };
+}
+```
+
+The audio route returns the WAV in 64 KB chunks with `Content-Length` and an `X-Line-Starts` header. The page reads the header, turns the body into a blob URL, and compares `audio.currentTime` with the start times to highlight the active line.
+
+## Swap the model provider
+
+`lib/model.ts` returns an AI SDK model. The example picks the AI Gateway, Anthropic or OpenAI from the keys you set. To use another provider, return its model from `getModel`.
+
+## Deploying
+
+- Both routes set `maxDuration = 300`. A long episode can take one to two minutes, so check your plan allows it.
+- A five minute episode is about 14 MB as WAV. Vercel limits non-streamed responses to 4.5 MB, and the route streams the body, but this has not been tested on a deployment. If it fails, switch to mp3 or store the file and return a link.
+- The routes have no auth and no rate limiting, and they spend money. Add both before the app is public.
+
+## Next steps
+
+- Run the finished app: [`examples/article-to-podcast`](../../../examples/article-to-podcast).
+- Stream speech as it is generated: [Stream text to speech in Next.js](./01-stream-speech.mdx).
+- Lock the routes down: [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).

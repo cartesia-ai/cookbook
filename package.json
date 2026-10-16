@@ -1,0 +1,45 @@
+{
+  "name": "cartesia-cookbook",
+  "private": true,
+  "description": "Runnable templates and recipes for Cartesia: Sonic text to speech, Ink speech to text and voice agents in Next.js, Python, Node and Expo.",
+  "keywords": [
+    "cartesia",
+    "text-to-speech",
+    "tts",
+    "speech-to-text",
+    "stt",
+    "voice-agent",
+    "voice-ai",
+    "speech-synthesis",
+    "speech-recognition",
+    "realtime",
+    "websocket",
+    "sonic",
+    "ink",
+    "nextjs",
+    "expo",
+    "python",
+    "templates",
+    "examples",
+    "cookbook"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cartesia-ai/cookbook.git"
+  },
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.4.1",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "check:content": "node tools/check-content/index.mjs && pnpm --filter @cartesia-cookbook/check-content test",
+    "test": "pnpm --filter @cartesia-cookbook/agents-web test",
+    "check": "pnpm check:facts && pnpm check:content && pnpm typecheck && pnpm test",
+    "check:facts": "node tools/check-facts/index.mjs && pnpm --filter @cartesia-cookbook/check-facts test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": []
+  }
+}

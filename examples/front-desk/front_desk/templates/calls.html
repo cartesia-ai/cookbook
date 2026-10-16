@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Calls · Front desk{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Calls</h1>
+    <p>Every call your receptionist answered, newest first. Open one for the transcript, the recording and per-turn latency.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-outline" href="/try">{{ icon("mic") }} Try it in the browser</a>
+  </div>
+</div>
+{% include "_setup_alert.html" %}
+<div id="calls" hx-get="/partials/calls" hx-trigger="every 5s" hx-swap="innerHTML">
+  {% include "_calls_list.html" %}
+</div>
+{% endblock %}

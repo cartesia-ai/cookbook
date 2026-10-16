@@ -1,0 +1,96 @@
+---
+title: Turn an EPUB ebook into an audiobook with Python
+description: Narrate an EPUB with Sonic, a voice per speaker, and save word timestamps for read-along.
+tags: ['python', 'tts', 'audiobook', 'sonic-3.6', 'timestamps']
+---
+
+# Turn an EPUB ebook into an audiobook with Python
+
+The `examples/audiobook` app converts an EPUB into one mp3 per chapter. Quoted speech gets a voice per speaker, the rest is read by a narrator, and each chapter comes with a JSON file of word timestamps and a WebVTT subtitle file. It is a fork of [p0n1/epub_to_audiobook](https://github.com/p0n1/epub_to_audiobook) (MIT) with a Cartesia provider, so the EPUB parsing and the web interface come from that project.
+
+## Run it
+
+You need Python 3.10 to 3.12, uv and ffmpeg. The sample book is two public-domain excerpts, about 15,000 characters.
+
+```bash filename="terminal"
+cd examples/audiobook
+cp .env.example .env            # put your key in .env
+set -a; . ./.env; set +a
+uv run python main.py examples/alice_sample.epub out --tts cartesia --no_prompt
+```
+
+Add `--preview` to list the chapters and the speakers it found without calling the API.
+
+## How a chapter becomes audio
+
+The bytes endpoint returns audio but no timings. The streaming endpoint returns both, but only as raw PCM. So the provider streams each chunk of text with `add_timestamps`, collects the PCM, and encodes the whole chapter once at the end with ffmpeg. This is the request, a method of the provider class in `audiobook_generator/tts_providers/cartesia_tts_provider.py`. `model_name` defaults to `sonic-3.6`, and `SAMPLE_RATE` is 44100.
+
+```python filename="audiobook_generator/tts_providers/cartesia_tts_provider.py"
+def _stream_chunk(self, chunk: cast.Segment) -> Tuple[bytes, List[Tuple[str, float, float]]]:
+    """One SSE request. Returns PCM bytes and (word, start, end) in chunk time."""
+    kwargs = dict(
+        model_id=self.config.model_name,
+        transcript=chunk.text,
+        voice=chunk.voice_id,
+        language=self.config.language,
+        output_format={"container": "raw", "encoding": "pcm_s16le", "sample_rate": SAMPLE_RATE},
+        add_timestamps=True,
+        use_normalized_timestamps=False,
+    )
+    gen = self._generation_config(chunk.emotion)
+    if gen:
+        kwargs["generation_config"] = gen
+
+    pcm = bytearray()
+    words: List[Tuple[str, float, float]] = []
+    for ev in self.client.tts.generate_sse(**kwargs):
+        if ev.type == "chunk":
+            if ev.audio:
+                pcm += ev.audio
+        elif ev.type == "timestamps":
+            wt = ev.word_timestamps
+            words.extend(zip(wt.words, wt.start, wt.end, strict=False))
+        elif ev.type == "error":
+            raise CartesiaStreamError(ev.status_code, f"{ev.title}: {ev.message}")
+        elif ev.type == "done":
+            break
+    return bytes(pcm), words
+```
+
+Two details matter. Timestamps are in seconds from the start of that request, so the provider adds the length of the audio already collected (bytes divided by 44,100 times 2) before saving them. And `use_normalized_timestamps=False` returns the original words ("$5", "Mr.") instead of the spoken form ("five dollars"), which is what a read-along page needs to show the book's own text.
+
+The `cartesia` 4.2.0 client does not read `CARTESIA_API_KEY` by itself, so the app reads it and passes `api_key=`.
+
+## One voice per speaker
+
+In `dialogue` mode the text is split on quotation marks. A few patterns attribute each quote to a speaker ("said Alice", "the Mouse cried"), and each speaker gets a voice from a pool of Cartesia library voices. The result is saved as `cast.json` in the output folder before any chapter is converted, so chapters processed in parallel agree:
+
+```json filename="cast.json"
+{
+  "narrator": "Archie",
+  "speakers": { "Alice": "Maya", "Mouse": "Leo" }
+}
+```
+
+Edit the file and run again to change a voice, or pass your own with `--cast_file`. This is a heuristic over English dialogue tags and it is wrong on plenty of real books. Check the file after `--preview`. Handing the attribution to an LLM instead is a good exercise, and the `cast.json` format is the place to plug it in.
+
+## Emotion and laughter
+
+For English dialogue, a cue next to a quote sets the emotion for that request through `generation_config`: "whispered" and "murmured" give `calm`, "shouted" gives `angry`, "sobbed" gives `sad`, "gasped" gives `scared`, and a question marked with "asked" gives `curious`. "Laughed" puts `[laughter]` at the start of the quote. Narration gets no emotion. Emotion control is a Beta feature, it is English only, and the model follows it best on voices Cartesia tags as emotive. A returned `[laughter]` marker comes back in the word list, so the app drops it before saving timestamps.
+
+## Long chapters
+
+No request length limit is documented. In a test, 8,000 characters in one request worked, but the app sends at most 1,500 (`--cartesia_max_chars`) so that a failed request costs little to retry. Text is split on sentence boundaries and never across paragraphs, and paragraphs are joined with 600 ms of silence added to the PCM. A stream that dies midway is retried for that chunk only, and its partial audio and timestamps are thrown away.
+
+## Read-along
+
+Each chapter has `<chapter>.timings.json` with a `words` list of `{"w", "s", "e", "speaker"}`, where `s` and `e` are seconds into the final mp3, pauses included. `<chapter>.vtt` groups them into cues of about eight words. Open `examples/audiobook/readalong.html`, pick the mp3 and its timings file, and the current word is highlighted as it plays.
+
+## Cost
+
+Sonic bills about one credit per character, and what a credit costs depends on your plan. The sample uses roughly 15,000 credits. See [cartesia.ai/pricing](https://cartesia.ai/pricing).
+
+## Next steps
+
+- [The example's README](../../../examples/audiobook/README.md), with every option
+- [Convert text to speech and save a WAV file](./01-generate-speech-to-file.mdx), the shortest Sonic script

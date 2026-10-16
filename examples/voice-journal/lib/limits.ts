@@ -1,0 +1,10 @@
+export const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
+export const MAX_RECORDING_SECONDS = 5 * 60;
+export const MAX_TRANSCRIPT_CHARS = 12_000;
+export const MAX_RECAP_ENTRIES = 30;
+export const MAX_RECAP_INPUT_CHARS = 40_000;
+export const MAX_SPEAK_CHARS = 2_000;
+export const DEFAULT_VOICE_ID = "6ccbfb76-1fc6-48f7-b71d-91ac6298247b";
+export const DEFAULT_VOICE_NAME = "Tessa";
+export const TTS_MODEL = "sonic-3.6";
+export const STT_MODEL = "ink-whisper";

@@ -1,0 +1,3 @@
+{% macro outcome_badge(outcome) -%}
+<span class="badge {{ 'badge-booked' if outcome == 'Booked' else 'badge-muted' }}">{{ outcome }}</span>
+{%- endmacro %}

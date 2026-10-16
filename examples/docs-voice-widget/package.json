@@ -1,0 +1,39 @@
+{
+  "name": "@cartesia-cookbook/docs-voice-widget",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Talk to your docs from one script tag: a voice widget on Cartesia Managed Agents with cited, scrolled-to sources.",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false server/index.ts",
+    "start": "NODE_ENV=production tsx server/index.ts",
+    "build": "tsx scripts/build-widget.ts",
+    "ingest": "tsx ingest/cli.ts",
+    "setup:agent": "tsx scripts/setup-agent.ts",
+    "teardown:agent": "tsx scripts/teardown-agent.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p widget/tsconfig.json",
+    "lint": "tsx scripts/lint.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cartesia/cartesia-js": "^4.2.0",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@hono/node-server": "^1.19.5",
+    "esbuild": "^0.27.7",
+    "github-slugger": "^2.0.0",
+    "hono": "^4.10.1",
+    "marked": "^18.1.1",
+    "node-html-parser": "^9.0.4",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "jsdom": "^30.1.2",
+    "typescript": "~5.9.0",
+    "vitest": "^5.0.4"
+  }
+}

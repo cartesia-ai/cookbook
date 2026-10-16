@@ -1,0 +1,43 @@
+{% from "_icons.html" import icon %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Front desk{% endblock %}</title>
+  <script>    try {
+      const t = localStorage.getItem("theme");
+      if (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.classList.add("dark");
+    } catch {}
+</script>
+  <link rel="preload" href="/static/vendor/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/vendor/htmx.min.js" defer>
+</script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="wrap {{ width|default('default') }}">
+      <a class="brand" href="/">Front desk</a>
+      <nav class="nav" aria-label="Main">
+        <a class="nav-link" href="/" {% if nav == "calls" or nav == "call" %}aria-current="page"{% endif %}>Calls</a>
+        <a class="nav-link" href="/inbox" {% if nav == "inbox" %}aria-current="page"{% endif %}>Inbox</a>
+        <a class="nav-link" href="/try" {% if nav == "try" %}aria-current="page"{% endif %}>Try it</a>
+        <button type="button" class="btn btn-ghost btn-icon" id="theme-toggle" aria-label="Toggle dark mode">
+          <span class="when-light">{{ icon("moon") }}</span><span class="when-dark">{{ icon("sun") }}</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap {{ width|default('default') }}">
+    {% block content %}{% endblock %}
+  </main>
+  <script>    document.getElementById("theme-toggle").addEventListener("click", () => {
+      const dark = document.documentElement.classList.toggle("dark");
+      try { localStorage.setItem("theme", dark ? "dark" : "light"); } catch {}
+    });
+</script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

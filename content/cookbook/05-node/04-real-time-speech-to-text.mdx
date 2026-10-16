@@ -1,0 +1,100 @@
+---
+title: Stream speech to text in real time with Ink 2
+description: Send live audio to Cartesia Ink 2 over the turns WebSocket in Node and get partial transcripts plus turn.start and turn.end events, with no separate voice activity detector.
+tags: ['node', 'stt', 'streaming', 'websocket', 'turn detection']
+---
+
+# Stream speech to text in real time with Ink 2
+
+Cartesia Ink 2 (`ink-2`) is the streaming speech to text model. You send raw audio over a WebSocket in small chunks, and it sends back the transcript as it grows plus turn events: `turn.start` when someone starts talking, `turn.update` with the partial text, and `turn.end` with the final text once the speaker is done. Ink 2 decides when the turn is over from the speech itself, so you do not run a voice activity detector or pick a silence timeout.
+
+This script streams a raw PCM file in real time, standing in for a microphone, and prints the events.
+
+Use `ink-2` only on the WebSocket. For a finished recording, use the file endpoint with `ink-whisper`, as in [Transcribe an audio file with ink-whisper](../10-python/02-transcribe-an-audio-file.mdx).
+
+## Prerequisites
+
+- Node 22.13 or newer
+- `pnpm add @cartesia/cartesia-js ws`. The SDK uses the `ws` package for WebSockets in Node.
+- `CARTESIA_API_KEY` set in your shell
+- A 16 kHz, 16-bit mono raw PCM file of someone talking. Convert any recording with `ffmpeg -i input.m4a -f s16le -ac 1 -ar 16000 question.pcm`.
+
+## The script
+
+```ts filename="listen.mts"
+import { readFile } from 'node:fs/promises';
+import { setTimeout as sleep } from 'node:timers/promises';
+import Cartesia from '@cartesia/cartesia-js';
+
+const SAMPLE_RATE = 16000;
+const CHUNK_BYTES = (SAMPLE_RATE / 10) * 2;
+
+const client = new Cartesia({ apiKey: process.env.CARTESIA_API_KEY });
+
+const ws = client.stt.autoFinalize.websocket({
+  model: 'ink-2',
+  encoding: 'pcm_s16le',
+  sample_rate: SAMPLE_RATE,
+});
+ws.on('error', (err) => console.error(err.message));
+
+const events = (async () => {
+  for await (const event of ws.stream()) {
+    if (event.type !== 'message') continue;
+    const m = event.message;
+    if (m.type === 'turn.start') console.log('[turn.start]');
+    else if (m.type === 'turn.update') console.log('[turn.update]', m.transcript);
+    else if (m.type === 'turn.end') console.log('[turn.end]', m.transcript);
+    else if (m.type === 'error') console.error('[error]', m);
+  }
+})();
+
+const audio = Buffer.concat([await readFile(process.argv[2] ?? 'question.pcm'), Buffer.alloc(SAMPLE_RATE * 2 * 2)]);
+for (let i = 0; i < audio.length; i += CHUNK_BYTES) {
+  ws.sendRaw(audio.subarray(i, i + CHUNK_BYTES));
+  await sleep(100);
+}
+
+ws.send({ type: 'close' });
+await events;
+```
+
+Run it with `pnpm dlx tsx listen.mts question.pcm`. On 2026-10-16, with a 2.4 second question, it printed:
+
+```text
+[turn.start]
+[turn.update] Can
+[turn.update] Can you
+[turn.update] Can you book a
+...
+[turn.update] Can you book a table for two at seven tonight?
+[turn.end] Can you book a table for two at seven tonight?
+```
+
+## Which audio format does Ink 2 take?
+
+Raw, headerless audio in the `encoding` and `sample_rate` you declare. The socket does not read file headers, so convert WAV, m4a or WebM recordings to raw PCM first, and make sure the declared rate matches the audio. In Node, 16 kHz `pcm_s16le` is the usual choice. In a browser, capture Float32 from an `AudioWorklet` and declare `encoding: 'pcm_f32le'` with `sample_rate: audioCtx.sampleRate`, so no resampling is needed. The `byo-snippets/listen.ts` file in [examples/voice-chat](../../../examples/voice-chat/README.md) does that.
+
+Send chunks of about 100 ms. Send silence while the user is muted instead of sending nothing, so the stream keeps its timing.
+
+## Which languages does Ink 2 transcribe?
+
+English, Spanish, French, Hindi and Japanese. Ink 2 detects which one it hears, so you do not pass a language. For anything else, record the audio and send it to `ink-whisper`.
+
+## When is the user done talking?
+
+Act on `turn.end`. Its `transcript` is the final text for that turn. Append it as it is, without trimming or adding spaces.
+
+Ink 2 also sends `turn.eager_end` when it thinks the turn may be over, before the end of turn pause has passed, and `turn.resume` if the speaker keeps going. A voice agent can start its LLM request on `turn.eager_end` and cancel it on `turn.resume`. [Build a real-time two-way voice translator](../01-next/40-real-time-voice-translation.mdx) does that. If a wrong early start is costly, wait for `turn.end`.
+
+To make turns end sooner or later, pass `turn_end_timeout_ms` (640 to 11200, default 5600) or `turn_end_threshold` (0.05 to 0.5, default 0.2) to `websocket()`. `keyterm` takes up to 100 words or phrases (1200 characters in total), such as product names, to boost.
+
+## Can the browser connect directly?
+
+Yes. Mint an access token on your server with the `stt` grant and build the browser client with `new Cartesia({ token })`. A token with only `{ stt: true }` opened this socket in a test on 2026-10-16. The API key never goes to the page. See [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
+
+## Next steps
+
+- [Stream text to speech from an LLM token stream](./02-stream-llm-text-to-speech.mdx), the speaking half of a voice loop
+- [Add voice mode to Claude Code, Cursor or Codex](../10-python/05-voice-mode-for-coding-agents.mdx) uses the same socket from Python
+- [Turn events](https://docs.cartesia.ai/use-the-api/stt/turns) in the Cartesia docs

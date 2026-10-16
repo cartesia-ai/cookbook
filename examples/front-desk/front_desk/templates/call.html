@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% from "_outcome.html" import outcome_badge %}
+{% block title %}{{ caller_label(call) }} · Front desk{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ caller_label(call) }}</h1>
+    <p>
+      {{ when(call.start_time) or "Time unknown" }}{% if call.duration_secs is not none %} · {{ fmt_duration(call.duration_secs) }}{% endif %}{% if call.end_reason %} · ended by {{ call.end_reason.replace("_", " ") }}{% endif %}
+    </p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-outline" href="/">{{ icon("arrow-left") }} All calls</a>
+  </div>
+</div>
+
+<div class="panel">
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <h2 class="section-title">Outcome</h2>
+        <p class="section-desc">From the tools the receptionist used on this call.</p>
+      </div>
+      {{ outcome_badge(call.outcome) }}
+    </div>
+    {% if call.summary %}<p class="summary">{{ call.summary }}</p>
+    {% elif call.status == "completed" %}<div hx-get="/calls/{{ call.id }}/summary" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <h2 class="section-title">Recording</h2>
+        <p class="section-desc">Streamed from Cartesia. It is not stored on this server.</p>
+      </div>
+    </div>
+    <div hx-get="/calls/{{ call.id }}/recording" hx-trigger="load" hx-swap="outerHTML">
+      <p class="small muted">Checking for a recording...</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <h2 class="section-title">Latency</h2>
+        <p class="section-desc">Medians over the call, from the turn data Cartesia reports. A dash means it sent none.</p>
+      </div>
+    </div>
+    <div class="stats">
+      {% for label, value in stats %}
+      <div><p class="stat-label">{{ label }}</p><p class="stat-value">{{ fmt_ms(value) or "-" }}</p></div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <h2 class="section-title">Transcript</h2>
+        <p class="section-desc">Tool calls appear under the turn that made them.</p>
+      </div>
+      <div class="legend" aria-hidden="true"><span><i class="stt"></i>STT</span><span><i></i>TTS</span></div>
+    </div>
+    {% if call.visible_turns %}
+    <div class="turns">
+      {% for t in call.visible_turns %}
+      {% set agent = t.role == "assistant" %}
+      {% set ttfb = t.tts_ttfb if agent else t.stt_ttfb %}
+      <div class="turn">
+        <div class="turn-head">
+          <span class="turn-role {{ 'agent' if agent and t.text else '' }}">{{ ("Receptionist" if t.text else "Tool call") if agent else "Caller" }}<span class="turn-time"> · {{ fmt_duration(t.start_ts) }}</span></span>
+          {% if ttfb is not none %}
+          <span class="latency" title="{{ 'Text to speech' if agent else 'Speech to text' }} time to first byte">
+            <span class="latency-track"><span class="latency-fill {{ '' if agent else 'stt' }}" style="width: {{ [100, (ttfb / scale * 100)|round(1)]|min }}%"></span></span>
+            <span class="latency-value">{{ fmt_ms(ttfb) }}</span>
+          </span>
+          {% endif %}
+        </div>
+        {% if t.text %}<p class="turn-text {{ 'interrupted' if t.interrupted else '' }}">{{ t.text }}</p>{% endif %}
+        {% for tc in t.tool_calls %}
+        <div class="tool-call"><code>{{ tc.name }}</code>{% if tc.arguments %}<span>{{ tc.arguments|tojson|truncate(140) }}</span>{% endif %}</div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="small muted">No transcript yet. It arrives with the call_completed webhook, or when you sync a browser call.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

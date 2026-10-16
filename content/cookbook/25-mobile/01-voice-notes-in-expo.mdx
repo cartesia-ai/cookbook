@@ -1,0 +1,285 @@
+---
+title: Record and transcribe voice notes in an Expo app with ink-whisper
+description: Record a voice note with expo-audio, transcribe it with Cartesia ink-whisper speech to text through an Expo Router API route, and read a recap back with Sonic 3.6 text to speech on iOS, Android and the web.
+tags: ['expo', 'react native', 'stt', 'tts', 'mobile']
+---
+
+# Record and transcribe voice notes in an Expo app with ink-whisper
+
+This recipe records a voice note in an Expo (React Native) app, sends it to an Expo Router API route, and gets the text back from Cartesia's `ink-whisper` file transcription model. The same route pattern turns text into an MP3 with Sonic 3.6 (`sonic-3.6`), which the app plays with `expo-audio`. It runs on iOS, Android and the web from one codebase.
+
+The code comes from a voice journal app. You tap record, talk, and the entry is saved with its transcript. An LLM then adds a title, a mood and a one-line reflection, and once a week the app writes a recap and reads it aloud. The full app is [examples/voice-journal](../../../examples/voice-journal/README.md). This page covers the audio half and leaves out the LLM prompts and storage.
+
+## Prerequisites
+
+- An Expo SDK 58 app with Expo Router and `"web": { "output": "server" }` in `app.json`, which API routes need
+- `pnpm add @cartesia/cartesia-js expo-audio expo-file-system`
+- `CARTESIA_API_KEY` in `.env.local`, from [play.cartesia.ai/keys](https://play.cartesia.ai/keys)
+- Node 22.13 or newer
+
+Do not give the key an `EXPO_PUBLIC_` prefix. Metro inlines `EXPO_PUBLIC_` variables into the app bundle, and anyone with the app could read it. Without the prefix, only server code in `app/api` sees it.
+
+Add the `expo-audio` config plugin so iOS and Android show a microphone prompt:
+
+```json filename="app.json"
+"plugins": [
+  "expo-router",
+  [
+    "expo-audio",
+    {
+      "microphonePermission": "Allow Voice journal to record your journal entries."
+    }
+  ],
+  "expo-font"
+],
+```
+
+## Record audio with expo-audio
+
+`useAudioRecorder` with the `HIGH_QUALITY` preset writes an m4a file on iOS and Android. On the web, `expo-audio` records with `MediaRecorder` and hands back a `blob:` URL, usually WebM. `ink-whisper` accepts both, so the app sends the recording as it is with no conversion.
+
+```ts filename="lib/use-recorder.ts"
+import {
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from "expo-audio";
+import * as React from "react";
+import { MAX_RECORDING_SECONDS } from "./limits";
+
+export function useRecorder() {
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const state = useAudioRecorderState(recorder, 100);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const seconds = Math.floor((state.durationMillis ?? 0) / 1000);
+  const level = state.isRecording && state.metering != null ? Math.min(1, Math.max(0, (state.metering + 60) / 60)) : 0;
+
+  const start = React.useCallback(async () => {
+    setError(null);
+    const permission = await AudioModule.requestRecordingPermissionsAsync();
+    if (!permission.granted) {
+      setError("Allow microphone access to record an entry.");
+      return false;
+    }
+    try {
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      return true;
+    } catch {
+      setError("Could not start recording. Check that no other app is using the microphone.");
+      return false;
+    }
+  }, [recorder]);
+
+  const stop = React.useCallback(async (): Promise<{ uri: string; seconds: number } | null> => {
+    const secs = (recorder.currentTime ?? 0) || seconds;
+    try {
+      await recorder.stop();
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+    } catch {
+      setError("Could not save the recording.");
+      return null;
+    }
+    const uri = recorder.uri;
+    return uri ? { uri, seconds: secs } : null;
+  }, [recorder, seconds]);
+
+  return { isRecording: state.isRecording, seconds, level, error, start, stop, maxSeconds: MAX_RECORDING_SECONDS };
+}
+```
+
+The hook sets the audio mode to `allowsRecording: true` before `prepareToRecordAsync` and turns it off again after `stop()`. With `isMeteringEnabled`, the recorder state carries a dBFS level, polled every 100 ms here, which the screen draws as a meter.
+
+## Upload the recording from the phone and the browser
+
+React Native's `FormData` reads a file from disk when you append an object with `uri`, `name` and `type`. The browser has no such shortcut. There you fetch the `blob:` URL first and append the blob. Name the file with an extension that matches the container, because that is the only format hint the server gets on the web.
+
+```ts filename="lib/api.ts"
+export async function transcribe(uri: string): Promise<{ text: string; duration: number | null }> {
+  const form = new FormData();
+  if (Platform.OS === "web") {
+    const blob = await (await fetch(uri)).blob();
+    const ext = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
+    form.append("file", blob, `entry.${ext}`);
+  } else {
+    form.append("file", { uri, name: "entry.m4a", type: "audio/m4a" } as unknown as Blob);
+  }
+  const res = await fetch("/api/transcribe", { method: "POST", body: form });
+  if (!res.ok) return readError(res, "Transcription failed");
+  return res.json();
+}
+```
+
+The relative URL `/api/transcribe` works in Expo Go during development, where Expo Router resolves it against the dev server. For a store build, deploy the server (for example with `eas deploy`) and set the `origin` option of the `expo-router` plugin to that URL.
+
+## Call the Cartesia STT file endpoint from an API route
+
+A file named `app/api/transcribe+api.ts` becomes `POST /api/transcribe`. It runs on the server, so it can read `CARTESIA_API_KEY`. The template keeps the client in `lib/server/cartesia.ts` and reads the key at call time, so `expo export` still builds with no environment set.
+
+```ts filename="lib/server/cartesia.ts"
+import Cartesia from "@cartesia/cartesia-js";
+
+export class MissingKeyError extends Error {
+  constructor() {
+    super("CARTESIA_API_KEY is not set");
+  }
+}
+
+export function getCartesia(): Cartesia {
+  const apiKey = process.env.CARTESIA_API_KEY;
+  if (!apiKey) throw new MissingKeyError();
+  return new Cartesia({ apiKey });
+}
+
+export { Cartesia };
+```
+
+The route checks the upload, wraps it in a `File` with a name and type, and calls `stt.transcribe` with `model: "ink-whisper"` (the `STT_MODEL` constant in `lib/limits.ts`).
+
+```ts filename="app/api/transcribe+api.ts"
+import { getCartesia } from "@/lib/server/cartesia";
+import { cartesiaError, json } from "@/lib/server/errors";
+import { MAX_AUDIO_BYTES, STT_MODEL } from "@/lib/limits";
+
+export async function POST(req: Request) {
+  let form: { get(name: string): unknown };
+  try {
+    form = (await req.formData()) as unknown as typeof form;
+  } catch {
+    return json({ error: "Send the audio as multipart form data" }, 400);
+  }
+  const file = form.get("file");
+  if (!(file instanceof Blob)) return json({ error: "Missing audio file" }, 400);
+  if (file.size === 0) return json({ error: "The recording is empty" }, 400);
+  if (file.size > MAX_AUDIO_BYTES) return json({ error: "The recording is too large (8 MB limit)" }, 413);
+
+  const name = file instanceof File && file.name ? file.name : "entry.m4a";
+  try {
+    const res = await getCartesia().stt.transcribe({
+      file: new File([file], name, { type: file.type || "application/octet-stream" }),
+      model: STT_MODEL,
+      language: "en",
+    });
+    return json({ text: res.text.trim(), duration: res.duration ?? null });
+  } catch (err) {
+    return cartesiaError(err, "Transcription");
+  }
+}
+```
+
+`ink-whisper` is the only model on the batch endpoint. `ink-2` is for streaming over a WebSocket and does not work here. The SDK sends `Cartesia-Version: 2026-08-14` for you. To transcribe another language, change `language: "en"` to its ISO 639-1 code.
+
+`cartesiaError` in `lib/server/errors.ts` maps failures to fixed messages ("Cartesia rejected the API key", a rate limit notice, or the status code). It never forwards the provider's error body to the app.
+
+The SDK call is a multipart `POST /stt`. Here is the same request with curl, which we ran on 2026-10-16 against a 3.9 second m4a clip made with Sonic 3.6. It came back in about 0.2 seconds.
+
+```sh
+curl https://api.cartesia.ai/stt \
+  -H "Authorization: Bearer $CARTESIA_API_KEY" \
+  -H "Cartesia-Version: 2026-08-14" \
+  -F "file=@entry.m4a;type=audio/m4a" \
+  -F model=ink-whisper \
+  -F language=en
+```
+
+```json
+{"type":"transcript","duration":3.8530625,"language":"en","request_id":"...","text":"Today, I finally finished the garden fence and it felt good."}
+```
+
+If `text` is empty, nobody spoke. The template's `createEntry` in `lib/pipeline.ts` treats that as an error and asks the user to try again closer to the mic. It saves the entry with its transcript before the LLM step runs, so a failed title or reflection never loses the recording's text.
+
+## Generate the recap with Sonic 3.6 and play it
+
+The speak route takes `{ text, voiceId }`, calls `tts.generate`, and returns the MP3 bytes. The key stays in the route. The app only ever sees audio.
+
+```ts filename="app/api/speak+api.ts"
+import { getCartesia } from "@/lib/server/cartesia";
+import { cartesiaError, json } from "@/lib/server/errors";
+import { MAX_SPEAK_CHARS, TTS_MODEL } from "@/lib/limits";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function POST(req: Request) {
+  const body = await req.json().catch(() => null);
+  const text = typeof body?.text === "string" ? body.text.trim() : "";
+  const voiceId = typeof body?.voiceId === "string" ? body.voiceId : "";
+  if (!text) return json({ error: "Nothing to read" }, 400);
+  if (text.length > MAX_SPEAK_CHARS) return json({ error: "The recap is too long to read in one request" }, 413);
+  if (!UUID.test(voiceId)) return json({ error: "Pick a voice" }, 400);
+
+  try {
+    const res = await getCartesia().tts.generate({
+      model_id: TTS_MODEL,
+      transcript: text,
+      voice: { mode: "id", id: voiceId },
+      language: "en",
+      output_format: { container: "mp3", sample_rate: 44100, bit_rate: 128000 },
+    });
+    const audio = await res.arrayBuffer();
+    return new Response(audio, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "no-store" } });
+  } catch (err) {
+    return cartesiaError(err, "Speech");
+  }
+}
+```
+
+`expo-audio` plays from a URI, so the bytes need somewhere to live. The template splits this by file suffix. Metro picks `audio-file.web.ts` for the browser and `audio-file.ts` for iOS and Android.
+
+```ts filename="lib/audio-file.web.ts"
+const urls = new Map<string, string>();
+
+export async function bytesToPlayableUri(bytes: ArrayBuffer, name: string): Promise<string> {
+  const old = urls.get(name);
+  if (old) URL.revokeObjectURL(old);
+  const url = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+  urls.set(name, url);
+  return url;
+}
+```
+
+```ts filename="lib/audio-file.ts"
+import { File, Paths } from "expo-file-system";
+
+export async function bytesToPlayableUri(bytes: ArrayBuffer, name: string): Promise<string> {
+  const file = new File(Paths.cache, `${name.replace(/[^a-z0-9-]/gi, "")}.mp3`);
+  if (file.exists) file.delete();
+  await file.write(new Uint8Array(bytes));
+  return file.uri;
+}
+```
+
+The client's `speak()` in `lib/api.ts` posts to `/api/speak` and passes the response to `bytesToPlayableUri`. The player component loads that URI into a `useAudioPlayer` and switches the audio session back to playback first:
+
+```tsx filename="components/journal/recap-player.tsx"
+const player = useAudioPlayer(null);
+const status = useAudioPlayerStatus(player);
+const loadedUri = React.useRef<string | null>(null);
+
+React.useEffect(() => {
+  if (!uri || loadedUri.current === uri) return;
+  loadedUri.current = uri;
+  player.replace({ uri });
+  if (autoPlay) {
+    void setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).finally(() => player.play());
+  }
+}, [uri, autoPlay, player]);
+```
+
+`status.currentTime` and `status.duration` drive the progress bar.
+
+## Limits
+
+- The transcribe route rejects files over 8 MB, and the recorder stops at five minutes (`lib/limits.ts`). The speak route reads at most 2,000 characters in one request.
+- The routes have no auth. Anyone who finds the URL can spend your Cartesia credits. Put them behind your own login or a rate limiter before you deploy.
+- The template README says the web and native paths were checked in headless Chrome. The native paths compile but were not run on a device.
+- This is batch transcription of a finished recording. For words on screen while you talk, you need Ink 2 over the streaming WebSocket with raw PCM chunks. `expo-audio` 58 has `useAudioStream` for that on iOS and Android, but not on the web.
+
+## Next steps
+
+- Run the full journal, with LLM titles and moods, a voice picker and weekly recaps: [examples/voice-journal](../../../examples/voice-journal/README.md).
+- Have the phone call Cartesia directly with a short-lived token instead of proxying audio: [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
+- The same transcribe route in Next.js, with an LLM summary step: [Transcribe and summarize meetings in Next.js](../01-next/20-transcribe-and-summarize-meetings.mdx).

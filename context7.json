@@ -1,0 +1,32 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "Cartesia Cookbook",
+  "description": "Runnable templates and recipes for Cartesia: Sonic text to speech, Ink speech to text and Managed Agents voice agents in Next.js, Node, Python and Expo.",
+  "branch": "main",
+  "folders": [],
+  "excludeFolders": [
+    "tools",
+    "examples/docs-voice-widget/content",
+    "examples/audiobook/examples",
+    "**/node_modules/**",
+    "**/tests/**",
+    "**/test/**",
+    "**/mock/**",
+    "**/__tests__/**"
+  ],
+  "excludeFiles": [
+    "CLAUDE.md",
+    "llms.txt",
+    "pnpm-lock.yaml"
+  ],
+  "rules": [
+    "Use model_id sonic-3.6 for text to speech. Its pinned snapshot is sonic-3.6-2026-08-27. Every other Sonic model id is sunset, scheduled for sunset on 2026-10-20, or a deprecated alias.",
+    "Use ink-2 for streaming speech to text with turn detection (/stt/turns/websocket; en, es, fr, hi, ja). Use ink-whisper for file transcription; ink-2 does not work on the batch endpoint.",
+    "The API version header is Cartesia-Version: 2026-08-14. The SDKs send it, so do not override it. Browser WebSockets pass ?cartesia_version= instead.",
+    "Use the official SDKs: @cartesia/cartesia-js 4.x for TypeScript and cartesia 4.x for Python. The Python client does not read CARTESIA_API_KEY itself; pass api_key=os.environ[\"CARTESIA_API_KEY\"].",
+    "Never send CARTESIA_API_KEY to a browser or mobile bundle. A server route mints client.accessToken.create({ grants, expires_in: 60 }) with the narrowest grants (agent, tts or stt) and the browser uses that token.",
+    "Managed Agents WebSocket: wss://api.cartesia.ai/v1/agents/websocket/{agent_id}, opened with an access token that has the agent grant. Client tool results must be under 4096 bytes.",
+    "Return fixed error messages from routes. Do not forward SDK error text or upstream response bodies to the client.",
+    "To start a new app, clone a template: pnpm dlx create-next-app --example https://github.com/cartesia-ai/cookbook/tree/main/examples/<slug> (Next.js) or pnpm dlx degit cartesia-ai/cookbook/examples/<slug>."
+  ]
+}

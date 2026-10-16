@@ -1,0 +1,14 @@
+{
+  "$comment": "One source for the Cartesia facts every README, recipe and example must match. tools/check-facts fails CI when a file drifts. Update this file first, then fix what the check reports.",
+  "checked": "2026-10-16",
+  "sources": [
+    "https://docs.cartesia.ai/build-with-cartesia/tts-models/latest",
+    "https://docs.cartesia.ai/build-with-cartesia/tts-models/api-changes",
+    "https://docs.cartesia.ai/build-with-cartesia/stt-models/latest"
+  ],
+  "apiVersion": "2026-08-14",
+  "tts": { "model": "sonic-3.6", "snapshot": "sonic-3.6-2026-08-27" },
+  "stt": { "streaming": "ink-2", "file": "ink-whisper", "streamingLanguages": ["en", "es", "fr", "hi", "ja"] },
+  "retired": ["sonic-2", "sonic-turbo", "sonic-3-2025-10-27", "sonic", "sonic-english", "sonic-multilingual"],
+  "deprecatedAliases": ["sonic-latest", "sonic-3-latest"]
+}

@@ -1,0 +1,32 @@
+[project]
+name = "audiobook"
+version = "0.1.0"
+description = "Convert an EPUB ebook to an mp3 audiobook with Cartesia Sonic text to speech: a voice per speaker, emotion cues and read-along word timestamps."
+readme = "README.md"
+license = "MIT"
+keywords = ["cartesia", "text-to-speech", "tts", "audiobook", "epub", "ebook", "sonic", "gradio", "speech-synthesis"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Environment :: Console",
+]
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "beautifulsoup4==4.13.4",
+    "EbookLib==0.19",
+    "mutagen==1.47.0",
+    "pydub==0.25.1",
+    "sentencex==0.6.1",
+    "gradio==5.50.0",
+    "gradio_log==0.0.8",
+    "cartesia>=4.2.0,<5",
+]
+
+[project.urls]
+Homepage = "https://github.com/cartesia-ai/cookbook/tree/main/examples/audiobook"
+Repository = "https://github.com/cartesia-ai/cookbook"
+Documentation = "https://docs.cartesia.ai"
+Upstream = "https://github.com/p0n1/epub_to_audiobook"
+
+[tool.uv]
+package = false

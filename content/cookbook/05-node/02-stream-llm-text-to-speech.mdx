@@ -1,0 +1,120 @@
+---
+title: Stream text to speech from an LLM token stream
+description: Push LLM tokens into a Cartesia Sonic 3.6 WebSocket context as they arrive (continuations), so speech starts before the model finishes writing, in Node with the AI SDK.
+tags: ['node', 'tts', 'websocket', 'streaming', 'llm', 'ai-sdk']
+---
+
+# Stream text to speech from an LLM token stream
+
+A voice reply should start playing while the LLM is still writing it. With Cartesia Sonic 3.6 you do that over the text to speech WebSocket: open one context per reply, push each token into it as it arrives, and read audio from the same context at the same time. Cartesia calls this continuations. Everything pushed into one context is spoken as one utterance, so the prosody does not reset at every chunk the way it would if you sent each sentence as its own request.
+
+This script asks an LLM a question, streams the tokens into Sonic and writes the spoken answer to `reply.wav`.
+
+## Prerequisites
+
+- Node 22.13 or newer
+- `pnpm add @cartesia/cartesia-js ws ai @ai-sdk/openai`. The SDK uses the `ws` package for WebSockets in Node. Browsers use their built-in WebSocket.
+- `CARTESIA_API_KEY` and `OPENAI_API_KEY` set in your shell. `CARTESIA_VOICE_ID` is optional; the script falls back to a public voice. Any AI SDK provider works in place of OpenAI.
+
+## The script
+
+```ts filename="speak-llm.mts"
+import { writeFile } from 'node:fs/promises';
+import Cartesia from '@cartesia/cartesia-js';
+import { openai } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+
+const SAMPLE_RATE = 24000;
+
+const client = new Cartesia({ apiKey: process.env.CARTESIA_API_KEY });
+const ws = await client.tts.websocket();
+
+const ctx = ws.context({
+  model_id: 'sonic-3.6',
+  voice: process.env.CARTESIA_VOICE_ID ?? 'db6b0ed5-d5d3-463d-ae85-518a07d3c2b4',
+  output_format: { container: 'raw', encoding: 'pcm_s16le', sample_rate: SAMPLE_RATE },
+  language: 'en',
+});
+
+const chunks: Buffer[] = [];
+let firstAudioAt = 0;
+const started = Date.now();
+const receiving = (async () => {
+  for await (const event of ctx.receive()) {
+    if (event.type === 'chunk' && event.audio) {
+      firstAudioAt ||= Date.now() - started;
+      chunks.push(Buffer.from(event.audio));
+    } else if (event.type === 'error') {
+      throw new Error(`${event.title}: ${event.message}`);
+    }
+  }
+})();
+
+const result = streamText({
+  model: openai('gpt-5.4-mini'),
+  system: 'You are a voice assistant. Answer in two or three plain sentences. No markdown.',
+  prompt: 'Why does the sky look blue?',
+});
+
+for await (const token of result.textStream) {
+  await ctx.push({ transcript: token });
+}
+await ctx.no_more_inputs();
+await receiving;
+ws.close();
+
+const pcm = Buffer.concat(chunks);
+await writeFile('reply.wav', Buffer.concat([wavHeader(pcm.length), pcm]));
+console.log(`First audio after ${firstAudioAt} ms. Wrote reply.wav (${(pcm.length / 2 / SAMPLE_RATE).toFixed(1)} s)`);
+
+function wavHeader(dataLength: number): Buffer {
+  const h = Buffer.alloc(44);
+  h.write('RIFF', 0);
+  h.writeUInt32LE(36 + dataLength, 4);
+  h.write('WAVE', 8);
+  h.write('fmt ', 12);
+  h.writeUInt32LE(16, 16);
+  h.writeUInt16LE(1, 20);
+  h.writeUInt16LE(1, 22);
+  h.writeUInt32LE(SAMPLE_RATE, 24);
+  h.writeUInt32LE(SAMPLE_RATE * 2, 28);
+  h.writeUInt16LE(2, 32);
+  h.writeUInt16LE(16, 34);
+  h.write('data', 36);
+  h.writeUInt32LE(dataLength, 40);
+  return h;
+}
+```
+
+Run it with `pnpm dlx tsx speak-llm.mts`. On 2026-10-16 it printed `First audio after 948 ms` for a 15 second answer. That number includes the LLM's time to first token.
+
+## How do continuations work?
+
+`ctx.push()` sends each piece of text with `continue: true` on the same `context_id`. `ctx.no_more_inputs()` sends an empty transcript with `continue: false`, which tells Sonic the utterance is complete so it speaks whatever is still buffered and sends `done`. `ctx.receive()` ends after `done`.
+
+The pieces must join into valid text. `"Hello,"` followed by `" world."` is fine. `"Hello,"` followed by `"world."` would be read as `"Hello,world."`. LLM tokens already carry their leading spaces, so push them unchanged and do not trim them.
+
+End the reply with closing punctuation. The docs warn that a final piece without `.`, `?` or `!` can add latency and odd sounds at the end of the audio.
+
+## Should I buffer tokens into sentences first?
+
+Pick one of two approaches and don't mix them.
+
+- Managed buffering, the script above. Push raw tokens and leave `max_buffer_delay_ms` at its default of 3000 ms. Sonic waits until it has enough text for good prosody, or until the delay runs out.
+- Custom buffering. Split the text into sentences or phrases yourself, and set `max_buffer_delay_ms: 0` in `ws.context()` so Sonic starts on each piece as soon as it arrives.
+
+The [buffering guide](https://docs.cartesia.ai/use-the-api/tts-websocket/buffering) calls the mix (sentences you buffered yourself plus the default 3000 ms delay) a common mistake, because Sonic may wait up to three more seconds after each complete sentence.
+
+## How do I stop speaking when the user interrupts?
+
+Call `await ctx.cancel()`. Sonic stops generating for that context, and `receive()` ends. Stop or flush whatever audio you have already queued for playback yourself, because cancel only affects audio that has not been generated yet. Open a new context for the next reply. The socket can stay open for the whole conversation.
+
+## Play it instead of saving it
+
+The script collects 16-bit PCM because a WAV file needs it. To play audio as it arrives in a browser, ask for `pcm_f32le` and copy each chunk into a Web Audio `AudioBuffer`, scheduled right after the previous one. [Stream text to speech in Next.js](../01-next/01-stream-speech.mdx) shows the scheduling, and the `byo-snippets/speak.ts` file in [examples/voice-chat](../../../examples/voice-chat/README.md) does it over a WebSocket context with barge-in. In a browser, build the client with `new Cartesia({ token })` from a server-minted token. See [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
+
+## Next steps
+
+- [Get word timestamps from Sonic](./03-word-timestamps.mdx) to know which words have been spoken
+- [Stream speech to text in real time with Ink 2](./04-real-time-speech-to-text.mdx) for the listening half of a voice loop
+- The [continuations guide](https://docs.cartesia.ai/build-with-cartesia/capability-guides/stream-inputs-using-continuations) in the Cartesia docs

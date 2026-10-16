@@ -1,0 +1,89 @@
+---
+title: Clone a voice from a short recording in Python
+description: Create an instant voice clone from a 10 to 60 second clip with the Cartesia API in Python, speak with it through Sonic 3.6, and delete it when you are done.
+tags: ['python', 'tts', 'voice cloning', 'voices']
+---
+
+# Clone a voice from a short recording in Python
+
+Cartesia's instant voice clone turns a short recording of one speaker into a voice you can use with Sonic 3.6. One API call creates it and returns a voice id, which works anywhere a library voice id does. Ten seconds of clean audio is enough to start. On Sonic 3.6 and newer, up to 60 seconds helps the clone keep the speaker's accent.
+
+Only clone a voice with the speaker's permission. A voice is personal data, so give people a way to delete theirs.
+
+## Prerequisites
+
+- Python 3.9 or newer
+- `pip install cartesia`, or `uv add cartesia`
+- `CARTESIA_API_KEY` set in your shell
+- `my-voice.wav` (or mp3, m4a): 10 to 60 seconds of one person talking, under 16 MB
+
+## Record a good clip
+
+The clone copies what it hears, including the mood. From the [cloning guide](https://docs.cartesia.ai/build-with-cartesia/capability-guides/clone-voices):
+
+- One speaker, a quiet room, no music and no echo.
+- Speak the way you want the clone to speak. A cheerful take gives a voice that sounds cheerful in everything it says.
+- Talk naturally. An announcer voice makes the clone sound less conversational.
+- Record in a language the speaker actually speaks, and pass that language when you clone.
+
+## The script
+
+```python filename="clone.py"
+import os
+
+from cartesia import Cartesia
+
+client = Cartesia(api_key=os.environ["CARTESIA_API_KEY"])
+
+with open("my-voice.wav", "rb") as clip:
+    voice = client.voices.clone(
+        clip=clip,
+        name="My voice",
+        language="en",
+        description="Cloned from my-voice.wav",
+    )
+print("Created voice", voice.id)
+
+response = client.tts.generate(
+    model_id="sonic-3.6",
+    transcript="This sentence was never recorded. It is spoken by the clone.",
+    voice=voice.id,
+    output_format={"container": "wav", "encoding": "pcm_s16le", "sample_rate": 44100},
+)
+response.write_to_file("clone-test.wav")
+print("Wrote clone-test.wav")
+```
+
+Run it with `python clone.py`. On 2026-10-16 a 15 second clip produced a voice in one call, and `clone-test.wav` spoke the new sentence in that voice. Save the id. Each run creates another voice on your account.
+
+## How do I use the cloned voice later?
+
+Store `voice.id` and pass it as `voice` in any Sonic request: `tts.generate`, `tts.generate_sse`, the WebSocket, or a Managed Agent's `audio.output.voice_id`. `client.voices.get(voice_id)` returns its name and language. In `client.voices.list()`, voices you created have `is_owner` set to true.
+
+## How do I delete a cloned voice?
+
+```python filename="delete_voice.py"
+import os
+import sys
+
+from cartesia import Cartesia
+
+client = Cartesia(api_key=os.environ["CARTESIA_API_KEY"])
+client.voices.delete(sys.argv[1])
+print("Deleted", sys.argv[1])
+```
+
+`python delete_voice.py <voice id>` removes it from your account. If your app lets people clone their own voice, wire this to a "delete my voice" button.
+
+## Can the clone speak other languages?
+
+A clone is built in one language. To have it speak others with a native accent, clone it in the speaker's own language first, then add languages with the [Add Voice Accents](https://docs.cartesia.ai/api-reference/voices/add-accents) API (`client.voices.add_accents`).
+
+## When is an instant clone not enough?
+
+For a rare accent, a character voice or anything you need to match closely, the docs point to a [Pro Voice Clone](https://docs.cartesia.ai/build-with-cartesia/capability-guides/clone-voices-pro), which trains on 30 minutes or more of the same speaker.
+
+## Next steps
+
+- [Convert text to speech and save a WAV file](./01-generate-speech-to-file.mdx), the shortest Sonic script
+- [Turn an EPUB ebook into an audiobook](./10-ebook-to-audiobook.mdx) and pass your clone's id as the narrator

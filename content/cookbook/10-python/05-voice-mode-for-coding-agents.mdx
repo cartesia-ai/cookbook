@@ -1,0 +1,109 @@
+---
+title: Add voice mode to Claude Code, Cursor or Codex
+description: Talk to Claude Code, Cursor or Codex with Sonic 3.6 speech out and Ink 2 turn detection in, through one MCP tool.
+tags: ['python', 'mcp', 'tts', 'stt', 'agents']
+---
+
+# Add voice mode to Claude Code, Cursor or Codex
+
+An MCP server that gives a coding agent a voice. The agent calls one tool, `converse`. Sonic 3.6 speaks the message, then Ink 2 listens, and its turn detection decides when you have finished. The transcript comes back as the tool result, so the agent treats it as your next message.
+
+The finished code is in [`examples/coding-voice-mode`](../../../examples/coding-voice-mode).
+
+## Prerequisites
+
+- [uv](https://docs.astral.sh/uv/) and Python 3.11 or newer
+- A `CARTESIA_API_KEY`
+- Headphones. The server has no echo cancellation, so on speakers the microphone would hear the voice it just played.
+
+## Set it up
+
+From the example directory, put the key in your shell and run the setup script for your agent.
+
+```sh
+cd examples/coding-voice-mode
+export CARTESIA_API_KEY=...
+./setup.sh claude --save-key   # or cursor, codex, all
+```
+
+For Claude Code this runs one command, which you can also run yourself:
+
+```sh
+claude mcp add cartesia-voice --scope user -- uv run --quiet --directory "$PWD" cartesia-voice-mode serve
+```
+
+`--save-key` copies the key from your shell into `~/.config/cartesia-voice-mode/env` with mode 0600. The key is never written into a client config. Run `uv run cartesia-voice-mode doctor` to check the key, the audio devices and the models, and `install --dry-run` to see what a setup would change.
+
+## How a turn flows
+
+1. The agent calls `converse(message="Shall I run the tests?")`.
+2. The server sends the text to Sonic 3.6 over server-sent events and plays the PCM chunks as they arrive. At the same time it opens the Ink 2 connection, so the handshake is not on the critical path.
+3. When playback ends, the microphone opens and 100 ms chunks of 16 kHz PCM go to Ink 2.
+4. Ink 2 sends `turn.start`, a stream of `turn.update` events, and `turn.end` with the definitive transcript. That transcript is the tool result.
+
+## Speech out
+
+One request per sentence group, with raw `pcm_s16le` at 24 kHz written to the speaker as it arrives.
+
+```python filename="src/cartesia_voice_mode/tts.py"
+stream = await client.tts.generate_sse(
+    model_id=s.tts_model,
+    transcript=piece,
+    voice=voice or s.voice_id,
+    output_format={"container": "raw", "encoding": "pcm_s16le", "sample_rate": s.sample_rate_out},
+    generation_config={"speed": speed} if speed else omit,
+    language=s.language or omit,
+)
+async for ev in stream:
+    if ev.type == "chunk":
+        await speaker.write(base64.b64decode(ev.data))
+```
+
+Speed goes in `generation_config`, not at the top level of the request.
+
+## Speech in
+
+The `auto_finalize` WebSocket takes raw audio and returns turn events. You do not run a voice activity detector or choose a silence timeout.
+
+```python filename="src/cartesia_voice_mode/stt.py"
+return client.stt.auto_finalize.websocket(
+    encoding="pcm_s16le",
+    model=s.stt_model,
+    sample_rate=s.sample_rate_in,
+```
+
+The listening loop reads one event at a time and keeps only what it needs.
+
+```python filename="src/cartesia_voice_mode/stt.py"
+if kind == "turn.start":
+    started = True
+elif kind == "turn.update":
+    partial = ev.transcript
+elif kind == "turn.end":
+```
+
+`turn.end` carries the definitive text, so the server returns that and ignores `turn.eager_end`. An eager end can be followed by `turn.resume`, and acting on it early would hand the agent half a command.
+
+## Tune turn detection
+
+Set these in the environment of the MCP server. They are sent only when set, so the API defaults apply otherwise.
+
+- `CARTESIA_TURN_END_TIMEOUT_MS` (640 to 11200) is how long the model waits through a pause before it ends the turn.
+- `CARTESIA_TURN_START_THRESHOLD`, `CARTESIA_TURN_EAGER_END_THRESHOLD` and `CARTESIA_TURN_END_THRESHOLD` move the model's confidence cut-offs.
+- `CARTESIA_KEYTERMS` takes a comma list of names such as library or function names. Test it with your own vocabulary, because on a short test sentence it did not always help.
+
+## Why not silence timeouts
+
+A silence timer has to be long enough for you to pause mid-thought and short enough to feel responsive, and it cannot be both. Ink 2 decides from the content of the speech, so a pause in the middle of a sentence is less likely to cut you off. The server keeps two plain deadlines only as a safety net: 20 seconds to hear anyone start, and 120 seconds for one turn.
+
+## Limits
+
+- No barge-in. The microphone is closed while the agent speaks.
+- Every wait in the listening path has a deadline, so a closed or stalled socket cannot freeze the agent. The SDK has open issues about reconnects and a receive that never returns after close, and this code does not depend on its reconnect.
+- Messages over 2,000 characters are refused, so an agent does not read a file aloud and spend your credits.
+
+## Next steps
+
+- Try `uv run cartesia-voice-mode hear --wav some.wav` to see turn events against a recording.
+- [Convert text to speech and save a WAV file](./01-generate-speech-to-file.mdx)
+- Read the example's README for the full list of settings.

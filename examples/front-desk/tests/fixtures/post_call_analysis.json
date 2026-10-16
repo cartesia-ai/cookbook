@@ -1,0 +1,9 @@
+{
+  "type": "post_call_analysis",
+  "call_id": "ac_sim_7Kq2mXbR9cLdNfPz",
+  "agent_id": "agent_simulated",
+  "webhook_id": "agent_webhook_simulated",
+  "webhook_request_id": "webhook_req_sim_analysis_1",
+  "timestamp": "2026-10-16T17:04:52.955058787Z",
+  "analysis": {"summary": "Dana Park booked a haircut for Saturday, October 17 at 10:30 AM."}
+}

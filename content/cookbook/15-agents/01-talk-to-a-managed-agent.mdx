@@ -1,0 +1,120 @@
+---
+title: Connect to a Cartesia Managed Agent from the browser
+description: Mint an agent token on the server and open the Managed Agents WebSocket from the browser.
+tags: ['agents', 'websocket', 'browser']
+---
+
+# Connect to a Cartesia Managed Agent from the browser
+
+A Managed Agent runs speech recognition, the LLM and speech synthesis on Cartesia's side. Your page sends microphone audio over a WebSocket and plays the audio that comes back.
+
+This is not the Line SDK. Line SDK hosting ends on 2026-12-01, and Managed Agents are a separate product.
+
+## Prerequisites
+
+- A Managed Agent and its id
+- `pnpm add @cartesia/cartesia-js`
+- A token route that grants `agent`, built like the one in [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx)
+
+## Step 1: mint a token with the agent grant
+
+```ts filename="app/api/agent-token/route.ts"
+import Cartesia from '@cartesia/cartesia-js';
+
+const client = new Cartesia({ apiKey: process.env.CARTESIA_API_KEY });
+
+export async function POST() {
+  const { token } = await client.accessToken.create({
+    grants: { agent: true },
+    expires_in: 60,
+  });
+  return Response.json({ token });
+}
+```
+
+## Step 2: connect from the browser
+
+Fetch a fresh token right before you connect, then open the socket.
+
+```ts filename="lib/connect-agent.ts"
+export async function connectAgent(agentId: string) {
+  const res = await fetch('/api/agent-token', { method: 'POST' });
+  const { token } = await res.json();
+
+  const url = new URL(`wss://api.cartesia.ai/v1/agents/websocket/${agentId}`);
+  url.searchParams.set('cartesia_version', '2026-08-14');
+  url.searchParams.set('access_token', token);
+
+  return new WebSocket(url);
+}
+```
+
+Servers connect to the same URL and send an `X-API-Key` header instead of a token.
+
+## Step 3: the events
+
+All messages are JSON text frames. Audio is base64 inside the JSON. Don't send binary frames. Send the first event within 10 seconds of connecting.
+
+Events you send:
+
+| Event | Fields |
+| --- | --- |
+| `session_create` | `audio` with `input_format` and `output_delivery`. Send it first. |
+| `audio_input` | `audio`, base64 audio |
+| `client_tool_result` | `tool_call_id`, `result`, `is_error` |
+
+Events you receive:
+
+| Event | Fields |
+| --- | --- |
+| `session_ready` | `call_id`, `agent_id`, `agent_version_id`, `audio` |
+| `audio_output` | `audio`, base64 audio in the same format as your input |
+| `audio_output_clear` | none. The user interrupted, so drop any queued agent audio. |
+| `client_tool_call` | `tool_call_id`, `tool_name`, `parameters`, `expects_response` |
+| `turn_started`, `turn_output_text_delta`, `turn_ended` | `turn_ended` carries the final `text`. The other fields are in the API reference. |
+| `error` | includes `fatal`. Recoverable errors have `fatal: false`. Fatal ones are followed by a close. |
+
+Each event also has a `type` field holding its name.
+
+`input_format` is required and picks headerless mono audio: `pcm_16000`, `pcm_24000` or `pcm_44100` (16-bit little-endian samples), or `mulaw_8000`. Send chunks of 20 to 100 ms. `output_delivery` is `speaking_pace` by default.
+
+Limits worth knowing: JSON messages up to 32 KiB (larger ones close the socket with `1009`), client tool results up to 4096 bytes, and the server closes the session after 120 seconds with no valid client event. Keep sending audio, even silence, to hold it open.
+
+The exact payload shapes are in the [Managed Agents WebSocket guide](https://docs.cartesia.ai/line/integrations/websocket-api) and the [event reference](https://docs.cartesia.ai/api-reference/agents/agent-websocket). This recipe lists field names only, so read them before you write a client.
+
+## Step 4: skip the plumbing with the browser client
+
+Microphone capture, conversion to PCM, the playback queue and barge-in handling all sit on top of these events. The `packages/agents-web` package in this repo does that work and wraps it in a React hook. It takes the token route from step 1.
+
+```tsx filename="app/talk.tsx"
+'use client';
+
+import { useCartesiaAgent } from '@cartesia-cookbook/agents-web/react';
+
+export function Talk({ agentId }: { agentId: string }) {
+  const { status, messages, start, stop } = useCartesiaAgent({
+    agentId,
+    getToken: async () => {
+      const res = await fetch('/api/agent-token', { method: 'POST' });
+      return (await res.json()).token;
+    },
+  });
+
+  return (
+    <div>
+      <button onClick={status === 'ready' ? stop : start}>
+        {status === 'ready' ? 'Hang up' : 'Talk'}
+      </button>
+      {messages.map((m) => (
+        <p key={m.turn}>{m.role}: {m.text}</p>
+      ))}
+    </div>
+  );
+}
+```
+
+Call `start` from a click, because browsers only allow the microphone and audio playback after a user gesture. See the [package README](../../../packages/agents-web/README.md) for events, tool calls and error handling.
+
+## Next steps
+
+- [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx)

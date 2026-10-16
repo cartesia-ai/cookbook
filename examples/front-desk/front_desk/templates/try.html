@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% set width = "narrow" %}
+{% block title %}Try it · Front desk{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Try it in the browser</h1>
+    <p>Talk to {{ s.business_name }}'s receptionist from this page. Book an appointment, leave a message, or ask for a person.</p>
+  </div>
+</div>
+{% include "_setup_alert.html" %}
+<div class="alert error hidden" id="call-error" role="alert">
+  {{ icon("info") }}
+  <div><p class="alert-title">Could not start the call</p><p class="alert-body" id="call-error-text"></p></div>
+</div>
+<div class="panel">
+  <section class="section">
+    <div class="section-head">
+      <div class="call-status">
+        <span class="dot" id="dot"></span>
+        <div class="call-status-text">
+          <h2 class="section-title" id="status-title">Ready</h2>
+          <p class="section-desc" id="status-desc">Use headphones so the receptionist does not hear itself.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="section">
+    <div class="section-head"><div><h2 class="section-title">Transcript</h2>
+      <p class="section-desc">{% if s.tool_mode == "client" %}Tools run through this tab, because Cartesia cannot reach this server. Phone calls need PUBLIC_BASE_URL.{% else %}Tools run as webhooks on {{ s.public_base_url }}.{% endif %}</p></div></div>
+    <div class="live-turns" id="turns" aria-live="polite">
+      <p class="small muted" id="turns-empty">The conversation appears here once the call starts.</p>
+    </div>
+  </section>
+  <div class="footer">
+    <a class="btn btn-ghost hidden" id="open-call" href="/">Open call</a>
+    <button type="button" class="btn btn-primary btn-wide" id="call-button" data-agent-id="{{ s.agent_id }}" {% if not setup.key or not setup.agent %}disabled{% endif %}>{{ icon("phone") }} Start call</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script type="module" src="/static/call.js">
+</script>{% endblock %}

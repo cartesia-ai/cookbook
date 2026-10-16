@@ -1,0 +1,13 @@
+---
+title: Node.js
+description: Recipes for Cartesia in plain Node.js scripts and servers.
+---
+
+# Node.js
+
+Short scripts that run with Node and `@cartesia/cartesia-js`, no framework. Each one does a single task.
+
+- [Convert text to speech and save a WAV file in Node](./01-generate-speech-to-file.mdx): one `tts.generate` call with Sonic 3.6.
+- [Stream text to speech from an LLM token stream](./02-stream-llm-text-to-speech.mdx): push tokens into a WebSocket context (continuations) so speech starts before the LLM finishes.
+- [Get word timestamps from Sonic text to speech](./03-word-timestamps.mdx): `add_timestamps` on the SSE stream, original or normalized words.
+- [Stream speech to text in real time with Ink 2](./04-real-time-speech-to-text.mdx): send raw PCM over the turns WebSocket and act on `turn.end`.

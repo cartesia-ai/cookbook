@@ -1,0 +1,6 @@
+{% if available %}
+<div><audio controls preload="none" src="/calls/{{ call_id }}/audio.wav"></audio>
+<p class="small muted" style="margin-top:8px"><a class="muted" href="/calls/{{ call_id }}/audio.wav" download="{{ call_id }}.wav" style="text-decoration:underline">Download WAV</a></p></div>
+{% else %}
+<p class="small muted">No recording for this call. Simulated calls and calls on Zero Data Retention accounts have none.</p>
+{% endif %}

@@ -1,0 +1,36 @@
+name: Template or recipe request
+description: Ask for a template or recipe that does not exist yet.
+labels: ["request"]
+body:
+  - type: markdown
+    attributes:
+      value: Check the catalog in the README and templates.json first. A request that names the task and the stack is easiest to act on.
+  - type: textarea
+    id: task
+    attributes:
+      label: What do you want to build?
+      placeholder: For example, "a voice agent that answers questions about my Shopify store".
+    validations:
+      required: true
+  - type: input
+    id: stack
+    attributes:
+      label: Stack
+      placeholder: Next.js, FastAPI, Expo, SvelteKit...
+    validations:
+      required: true
+  - type: dropdown
+    id: products
+    attributes:
+      label: Cartesia products
+      multiple: true
+      options:
+        - Sonic (text to speech)
+        - Ink (speech to text)
+        - Managed Agents
+        - Phone numbers
+        - Not sure
+  - type: textarea
+    id: closest
+    attributes:
+      label: Closest existing template, and what it is missing

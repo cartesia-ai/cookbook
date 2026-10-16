@@ -1,0 +1,294 @@
+---
+title: Build a real-time two-way voice translator with Ink 2 and Sonic
+description: Translate a spoken conversation between two people on one phone with Cartesia Ink 2 streaming speech to text, an LLM, and Sonic 3.6 text to speech in Next.js.
+tags: ['next', 'stt', 'tts', 'translation']
+---
+
+# Build a real-time two-way voice translator with Ink 2 and Sonic
+
+This recipe builds an interpreter for two people who share one phone and no language. Each person speaks their own language. Cartesia Ink 2 (`ink-2`) streams the microphone to text and decides when a turn is over, an LLM translates the turn, and Cartesia Sonic 3.6 (`sonic-3.6`) says it out loud in the other language with a voice made for that language.
+
+The full app, with the split screen that turns one half upside down, is in [examples/pocket-interpreter](../../../examples/pocket-interpreter/README.md).
+
+## Prerequisites
+
+- A Next.js App Router app
+- `pnpm add @cartesia/cartesia-js ai zod`, plus `@ai-sdk/openai` or `@ai-sdk/anthropic` if you call a provider directly
+- `CARTESIA_API_KEY` in `.env.local`
+- `LLM_MODEL` in `.env.local`, as `provider/model` (for example `openai/gpt-5.4-mini`), and the key for that provider. Any other prefix goes through the Vercel AI Gateway with `AI_GATEWAY_API_KEY`.
+
+Both languages must be one of English, Spanish, French, Hindi or Japanese. Those are the five languages Ink 2 streams today. Browsers only allow the microphone on HTTPS or localhost.
+
+## How do I open Ink 2 and Sonic from the browser without exposing my API key?
+
+The server mints a 60 second access token with the `stt` and `tts` grants and nothing else. This is the only file in the app that reads `CARTESIA_API_KEY`.
+
+```ts filename="lib/cartesia.ts"
+import Cartesia from "@cartesia/cartesia-js";
+
+export function cartesiaConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  return Boolean(env.CARTESIA_API_KEY);
+}
+
+export async function mintBrowserToken(env: NodeJS.ProcessEnv = process.env): Promise<string> {
+  const client = new Cartesia({ apiKey: env.CARTESIA_API_KEY });
+  const { token } = await client.accessToken.create({
+    grants: { stt: true, tts: true },
+    expires_in: 60,
+  });
+  return token;
+}
+```
+
+`POST /api/token` returns `{ token }` from `mintBrowserToken()`, with a small in-memory rate limit. The page builds one SDK client from that token and opens both sockets with it. Sixty seconds is enough because a socket only needs the token to connect. When a socket closes later, the page fetches a new token and reconnects.
+
+```ts filename="lib/interpreter.ts"
+  let client = new Cartesia({ token: await fetchToken() });
+  let speaker: Speaker = await createSpeaker(client, audioCtx);
+```
+
+## Stream the microphone to Ink 2 and listen for turn events
+
+`client.stt.autoFinalize.websocket()` opens `/stt/turns/websocket`. The browser captures Float32 audio at the `AudioContext` rate, so the socket is told exactly that. Each server message is a turn event.
+
+```ts filename="lib/audio/listener.ts"
+export async function listen(
+  client: Cartesia,
+  audioCtx: AudioContext,
+  isMuted: () => boolean,
+  handlers: ListenHandlers,
+) {
+  const ws = client.stt.autoFinalize.websocket({
+    model: "ink-2",
+    encoding: "pcm_f32le",
+    sample_rate: audioCtx.sampleRate,
+  });
+  let stopped = false;
+  ws.on("error", (err) => console.error(err.message));
+
+  const mic = await startMic(audioCtx, (chunk) => ws.sendRaw(chunk), isMuted);
+
+  void (async () => {
+    let reason = "closed";
+    try {
+      for await (const event of ws.stream()) {
+        if (event.type === "close") {
+          reason = `closed (${event.code})`;
+          continue;
+        }
+        if (event.type !== "message") continue;
+        const m = event.message;
+        if (m.type === "turn.start") handlers.onTurnStart();
+        else if (m.type === "turn.update") handlers.onPartial(m.transcript);
+        else if (m.type === "turn.eager_end") handlers.onEagerEnd(m.transcript);
+        else if (m.type === "turn.resume") handlers.onResume();
+        else if (m.type === "turn.end") handlers.onTurnEnd(m.transcript);
+        else if (m.type === "error") reason = m.message ?? "error";
+      }
+    } catch (err) {
+      reason = (err as Error).message;
+    }
+    mic.stop();
+    if (!stopped) handlers.onClosed(reason);
+  })();
+  // ...
+}
+```
+
+The socket sets no language. Two people speak two languages into the same microphone, so the app leaves detection to Ink 2. Ink 2 does not report which language it heard, though, and `turn.end` has no language field. The translate route below works that out.
+
+`startMic` sends 100 ms chunks from an `AudioWorklet`. While Sonic is playing, `isMuted()` returns true and the chunks are silence. Without that gate the app hears its own translation and translates it back, forever. The stream keeps its timing because silence still goes out.
+
+To tune when a turn ends, pass `turn_end_threshold` or `turn_end_timeout_ms` to the websocket call. See [turn events](https://docs.cartesia.ai/use-the-api/stt/turns) in the Cartesia docs.
+
+## When should I start translating?
+
+`turn.end` is the signal to translate. `turn.eager_end` comes a little earlier, when Ink 2 thinks the turn may be over. The app starts the LLM request on `turn.eager_end` and cancels it if the speaker keeps going (`turn.resume`). If `turn.end` arrives with the same words, the request already in flight is reused, which saves most of the LLM's time to first token.
+
+```ts filename="lib/interpreter.ts"
+    onEagerEnd(text: string) {
+      if (early?.text === text.trim()) return;
+      dropEarly();
+      if (text.trim()) early = translate(text.trim());
+    },
+    onResume() {
+      dropEarly();
+    },
+    onTurnEnd(text: string) {
+      const endedAt = performance.now();
+      hearing = false;
+      events.onCaption("");
+      const source = text.trim();
+      if (!source) {
+        dropEarly();
+        return phase();
+      }
+      const job = early?.text === source ? early : (dropEarly(), translate(source));
+      early = null;
+
+      const turn: Turn = { id: nextId++, from: null, to: null, source, translation: "", status: "translating", latency: {} };
+      turns.push(turn);
+      update();
+      queue = queue.then(async () => {
+        if (stopped) return;
+        try {
+          await run(turn, endedAt, job.res);
+          turn.status = "done";
+        } catch (err) {
+          if (stopped || (err as Error).name === "AbortError") return;
+          turn.status = "failed";
+          console.error(err);
+        }
+        update();
+      });
+    },
+```
+
+`translate()` is a `fetch` to `/api/translate` with its own `AbortController`. `dropEarly()` aborts it, and the abort reaches the LLM call on the server through `req.signal`.
+
+## Stream the translation and detect who spoke
+
+One streamed reply does two jobs. The first line is the language code of the turn, and the translation follows. The code says who spoke, which decides the target language, the voice and the side of the screen.
+
+```ts filename="lib/prompt.ts"
+export function translatePrompt([a, b]: readonly [Lang, Lang]): string {
+  return [
+    `You are a live interpreter between a ${englishName(a)} speaker and a ${englishName(b)} speaker.`,
+    "Each user message is one spoken turn, written down by speech recognition, so it may have small recognition errors.",
+    `Decide whether the turn is in ${englishName(a)} (${a}) or ${englishName(b)} (${b}), then translate it into the other of the two.`,
+    `Reply in exactly this format: the code of the language you detected, ${a} or ${b}, alone on the first line. The translation on the next line.`,
+    "The translation is read aloud. Write natural spoken language: no quotes, no notes, no markdown, no romanization.",
+    "Keep names, numbers and the speaker's tone. Translate questions and requests as they are. Never answer them.",
+    "If the turn mixes the two languages, use the main one.",
+  ].join("\n");
+}
+```
+
+The route validates the body with zod and streams plain text back with the AI SDK.
+
+```ts filename="lib/translate-route.ts"
+    const { text, pair } = parsed.data;
+    const result = streamText({
+      model: resolved,
+      system: translatePrompt(pair),
+      prompt: text,
+      maxOutputTokens: 600,
+      abortSignal: req.signal,
+      onError: ({ error }) => console.error("translate failed", (error as Error)?.message ?? error),
+    });
+    return result.toTextStreamResponse({ headers: { "Cache-Control": "no-store" } });
+```
+
+`resolved` comes from `getModel()` in `lib/llm.ts`, which turns `LLM_MODEL` into a provider model or a Vercel AI Gateway id. The route passes no `temperature`, because reasoning models reject it.
+
+In the browser, `run()` reads the stream until the first line names the language, then picks the other language as the target. `createReplyParser` in `lib/translation.ts` strips the code. If a model skips the header, the app falls back to a script check (kana or kanji means Japanese, Devanagari means Hindi), and then to the opposite of the previous speaker.
+
+```ts filename="lib/interpreter.ts"
+    let head = "";
+    for (;;) {
+      const { done, value } = await it.next();
+      if (done) {
+        head = parser.end();
+        break;
+      }
+      head = parser.push(value);
+      if (head || parser.lang) break;
+    }
+    const previous = turns.filter((t) => t.from && t.id !== turn.id).at(-1)?.from;
+    const from = parser.lang ?? guessByScript(turn.source, pair) ?? (previous ? otherOf(pair, previous) : pair[0]);
+    const to = otherOf(pair, from);
+    turn.from = from;
+    turn.to = to;
+    mark(head);
+```
+
+## Speak the translation with Sonic in the target language
+
+Each language has a public Sonic voice whose own language is that language.
+
+```ts filename="lib/languages.ts"
+export const VOICES: Record<Lang, { id: string; name: string }> = {
+  en: { id: "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4", name: "Skylar" },
+  es: { id: "35b2cfc1-e6fb-4d69-a598-c1780612be4a", name: "Darío" },
+  fr: { id: "7c58f4a4-a72c-42fa-a503-41b9408820f3", name: "Inès" },
+  hi: { id: "cb9c954d-bcaa-43ed-82bf-aeb5e88a3cb5", name: "Kabir" },
+  ja: { id: "498e7f37-7fa3-4e2c-b8e2-8b6e9276f956", name: "Aiko" },
+};
+```
+
+The rest of the LLM stream goes to the speaker with that voice and `language: to`.
+
+```ts filename="lib/interpreter.ts"
+    await ensureSpeaker();
+    await speaker.speak(rest(), {
+      voice: VOICES[to].id,
+      language: to,
+      onFirstAudio: () => {
+        turn.latency.speakingMs = performance.now() - endedAt;
+        turn.status = "speaking";
+        update();
+      },
+    });
+```
+
+The speaker opens one Sonic context per turn on the TTS WebSocket. It pushes whole sentences while the LLM is still writing, and schedules each audio chunk on Web Audio as it arrives.
+
+```ts filename="lib/audio/speaker.ts"
+        const ctx = ws.context({
+          model_id: "sonic-3.6",
+          voice: { mode: "id", id: voice },
+          output_format: { container: "raw", encoding: "pcm_f32le", sample_rate: SAMPLE_RATE },
+          language,
+        });
+        // ...
+        let buffer = "";
+        let pushed = false;
+        for await (const piece of text) {
+          buffer += piece;
+          const { sentences, rest } = takeSentences(buffer);
+          buffer = rest;
+          for (const transcript of sentences) {
+            await ctx.push({ transcript: `${transcript} ` });
+            pushed = true;
+          }
+        }
+        if (buffer.trim()) {
+          await ctx.push({ transcript: buffer.trim() });
+          pushed = true;
+        }
+        if (!pushed) {
+          await ctx.cancel();
+          return;
+        }
+        await ctx.no_more_inputs();
+        await playing;
+```
+
+`takeSentences` splits on `.`, `!` and `?` followed by a space, and on `。`, `！`, `？` and `।` on their own, so Japanese and Hindi sentences go to Sonic as soon as they end. `speaker.busy()` stays true while audio plays and for 0.35 s after, for room echo. That is the value the microphone gate reads.
+
+## How is latency measured?
+
+Both numbers start at `endedAt`, the `performance.now()` taken when `turn.end` arrives. `translatedMs` is set when the first translated word comes back from the LLM. `speakingMs` is set in `onFirstAudio`, when the first Sonic chunk is scheduled to play.
+
+```ts filename="lib/interpreter.ts"
+    const mark = (t: string) => {
+      if (!t) return;
+      if (turn.latency.translatedMs === undefined) turn.latency.translatedMs = performance.now() - endedAt;
+      turn.translation += t;
+      emit();
+    };
+```
+
+Because the clock starts at `turn.end` and not at `turn.eager_end`, the time saved by the early request shows up as a smaller number. The page prints both under each translated turn. The template README reports first audio 0.6 to 1.5 s after the speaker stopped, with `openai/gpt-5.4-mini`, tested in desktop Chrome with a recorded voice as the microphone and not on a real phone.
+
+## Limits
+
+- One microphone, one turn at a time. The microphone is muted for Ink 2 while a translation plays, so the other person waits for it to finish.
+- In a loud room, background voices can start a stray turn.
+- `/api/token` and `/api/translate` have no auth. Anyone who can reach them spends your Cartesia and LLM credits, so put the app behind your own login before you share the URL.
+
+## Next steps
+
+- Run the full app, with the setup banner, the split conversation and reconnects: [examples/pocket-interpreter](../../../examples/pocket-interpreter/README.md).
+- Read more about minting browser tokens in [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
+- Stream Sonic on its own in [Stream text to speech in Next.js](./01-stream-speech.mdx).

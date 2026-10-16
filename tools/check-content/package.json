@@ -1,0 +1,9 @@
+{
+  "name": "@cartesia-cookbook/check-content",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test index.test.mjs",
+    "typecheck": "node --check index.mjs"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Voice journal",
+    "slug": "voice-journal",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "voicejournal",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ai.cartesia.cookbook.voicejournal"
+    },
+    "android": {
+      "package": "ai.cartesia.cookbook.voicejournal"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "server"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Voice journal to record your journal entries."
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

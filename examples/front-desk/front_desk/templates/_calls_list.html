@@ -1,0 +1,28 @@
+{% from "_icons.html" import icon %}
+{% from "_outcome.html" import outcome_badge %}
+{% if calls %}
+<div class="list">
+  {% for c in calls %}
+  <a class="row" href="/calls/{{ c.id }}">
+    <div class="row-main">
+      <span class="row-title">{{ caller_label(c) }}</span>
+      <span class="row-meta">
+        {{ when(c.start_time) or "Time unknown" }}{% if c.duration_secs is not none %} · {{ fmt_duration(c.duration_secs) }}{% endif %}{% if c.summary %} · {{ c.summary }}{% elif c.status == "started" %} · In progress{% endif %}
+      </span>
+    </div>
+    <div class="row-end">
+      {{ outcome_badge(c.outcome) }}
+      {{ icon("chevron-right") }}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <span class="empty-icon">{{ icon("phone") }}</span>
+  <div>
+    <p class="empty-title">No calls yet</p>
+    <p class="empty-desc">Calls show up here when they end. Start one from Try it, or call your number.</p>
+  </div>
+</div>
+{% endif %}

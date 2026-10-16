@@ -1,0 +1,77 @@
+# Cartesia cookbook
+
+> Runnable templates and recipes for Cartesia: Sonic text to speech, Ink speech to text and voice agents in Next.js, Python, Node and Expo. Each template is a standalone folder in examples/ with a README, an AGENTS.md for coding agents and an .env.example.
+
+Current facts (from facts.json, checked 2026-10-16): text to speech model `sonic-3.6`, streaming speech to text with turn detection `ink-2` (en, es, fr, hi, ja), file speech to text `ink-whisper`, API version header `Cartesia-Version: 2026-08-14`. Any other Sonic model id is sunset, about to be sunset, or a deprecated alias. The API key stays on the server; browsers and apps get a 60 second access token from a server route (`client.accessToken.create({ grants, expires_in: 60 })`). SDKs: `@cartesia/cartesia-js` (TypeScript) and `cartesia` (Python).
+
+Clone one template: `pnpm dlx create-next-app --example https://github.com/cartesia-ai/cookbook/tree/main/examples/<name> my-app` for Next.js templates, or `pnpm dlx degit cartesia-ai/cookbook/examples/<name> my-app` for any of them.
+
+## Templates: Voice agents
+
+- [Voice chat](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/voice-chat/README.md): Talk to a Cartesia Managed Agent in the browser, interrupt it mid-sentence, and watch the transcript update as it speaks. Stack: Next.js 16, React 19, shadcn/ui, agents-web. Models: ink-2, sonic-3.6. Agent notes: https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/voice-chat/AGENTS.md
+- [Speaking partner](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/speaking-partner/README.md): Practice a language out loud in role plays with a Cartesia Managed Agent, with written corrections after every line. Stack: Next.js 16, React 19, AI SDK, shadcn/ui, agents-web. Models: ink-2, sonic-3.6. Agent notes: https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/speaking-partner/AGENTS.md
+- [Docs voice widget](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/docs-voice-widget/README.md): Add a voice agent to any documentation site with one script tag. It answers from your docs, cites the page and scrolls to the section. Stack: Hono, Node.js, Web Components, esbuild, OpenAI embeddings. Models: ink-2, sonic-3.6. Agent notes: https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/docs-voice-widget/AGENTS.md
+- [Voice mode for coding agents](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/coding-voice-mode/README.md): Talk to Claude Code, Cursor or Codex through one MCP tool: Sonic 3.6 speaks the agent's message and Ink 2 turn detection hears your reply. Stack: Python, FastMCP, sounddevice, uv. Models: sonic-3.6, ink-2. Agent notes: https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/coding-voice-mode/AGENTS.md
+
+## Templates: Speech generation
+
+- [Article to podcast](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/article-to-podcast/README.md): Paste a link or text and get a two-host podcast episode voiced by Sonic 3.6, with a transcript that follows along. Stack: Next.js 16, React 19, AI SDK, Mozilla Readability, shadcn/ui. Models: sonic-3.6. Agent notes: https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/article-to-podcast/AGENTS.md
+- [Ebook to audiobook](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/audiobook/README.md): Turn an EPUB into narrated MP3 chapters with Sonic 3.6, a voice per speaker, and word timestamps for read-along. Stack: Python, Gradio, EbookLib, ffmpeg, uv. Models: sonic-3.6. Agent notes: https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/audiobook/AGENTS.md
+- [Story time](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/story-time/README.md): An interactive bedtime story generator that reads aloud with a Sonic 3.6 voice per character, highlights each word, and takes spoken choices with Ink 2. Stack: Next.js 16, React 19, AI SDK, IndexedDB, shadcn/ui. Models: sonic-3.6, ink-2. Agent notes: https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/story-time/AGENTS.md
+
+## Templates: Transcription and translation
+
+- [Meeting notes](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/meeting-notes/README.md): Record or upload a meeting, transcribe it with ink-whisper, and get a summary, decisions and action items. Meetings stay in the browser. Stack: Next.js 16, React 19, AI SDK, IndexedDB, shadcn/ui. Models: ink-whisper. Agent notes: https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/meeting-notes/AGENTS.md
+- [Pocket interpreter](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/pocket-interpreter/README.md): Real-time voice translation between two people on one phone: Ink 2 hears each turn, an LLM translates it, and Sonic 3.6 speaks it. Stack: Next.js 16, React 19, AI SDK, Web Audio, shadcn/ui. Models: ink-2, sonic-3.6. Agent notes: https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/pocket-interpreter/AGENTS.md
+
+## Templates: Telephony
+
+- [Front desk](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/front-desk/README.md): An AI phone receptionist on a Cartesia Managed Agent that answers calls, books appointments, takes messages and logs every call with transcript and latency. Stack: Python, FastAPI, htmx, SQLite, uv. Models: ink-2, sonic-3.6. Agent notes: https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/front-desk/AGENTS.md
+
+## Templates: Mobile
+
+- [Voice journal](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/voice-journal/README.md): An Expo voice diary for iOS, Android and the web: ink-whisper transcribes each entry and Sonic 3.6 reads a weekly recap aloud. Stack: Expo, React Native, Expo Router API routes, AI SDK, AsyncStorage. Models: ink-whisper, sonic-3.6. Agent notes: https://raw.githubusercontent.com/cartesia-ai/cookbook/main/examples/voice-journal/AGENTS.md
+
+## Recipes
+
+- [Browser auth with access tokens](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx): Keep the API key on the server and give the browser a token that expires in 60 seconds.
+- [Stream speech in Next.js](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/content/cookbook/01-next/01-stream-speech.mdx): Stream Sonic audio through a route handler and play it in the browser while it is still being generated.
+- [Turn an article into a podcast in Next.js](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/content/cookbook/01-next/02-article-to-podcast.mdx): Have a model write a two-host script, voice each line with Sonic 3.6, and play one episode with a synced transcript.
+- [Transcribe and summarize meetings](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/content/cookbook/01-next/20-transcribe-and-summarize-meetings.mdx): Record audio in the browser, transcribe it with ink-whisper, and turn the transcript into a summary, decisions and action items.
+- [Generate speech to a file in Node](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/content/cookbook/05-node/01-generate-speech-to-file.mdx): Turn text into a WAV file with a short Node script.
+- [Generate speech to a file in Python](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/content/cookbook/10-python/01-generate-speech-to-file.mdx): Turn text into a WAV file with a short Python script.
+- [Voice mode for coding agents](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/content/cookbook/10-python/05-voice-mode-for-coding-agents.mdx): Talk to Claude Code, Cursor or Codex with Sonic 3.6 speech out and Ink 2 turn detection in, through one MCP tool.
+- [Turn an ebook into an audiobook](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/content/cookbook/10-python/10-ebook-to-audiobook.mdx): Narrate an EPUB with Sonic, a voice per speaker, and save word timestamps for read-along.
+- [Talk to a Managed Agent](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/content/cookbook/15-agents/01-talk-to-a-managed-agent.mdx): Mint an agent token on the server and open the Managed Agents WebSocket from the browser.
+- [Voice chat with a Managed Agent](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/content/cookbook/15-agents/02-voice-chat.mdx): Talk to a Managed Agent in the browser with barge-in and live captions, using Next.js.
+- [Language speaking partner](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/content/cookbook/15-agents/03-speaking-partner.mdx): Practice speaking a language with a Managed Agent and get written corrections after every line, using Next.js.
+
+## Repo files
+
+- [AGENTS.md](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/AGENTS.md): Repo rules for coding agents, commands, and a docs index.
+- [facts.json](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/facts.json): Current model ids, API version and retired ids. CI fails when a file drifts from it.
+- [templates.json](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/templates.json): Every template with its env keys, models, Cartesia APIs, clone command and deploy link.
+- [Agents web client](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/packages/agents-web/README.md): Browser client for the Managed Agents WebSocket that several templates copy.
+- [Design rules](https://raw.githubusercontent.com/cartesia-ai/cookbook/main/packages/kit/DESIGN.md): Layout, type and color rules every template UI follows.
+
+## Cartesia docs
+
+- [Sonic 3.6](https://docs.cartesia.ai/build-with-cartesia/tts-models/latest.md): Current text to speech model, snapshots and languages.
+- [Ink 2](https://docs.cartesia.ai/build-with-cartesia/stt/latest.md): Current speech to text models.
+- [Deprecated models](https://docs.cartesia.ai/build-with-cartesia/tts-models/api-changes.md): Sunset dates and what replaces each old model.
+- [Authenticate your applications](https://docs.cartesia.ai/get-started/authenticate-your-client-applications.md): Access tokens for browsers and apps, API keys on servers.
+- [Client libraries](https://docs.cartesia.ai/tools/client-libraries.md): The TypeScript and Python SDKs.
+- [Compare TTS endpoints](https://docs.cartesia.ai/use-the-api/compare-tts-endpoints.md): Bytes, SSE and WebSocket, and when to use each.
+- [Compare STT endpoints](https://docs.cartesia.ai/use-the-api/stt/compare-endpoints.md): Batch, streaming and turn-detecting speech to text.
+- [Turn detection](https://docs.cartesia.ai/use-the-api/stt/turns.md): Ink 2 turn events on /stt/turns/websocket.
+- [Managed Agents](https://docs.cartesia.ai/agents/introduction.md): Create and run hosted voice agents.
+- [Agents WebSocket API](https://docs.cartesia.ai/line/integrations/websocket-api.md): Audio and events between your app and an agent.
+- [Client tools](https://docs.cartesia.ai/agents/client-tools.md): Run functions in your app during a call.
+- [Phone numbers](https://docs.cartesia.ai/line/integrations/telephony/phone-numbers.md): Connect a number to an agent.
+- [Pricing](https://docs.cartesia.ai/pricing.md): How Cartesia charges for usage.
+
+## Optional
+
+- [Cartesia docs index](https://docs.cartesia.ai/llms.txt): Every docs page as Markdown.
+- [Cartesia agent skills](https://github.com/cartesia-ai/skills): Install with `npx skills add cartesia-ai/skills`.
+- [Cookbook on GitHub](https://github.com/cartesia-ai/cookbook): Source, issues and pull requests.

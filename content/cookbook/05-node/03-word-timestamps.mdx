@@ -1,0 +1,97 @@
+---
+title: Get word timestamps from Sonic text to speech
+description: Ask Cartesia Sonic 3.6 for word-level timestamps with add_timestamps, collect them from the SSE stream in Node, and use them for captions, read-along highlighting or barge-in.
+tags: ['node', 'tts', 'timestamps', 'captions']
+---
+
+# Get word timestamps from Sonic text to speech
+
+Set `add_timestamps: true` on a Sonic 3.6 request and Cartesia sends word timings alongside the audio: each word with its start and end time in seconds from the start of the audio. Use them to highlight the word being spoken, write subtitles, or work out how much of a reply the listener heard before they interrupted.
+
+Timestamps come back on the streaming endpoints, server-sent events (`tts.generateSSE`) and the WebSocket. The plain bytes endpoint (`tts.generate`) returns audio only.
+
+## Prerequisites
+
+- Node 22.13 or newer
+- `pnpm add @cartesia/cartesia-js`
+- `CARTESIA_API_KEY` set in your shell. `CARTESIA_VOICE_ID` is optional; the script falls back to a public voice.
+
+## The script
+
+```ts filename="timestamps.mts"
+import { writeFile } from 'node:fs/promises';
+import Cartesia from '@cartesia/cartesia-js';
+
+const SAMPLE_RATE = 44100;
+const client = new Cartesia({ apiKey: process.env.CARTESIA_API_KEY });
+
+const stream = await client.tts.generateSSE({
+  model_id: 'sonic-3.6',
+  transcript: 'Dr. Lee moved the meeting to 3:30 on Friday.',
+  voice: process.env.CARTESIA_VOICE_ID ?? 'db6b0ed5-d5d3-463d-ae85-518a07d3c2b4',
+  output_format: { container: 'raw', encoding: 'pcm_s16le', sample_rate: SAMPLE_RATE },
+  add_timestamps: true,
+  use_normalized_timestamps: false, // keep "Dr." and "3:30" as written
+});
+
+const audio: Buffer[] = [];
+const words: { word: string; start: number; end: number }[] = [];
+
+for await (const event of stream) {
+  if (event.type === 'chunk' && event.data) {
+    audio.push(Buffer.from(event.data, 'base64'));
+  } else if (event.type === 'timestamps' && event.word_timestamps) {
+    const { words: w, start, end } = event.word_timestamps;
+    w.forEach((word, i) => words.push({ word, start: start[i]!, end: end[i]! }));
+  } else if (event.type === 'error') {
+    throw new Error(`${event.title}: ${event.message}`);
+  } else if (event.type === 'done') {
+    break;
+  }
+}
+
+await writeFile('speech.pcm', Buffer.concat(audio));
+await writeFile('speech.words.json', JSON.stringify(words, null, 2));
+console.table(words);
+```
+
+Run it with `pnpm dlx tsx timestamps.mts`. Play the audio with `ffplay -f s16le -ar 44100 speech.pcm`.
+
+## What do the timestamps look like?
+
+Each `timestamps` event carries a batch of words as three parallel arrays, `words`, `start` and `end`. A run on 2026-10-16 printed this (times rounded):
+
+| word | start | end |
+| --- | --- | --- |
+| Dr. | 0.11 | 0.52 |
+| Lee | 0.60 | 0.76 |
+| moved | 0.76 | 1.16 |
+| the | 1.24 | 1.24 |
+| meeting | 1.32 | 1.56 |
+| to | 1.64 | 1.72 |
+| 3:30 | 1.72 | 2.44 |
+| on | 2.52 | 2.52 |
+| Friday. | 2.52 | 3.16 |
+
+Three things to expect:
+
+- Punctuation stays attached to the word (`Friday.`).
+- Short words can have `start` equal to `end`. Highlight by start time, and keep a word lit until the next one starts.
+- The values change a little from run to run, because the audio does.
+
+## Original or normalized words?
+
+`use_normalized_timestamps` decides which words you get back. With `false`, as above, they match the text you sent. With `true`, they are the spoken form: the same sentence came back as `doctor`, `Lee`, ..., `three`, `thirty`, `on`, `Friday.`. Use `false` when you highlight your own text on screen, and `true` when you need one entry per spoken word.
+
+## How do I line timestamps up with playback?
+
+Times count from the start of that request's audio. If you join several requests into one file, add the duration of the audio before each one: for 16-bit mono PCM that is `bytes / 2 / sampleRate` seconds. In a browser, record the `AudioContext.currentTime` at which a request's first chunk was scheduled, then compare `ctx.currentTime - lineStart` with each word's `start` on every animation frame. [Narrate a story with a different voice per character](../01-next/30-multi-voice-narration-with-word-timestamps.mdx) does exactly that.
+
+## Timestamps over the WebSocket
+
+The WebSocket context takes the same option. Pass `add_timestamps: true` to `ws.context()`, and `ctx.receive()` yields events with `type: 'timestamps'` and the same `word_timestamps` shape. Chunks on the WebSocket carry `event.audio` as bytes, not base64. See [Stream text to speech from an LLM token stream](./02-stream-llm-text-to-speech.mdx) for the context setup.
+
+## Next steps
+
+- [Turn an EPUB ebook into an audiobook](../10-python/10-ebook-to-audiobook.mdx) saves timestamps per chapter as JSON and WebVTT
+- [Transcribe an audio file with ink-whisper in Python](../10-python/02-transcribe-an-audio-file.mdx), which returns word timestamps for speech you recorded

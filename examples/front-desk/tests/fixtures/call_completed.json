@@ -1,0 +1,40 @@
+{
+  "type": "call_completed",
+  "call_id": "ac_sim_7Kq2mXbR9cLdNfPz",
+  "agent_id": "agent_simulated",
+  "webhook_id": "agent_webhook_simulated",
+  "webhook_request_id": "webhook_req_sim_completed_1",
+  "timestamp": "2026-10-16T17:04:51.061907836Z",
+  "end_reason": "agent_hangup",
+  "call": {
+    "id": "ac_sim_7Kq2mXbR9cLdNfPz",
+    "agent_id": "agent_simulated",
+    "agent_name": "Front desk: Juniper Hair Studio",
+    "status": "completed",
+    "start_time": "2026-10-16T17:03:12.413659Z",
+    "end_time": "2026-10-16T17:04:50.036327Z",
+    "end_reason": "agent_hangup",
+    "telephony_params": {
+      "from": "+14155550123",
+      "to": "+14155550199",
+      "direction": "inbound",
+      "call_sid": "CA00000000000000000000000000000000",
+      "connection_type": "phone"
+    },
+    "telephony_account_type": "cartesia",
+    "transcript": [
+      {"role": "assistant", "text": "Hi, thanks for calling Juniper Hair Studio. How can I help you today?", "start_timestamp": 0.41, "end_timestamp": 3.9, "tts_ttfb": 0.071},
+      {"role": "user", "text": "Hi, I'd like to book a haircut for Saturday morning.", "start_timestamp": 4.6, "end_timestamp": 7.8, "stt_ttfb": 0.182},
+      {"role": "assistant", "text": "Let me check Saturday. I have ten, ten thirty or eleven in the morning. Which works best?", "start_timestamp": 8.5, "end_timestamp": 13.6, "tts_ttfb": 0.094,
+       "tool_calls": [{"id": "tc_1", "name": "check_availability", "arguments": {"date": "2026-10-17", "part_of_day": "morning"}, "result": "{\"date\":\"2026-10-17\",\"day\":\"Saturday, October 17\",\"open_times\":[\"10 AM\",\"10:30 AM\",\"11 AM\",\"11:30 AM\"],\"more\":0}"}]},
+      {"role": "user", "text": "Ten thirty is good. My name is Dana Park.", "start_timestamp": 14.2, "end_timestamp": 17.1, "stt_ttfb": 0.205},
+      {"role": "assistant", "text": "Thanks, Dana. That's a haircut on Saturday, October seventeenth at ten thirty. Shall I book that?", "start_timestamp": 17.9, "end_timestamp": 23.4, "tts_ttfb": 0.088},
+      {"role": "user", "text": "Yes please.", "start_timestamp": 24.0, "end_timestamp": 24.9, "stt_ttfb": 0.161},
+      {"role": "assistant", "text": "You're booked for Saturday at ten thirty. Anything else?", "start_timestamp": 25.6, "end_timestamp": 28.7, "tts_ttfb": 0.112,
+       "tool_calls": [{"id": "tc_2", "name": "book_appointment", "arguments": {"date": "2026-10-17", "time": "10:30 AM", "name": "Dana Park", "service": "haircut"}, "result": "{\"booked\":true,\"day\":\"Saturday, October 17\",\"time\":\"10:30 AM\",\"name\":\"Dana Park\"}"}]},
+      {"role": "user", "text": "No, that's it. Thanks, bye.", "start_timestamp": 29.5, "end_timestamp": 31.0, "stt_ttfb": 0.174},
+      {"role": "assistant", "text": "Thanks for calling, Dana. See you Saturday. Goodbye!", "start_timestamp": 31.6, "end_timestamp": 34.2, "tts_ttfb": 0.079,
+       "tool_calls": [{"id": "tc_3", "name": "end_call", "arguments": {}}]}
+    ]
+  }
+}

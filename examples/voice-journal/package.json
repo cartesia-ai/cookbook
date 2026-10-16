@@ -1,0 +1,54 @@
+{
+  "name": "@cartesia-cookbook/voice-journal",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start",
+    "web": "expo start --web",
+    "ios": "expo start --ios",
+    "android": "expo start --android",
+    "build:web": "expo export --platform web",
+    "typecheck": "tsc --noEmit",
+    "lint": "expo lint",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.79",
+    "@ai-sdk/openai": "^4.0.95",
+    "@cartesia/cartesia-js": "^4.2.0",
+    "@expo-google-fonts/inter": "^0.4.2",
+    "@expo/metro-runtime": "~58.0.14",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "ai": "^7.0.142",
+    "expo": "~58.0.12",
+    "expo-audio": "~58.0.9",
+    "expo-constants": "~58.0.12",
+    "expo-file-system": "~58.0.9",
+    "expo-font": "~58.0.8",
+    "expo-linking": "~58.0.13",
+    "expo-router": "~58.0.21",
+    "expo-status-bar": "~58.0.3",
+    "expo-system-ui": "~58.0.6",
+    "lucide-react-native": "^1.58.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-screens": "~4.30.0",
+    "react-native-svg": "15.16.0",
+    "react-native-web": "~0.21.4",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "eslint": "^9",
+    "eslint-config-expo": "~58.0.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.4"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Cartesia docs
+    url: https://docs.cartesia.ai
+    about: API reference, model ids and guides.
+  - name: Bug in the TypeScript SDK
+    url: https://github.com/cartesia-ai/cartesia-js/issues
+    about: Problems in @cartesia/cartesia-js itself.
+  - name: Bug in the Python SDK
+    url: https://github.com/cartesia-ai/cartesia-python/issues
+    about: Problems in the cartesia Python package itself.

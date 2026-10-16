@@ -1,0 +1,33 @@
+# Cartesia kit
+
+shadcn/ui (MIT, Copyright (c) 2023 shadcn), recolored for Cartesia. The components are the registry output from the shadcn CLI, unedited (style `new-york`, base color `neutral`, Radix, lucide icons, Tailwind v4). Only the CSS variables in `theme.css` are changed.
+
+Components here: button, card, input, textarea, select, label, tabs, alert, badge, skeleton, separator, tooltip, dialog, sonner, scroll-area, avatar.
+
+## Theme
+
+`theme.css` holds the whole palette as CSS variables on `:root` and `.dark`. Light is Canvas `#f9f9f8` with Verdant `#309d4b` as `--primary`. Dark is Carbon `#111010` with green-400 `#5db368` as `--primary`. Fonts are Inter only, wired to `--font-sans` with `next/font/google`.
+
+White on Verdant is about 3.3:1, so primary buttons rely on the default `font-medium`. Keep primary text at 14px medium or larger.
+
+## Use in a template
+
+Run these inside the template (a Next.js app with Tailwind v4):
+
+```sh
+pnpm dlx shadcn@latest init -b radix
+pnpm dlx shadcn@latest add button card badge
+```
+
+Then replace the `:root` and `.dark` blocks in `app/globals.css` with the ones from `theme.css` (or copy the file over). In `app/layout.tsx`:
+
+```tsx
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+
+<html lang="en" className={`${inter.variable} font-sans`}>
+```
+
+Templates stay self-contained: copy, do not depend on this package.
+

@@ -1,0 +1,297 @@
+---
+title: Narrate a story with a different voice per character and highlight each word
+description: Read a story aloud with Cartesia Sonic 3.6 text to speech, one voice per character, highlight each word from Sonic's word timestamps, and hear a spoken choice with Ink 2 speech to text, in Next.js.
+tags: ['next', 'tts', 'timestamps', 'stt']
+---
+
+# Narrate a story with a different voice per character and highlight each word
+
+This recipe reads a scene aloud in the browser with Cartesia Sonic 3.6 (`sonic-3.6`). The narrator and each character get their own voice and their own emotion, the word being spoken lights up on screen, and when the scene ends the listener says what happens next. Cartesia Ink 2 (`ink-2`) turns that answer into text, and a small matcher picks one of the two choices.
+
+The code comes from a bedtime story app, [examples/story-time](../../../examples/story-time/README.md), which also writes the scenes with an LLM, checks them for kid safety and saves the narration in IndexedDB for replay. This page covers the voice and timing parts.
+
+## Prerequisites
+
+- A Next.js App Router app
+- `pnpm add @cartesia/cartesia-js` (the template uses `^4.2.0`, which sends `Cartesia-Version: 2026-08-14`)
+- `CARTESIA_API_KEY` in `.env.local`
+- A scene as an array of lines, each with a `speaker`, an `emotion` and a `text`
+
+## How does the browser talk to Cartesia without the API key?
+
+The page opens WebSockets straight to Cartesia, one for Sonic per scene and one for Ink 2 per choice. Before each one it asks your server for an access token that lasts 60 seconds and carries the `tts` and `stt` grants.
+
+```ts filename="app/api/token/route.ts"
+import { getCartesia, MissingKeyError } from "@/lib/cartesia";
+import { createRateLimiter } from "@/lib/rate-limit";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const headers = { "Cache-Control": "no-store" };
+const allow = createRateLimiter(20, 60_000);
+
+export async function POST(req: Request) {
+  if (!allow(req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local")) {
+    return Response.json({ error: "Too many requests. Try again in a minute." }, { status: 429, headers });
+  }
+  try {
+    const { token } = await getCartesia().accessToken.create({ grants: { tts: true, stt: true }, expires_in: 60 });
+    return Response.json({ token }, { headers });
+  } catch (err) {
+    if (err instanceof MissingKeyError) {
+      return Response.json({ error: "CARTESIA_API_KEY is not set. Add it to .env.local and restart." }, { status: 503, headers });
+    }
+    return Response.json({ error: "Could not get a Cartesia token. Check CARTESIA_API_KEY." }, { status: 502, headers });
+  }
+}
+```
+
+`getCartesia()` in `lib/cartesia.ts` reads `CARTESIA_API_KEY` when the request comes in, so `next build` works with no environment set. On the client, a fresh token becomes a client with `new Cartesia({ token })`.
+
+```ts filename="lib/audio.ts"
+export async function cartesiaClient(): Promise<Cartesia> {
+  let res: Response;
+  try {
+    res = await fetch("/api/token", { method: "POST" });
+  } catch {
+    throw new Error("Could not reach the server");
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || typeof body.token !== "string") throw new Error(body.error ?? "Could not get a Cartesia token");
+  return new Cartesia({ token: body.token });
+}
+```
+
+The [browser auth guide](../00-guides/01-browser-auth-with-access-tokens.mdx) covers tokens in more detail.
+
+## How do I give each character a different voice?
+
+Every new speaker gets the next voice from a pool, and the narrator keeps the voice picked on the setup screen. `lib/cast.ts` stores that mapping on the story, so a character sounds the same in every scene.
+
+```ts filename="lib/cast.ts"
+export function castVoices(cast: Record<string, VoiceKey>, narrator: VoiceKey, lines: Line[]): Record<string, VoiceKey> {
+  const next = { ...cast };
+  const pool = CHARACTER_POOL.filter((v) => v !== narrator);
+  for (const line of lines) {
+    if (isNarrator(line.speaker)) continue;
+    const key = speakerKey(line.speaker);
+    if (next[key]) continue;
+    const used = Object.keys(next).length;
+    next[key] = pool[used % pool.length]!;
+  }
+  return next;
+}
+
+export function voiceFor(speaker: string, cast: Record<string, VoiceKey>, narrator: VoiceKey): string {
+  const key = isNarrator(speaker) ? narrator : (cast[speakerKey(speaker)] ?? narrator);
+  return VOICES[key].id;
+}
+```
+
+`VOICES` in `lib/story.ts` holds seven voice ids from the Cartesia voice library, the ones the docs list as having the widest emotional range.
+
+## Voice each line in its own context
+
+The scene uses one Sonic WebSocket. Each line gets its own context on that socket, with the speaker's voice, the line's emotion, and `add_timestamps: true` so Sonic sends word timings along with the audio. Contexts on one connection are independent, so the narrator and a character can take turns without reconnecting.
+
+```ts filename="lib/narrate.ts"
+    const ws = await client.tts.websocket();
+    // ...
+      for (const [i, line] of lines.entries()) {
+        if (isStopped) return null;
+        const c = ws.context({
+          model_id: "sonic-3.6",
+          voice: { mode: "id", id: voiceOf(line.speaker) },
+          output_format: { container: "raw", encoding: "pcm_f32le", sample_rate: SAMPLE_RATE },
+          language: "en",
+          add_timestamps: true,
+          use_normalized_timestamps: false,
+        });
+        cancel = () => c.cancel();
+        await c.push({
+          transcript: spokenText(line.text),
+          ...(line.emotion === "neutral" ? {} : { generation_config: { emotion: line.emotion } }),
+        });
+        await c.no_more_inputs();
+
+        const words: WordTiming[] = [];
+        timeline.words[i] = words;
+        meta.push({ offset: length / SAMPLE_RATE, words });
+        let started = false;
+        for await (const ev of c.receive()) {
+          if (ev.type === "chunk" && ev.audio?.byteLength) {
+            const samples = new Float32Array(ev.audio.slice().buffer);
+            if (!started) {
+              timeline.lineStarts[i] = Math.max(out.next, ctx.currentTime);
+              started = true;
+            }
+            out.play(samples);
+            pcm.push(samples);
+            length += samples.length;
+          } else if (ev.type === "timestamps" && ev.word_timestamps) {
+            const w = ev.word_timestamps;
+            w.words.forEach((word, k) => words.push({ word, start: w.start[k] ?? 0, end: w.end[k] ?? 0 }));
+          } else if (ev.type === "error") {
+            throw new Error(ev.message ?? ev.title ?? "Sonic returned an error");
+          }
+        }
+        // ...
+        out.skip(GAP_SECONDS);
+      }
+```
+
+A few choices in this loop matter:
+
+- Lines run one after another, not all at once. Sonic generates faster than the audio plays, so line two is ready before line one finishes. The template's notes say that opening a context for every line at the same time can hit concurrency limits.
+- A new context per line is also how the emotion changes. The Cartesia docs advise a separate context when the emotion changes. `generation_config.emotion` is in beta, works in English only, and works best when it matches the words, so the scene prompt asks the LLM for that.
+- `pcm_f32le` at 24 kHz is already Float32, so each chunk goes into an `AudioBuffer` without conversion. `out.play` schedules it right where the last chunk ends on the `AudioContext` clock, and `out.skip` leaves a 0.35 second pause between lines.
+- `timeline.lineStarts[i]` records the clock time of the line's first chunk. Sonic's word times count from the start of the line's audio, so that start time is all the page needs to line them up.
+
+## What do Sonic's word timestamps look like?
+
+This loop was run from Node against the live API on 2026-10-16 with a token-based client, two lines and two voices (Marian for the narrator, Maya for Mia). Both lines came back in about 0.6 seconds total. The narrator's line produced these timings, in seconds from the start of the line:
+
+```json
+[
+  { "word": "The", "start": 0.119, "end": 0.36 },
+  { "word": "moon", "start": 0.44, "end": 0.84 },
+  { "word": "rose", "start": 0.84, "end": 1.4 },
+  { "word": "over", "start": 1.48, "end": 1.72 },
+  { "word": "the", "start": 1.72, "end": 1.8 },
+  { "word": "quiet", "start": 1.88, "end": 2.28 },
+  { "word": "hill.", "start": 2.28, "end": 2.76 }
+]
+```
+
+Punctuation stays on the word. The template sets `use_normalized_timestamps: false` so the words follow the text it sent. Sonic also returns `[laughter]` as a timestamped word when the text has one, which the next step skips.
+
+## Highlight the word being spoken
+
+The page never asks the audio "where are you?". It reads `ctx.currentTime` on every animation frame, finds the line whose start time has passed, and then the last word in that line whose start time has passed.
+
+```tsx filename="components/read-along.tsx"
+export function useReadAlong(ctx: AudioContext | null, timeline: Timeline | null, lines: Line[]): Position | null {
+  const [pos, setPos] = useState<Position | null>(null);
+  useEffect(() => {
+    if (!ctx || !timeline) {
+      setPos(null);
+      return;
+    }
+    const tokens = lines.map((l) => displayTokens(l.text));
+    let raf = 0;
+    let last = "";
+    const tick = () => {
+      const now = ctx.currentTime;
+      let line = -1;
+      timeline.lineStarts.forEach((start, i) => {
+        if (start !== undefined && start <= now) line = i;
+      });
+      let token = -1;
+      if (line >= 0) {
+        const words = timeline.words[line] ?? [];
+        token = activeToken(
+          words.map((w) => w.start),
+          alignWords(tokens[line]!, words.map((w) => w.word)),
+          now - timeline.lineStarts[line]!,
+        );
+      }
+      const key = `${line}:${token}`;
+      if (key !== last) {
+        last = key;
+        setPos({ line, token });
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [ctx, timeline, lines]);
+  return pos;
+}
+```
+
+The hook only calls `setPos` when the line or word changes, so React re-renders a few times a second instead of 60.
+
+The words on screen and the words Sonic timed do not always split the same way. `alignWords` in `lib/align.ts` maps each timed word to a display token by comparing lowercased letters and digits up to four tokens ahead, and skips `[laughter]`. A split or merged word moves the highlight late for a moment instead of breaking it. `activeToken` then picks the token for the current time.
+
+```ts filename="lib/align.ts"
+export function activeToken(starts: number[], tokenOf: number[], t: number): number {
+  let idx = -1;
+  for (let i = 0; i < starts.length; i++) {
+    if (starts[i]! <= t) idx = tokenOf[i] ?? idx;
+    else break;
+  }
+  return idx;
+}
+```
+
+The same timeline drives replay. The template saves the joined PCM and each line's offset and words, and `replay()` in `lib/narrate.ts` rebuilds `lineStarts` from those offsets. A saved scene plays with the highlight and makes no API calls.
+
+## Hear the spoken choice with Ink 2
+
+When the scene ends, the page streams the microphone to Ink 2 over the turns WebSocket. Ink 2 detects when the speaker stops, so there is no button to hold.
+
+```ts filename="lib/listen.ts"
+export async function listenForChoice(client: Cartesia, ctx: AudioContext, handlers: ListenHandlers) {
+  const ws = client.stt.autoFinalize.websocket({ model: "ink-2", encoding: "pcm_f32le", sample_rate: ctx.sampleRate, language: "en" });
+  ws.on("error", (err) => console.error(err.message));
+  let stopMic: (() => void) | null = null;
+  let closed = false;
+  const stop = () => {
+    if (closed) return;
+    closed = true;
+    stopMic?.();
+    try {
+      ws.send({ type: "close" });
+    } catch {}
+  };
+  stopMic = await startMic(ctx, (chunk) => !closed && ws.sendRaw(chunk));
+
+  void (async () => {
+    for await (const event of ws.stream()) {
+      if (closed) break;
+      if (event.type !== "message") continue;
+      const m = event.message;
+      if (m.type === "turn.update") handlers.onPartial(m.transcript);
+      else if (m.type === "turn.eager_end" || m.type === "turn.end") {
+        if (handlers.onAnswer(m.transcript, m.type === "turn.end")) stop();
+      }
+    }
+  })().catch((err) => console.error(err));
+
+  return { stop };
+}
+```
+
+`startMic` in the same file runs an `AudioWorklet` that posts raw Float32 samples and cuts them into 100 ms chunks at the context's own sample rate, which is the `sample_rate` sent to Ink 2. Nothing is recorded or kept.
+
+The player tries to match on `turn.eager_end`, before the end-of-turn silence has passed, so a clear answer moves the story on sooner. Only an unclear `turn.end` tells the listener to try again.
+
+```tsx filename="components/story-player.tsx"
+        onAnswer: (t, final) => {
+          const pick = matchChoice(t, scene.choices);
+          if (pick !== null) {
+            void chooseRef.current(pick);
+            return true;
+          }
+          if (final) {
+            setHeard(t);
+            setUnclear(true);
+          }
+          return false;
+        },
+```
+
+`matchChoice` in `lib/match-choice.ts` runs in the browser. It counts content words that appear in only one of the two choices, so "the rocket" picks the rocket. If no choice words were heard, it falls back to ordinals like "the second one" or "number two". Only the chosen index goes back to the server. The transcript never does.
+
+## Limits
+
+- The routes have no auth. Anyone with the URL can spend your credits, and the token route's in-memory rate limit only slows casual abuse. Put the app behind your own login before you deploy.
+- Emotion control is English only. For another language, set `language` in `lib/narrate.ts` and `lib/listen.ts` and drop `generation_config.emotion`.
+- The live test above covered the Sonic loop from Node with a token client. The microphone path and the read-along UI were not part of it.
+
+## Next steps
+
+- Run the full app, with LLM-written scenes, kid-safety checks and a story library: [examples/story-time](../../../examples/story-time/README.md).
+- Stream speech in a Next.js page with less setup: [Stream text to speech in Next.js](./01-stream-speech.mdx).
+- Read more on tokens: [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).

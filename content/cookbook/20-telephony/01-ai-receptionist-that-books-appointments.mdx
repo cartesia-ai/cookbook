@@ -1,0 +1,337 @@
+---
+title: Build an AI receptionist that answers the phone and books appointments
+description: Put a Cartesia Managed Agent (Ink 2 speech to text, an LLM, Sonic 3.6 text to speech) on a phone number and give it booking tools served by a Python FastAPI app.
+tags: ['python', 'agents', 'telephony', 'fastapi', 'managed agents']
+---
+
+# Build an AI receptionist that answers the phone and books appointments
+
+This recipe builds a phone receptionist for a small business. A caller asks for a haircut tomorrow afternoon, the agent checks the calendar, reads a time back, and books it. The voice side is a Cartesia Managed Agent, which runs Ink 2 speech to text, an LLM (`claude-haiku-4.5` by default) and Sonic 3.6 text to speech as one managed stack. Your code is a FastAPI server that owns the calendar and answers the agent's tool calls.
+
+The finished app is in [`examples/front-desk`](../../../examples/front-desk/README.md). It also takes messages, hands callers to a person, books into Cal.com if you configure it, and logs every call with its transcript, recording and per-turn latency. This recipe covers the core: defining the tools, creating the agent, getting tool calls to your server, and putting the agent on a number. You can try all of it from the browser with only an API key.
+
+## Prerequisites
+
+- A Cartesia API key from https://play.cartesia.ai/keys
+- Python 3.12 or newer and [uv](https://docs.astral.sh/uv/)
+- For phone calls, a public HTTPS address for the server (a deploy or a tunnel such as `ngrok http 8000`)
+
+All requests send `Cartesia-Version: 2026-08-14`. The Python SDK has no typed Managed Agents client yet, so the template calls the documented paths with httpx.
+
+```python filename="front_desk/cartesia.py"
+class Cartesia:
+    def __init__(
+        self, api_key: str, base_url: str = CARTESIA_BASE_URL, transport: httpx.BaseTransport | None = None
+    ):
+        if not api_key:
+            raise CartesiaError(0, "CARTESIA_API_KEY is not set.")
+        self.http = httpx.Client(
+            base_url=base_url,
+            headers={"X-API-Key": api_key, "Cartesia-Version": CARTESIA_VERSION},
+            timeout=20,
+            transport=transport,
+        )
+```
+
+## How do I define booking tools for a Managed Agent?
+
+Write each tool once, as a name, a description the LLM reads, and JSON Schema properties. The descriptions carry the rules. `book_appointment` says to call it only after the caller confirmed the time, and the prompt repeats that the agent must never claim a booking unless the tool returned `"booked": true`.
+
+```python filename="front_desk/tools.py"
+TOOL_SPECS: list[dict[str, Any]] = [
+    {
+        "name": "check_availability",
+        "description": (
+            "Lists open appointment times. Use it before offering or booking a time, and again if the "
+            "caller asks about another day. Leave date empty to get the next days with openings."
+        ),
+        "properties": {
+            "date": {
+                "type": "string",
+                "description": "Day the caller wants, as YYYY-MM-DD. Work it out from today's date. Empty for "
+                "the next open days.",
+            },
+            "part_of_day": {
+                "type": "string",
+                "enum": ["any", "morning", "afternoon", "evening"],
+                "description": "Narrow the times if the caller said morning, afternoon or evening.",
+            },
+        },
+        "required": [],
+    },
+    {
+        "name": "book_appointment",
+        "description": (
+            "Books one appointment. Use it only after you have read the date and time back to the caller "
+            "and they said yes, and you have their name. The result says if it worked."
+        ),
+        "properties": {
+            "date": {"type": "string", "description": "Appointment day as YYYY-MM-DD."},
+            "time": {"type": "string", "description": "Start time from check_availability, like 2:30 PM."},
+            "name": {"type": "string", "description": "Caller's full name."},
+            "phone": {
+                "type": "string",
+                "description": "Callback number the caller gave. Empty if they did not give one.",
+            },
+            "service": {"type": "string", "description": "What the appointment is for, in a few words."},
+        },
+        "required": ["date", "time", "name"],
+    },
+]
+```
+
+The handlers return short JSON strings, well under the 4096 byte limit Cartesia sets for a tool result. Days and times come back in spoken form, like "Friday, October 17" and "2:30 PM", so the agent can read them out. One `run` method dispatches by name, and a calendar failure turns into an instruction for the agent instead of an exception.
+
+```python filename="front_desk/tools.py"
+    def run(self, name: str, params: dict[str, Any]) -> str:
+        if name not in TOOL_NAMES:
+            return _json({"error": "Unknown tool."})
+        try:
+            return getattr(self, name)(params)
+        except CalendarError as e:
+            return _json({"error": str(e), "next": "Offer to take a message instead."})
+```
+
+## Client tool or webhook tool?
+
+Cartesia can reach a tool two ways. A [client tool](https://docs.cartesia.ai/agents/client-tools) arrives as a `client_tool_call` event on the WebSocket the browser holds open. A [webhook tool](https://docs.cartesia.ai/agents/webhook-tools) is an HTTPS POST from Cartesia to a URL you give it. A phone call has no browser in the middle, so phone calls need webhook tools, and those need a public HTTPS address.
+
+The template picks the mode from one setting. With no `PUBLIC_BASE_URL` it makes client tools, so you can run everything on a laptop. With it set, it makes webhook tools.
+
+```python filename="front_desk/config.py"
+    @property
+    def tool_mode(self) -> str:
+        """`webhook` when Cartesia can reach this server over HTTPS, otherwise `client`."""
+        return "webhook" if self.public_base_url else "client"
+```
+
+`tool_body` turns a spec into the request for `POST /v1/agents/tools`. The webhook version adds two things. A secret `X-Tool-Secret` header lets your server reject posts that did not come from Cartesia. And three extra properties are bound to system dynamic variables, so Cartesia fills in the call id, caller number and call direction itself. The model never sees or writes those values.
+
+```python filename="front_desk/tools.py"
+WEBHOOK_CONTEXT = {
+    "call_id": "system__conversation_id",
+    "caller_number": "system__caller_id",
+    "call_direction": "system__call_direction",
+}
+```
+
+```python filename="scripts/setup_agent.py"
+def tool_body(spec: dict[str, Any], s: Settings, tool_secret: str) -> dict[str, Any]:
+    common = {
+        "name": spec["name"],
+        "description": spec["description"],
+        "pre_tool_speech": "auto",
+        "execution_mode": "immediate",
+        "response_timeout_secs": 15,
+    }
+    if s.tool_mode == "client":
+        return {
+            "type": "client",
+            **common,
+            "expects_response": True,
+            "parameters": {"type": "object", "properties": spec["properties"], "required": spec["required"]},
+        }
+    props = dict(spec["properties"])
+    for field, variable in WEBHOOK_CONTEXT.items():
+        props[field] = {"type": "string", "dynamic_variable": variable}
+    return {
+        "type": "webhook",
+        **common,
+        "api_schema": {
+            "url": f"{s.public_base_url}/tools/{spec['name']}",
+            "method": "POST",
+            "request_body_schema": {"type": "object", "properties": props, "required": spec["required"]},
+            "request_headers": {"X-Tool-Secret": {"type": "secret", "secret_value": tool_secret}},
+        },
+        "assignments": [],
+    }
+```
+
+`book_appointment` uses the injected `caller_number` when the caller did not say a number, so a phone booking keeps a callback number whenever caller ID is available.
+
+## Create the agent with its tools
+
+The agent body attaches the tools by id and sets the rest of the call: instructions, the greeting, the business time zone, the model, the voice, and the built-in `end_call` system tool. The business name goes into `keyterms` so speech to text spells it right. `transfer_to_number` is only set when you configure `TRANSFER_NUMBER`.
+
+```python filename="scripts/setup_agent.py"
+    return {
+        "name": f"{AGENT_NAME_PREFIX}: {s.business_name}"[:64],
+        "description": "Receptionist from examples/front-desk in the Cartesia cookbook.",
+        "config": {
+            "instructions": instructions(s),
+            "initial_message": greeting(s),
+            "timezone": s.timezone,
+            "model": {"id": s.model_id, "temperature": 0.4},
+            "language": {"primary": "en"},
+            "audio": {
+                "input": {"noise_suppression": "auto", "keyterms": [s.business_name]},
+                "output": {"voice_id": s.voice_id},
+            },
+            "turn": {"inactivity_check_in_secs": 10, "inactivity_end_call_secs": 120},
+            "tools": [{"id": i} for i in tool_ids],
+            "system_tools": {
+                "end_call": {"description": None, "pre_tool_speech": "force"},
+                "transfer_to_number": transfer,
+            },
+        },
+    }
+```
+
+The instructions use `{{system__time}}` to resolve "tomorrow" and `{{system__caller_id}}` to know the caller's number. Cartesia fills both per call. The booking steps are spelled out in order.
+
+```md filename="front_desk/prompt.py"
+# Booking an appointment
+1. Ask what they want booked and which day suits them.
+2. Call check_availability with that day as YYYY-MM-DD. Offer two or three of the open times, not all of them.
+3. When they pick a time, ask for their name, and a callback number if you do not have one.
+4. Read the day, time and name back once and ask "Shall I book that?"
+5. Only after they say yes, call book_appointment. If it says booked is false, offer the open times it returns.
+Never say an appointment is booked unless book_appointment returned "booked": true.
+```
+
+The setup script is safe to run again. It reads `CARTESIA_AGENT_ID` from `.env`, patches existing tools whose type has not changed, creates the ones that are missing, then patches or creates the agent. Tools whose type changed (client to webhook) are replaced and the old ones deleted after the agent stops using them.
+
+```python filename="scripts/setup_agent.py"
+    agent = existing_agent(api, s.agent_id)
+    tool_ids, retire = sync_tools(api, s, agent, tool_secret)
+    body = agent_body(s, tool_ids)
+    if agent:
+        api.request("PATCH", f"/v1/agents/{agent['id']}", json=body)
+        agent_id = agent["id"]
+        print(f"Updated agent {agent_id}")
+    else:
+        agent_id = api.request("POST", "/v1/agents", json=body)["id"]
+        upsert_env(ENV_PATH, "CARTESIA_AGENT_ID", agent_id)
+        print(f"Created agent {agent_id} and saved CARTESIA_AGENT_ID to .env")
+```
+
+`uv run scripts/setup_agent.py --dry-run` prints every request body without a key, and `--delete` removes the agent, its tools and its webhook.
+
+## How do tool calls reach the FastAPI server?
+
+Both modes end in the same `Tools.run`. Webhook tool calls come straight from Cartesia, so the route checks the shared secret in constant time before it runs anything.
+
+```python filename="front_desk/main.py"
+@app.post("/tools/{name}")
+async def webhook_tool(name: str, request: Request) -> PlainTextResponse:
+    s = settings()
+    if name not in TOOL_NAMES:
+        raise HTTPException(404, "Unknown tool.")
+    given = request.headers.get("x-tool-secret", "")
+    if not s.tool_secret or not hmac.compare_digest(given.encode(), s.tool_secret.encode()):
+        raise HTTPException(401, "unauthorized")
+    body = await request.json()
+    params = body if isinstance(body, dict) else {}
+    return PlainTextResponse(tools(s).run(name, params))
+```
+
+Client tool calls come from the browser. The page forwards the call id and parameters, and the route drops `call_direction` so a browser call can never ask for a transfer.
+
+```python filename="front_desk/main.py"
+@app.post("/api/client-tools/{name}")
+async def client_tool(name: str, request: Request) -> PlainTextResponse:
+    """The browser forwards client_tool_call events here. Same handlers as the webhook tools."""
+    if name not in TOOL_NAMES:
+        raise HTTPException(404, "Unknown tool.")
+    body = await request.json()
+    params = dict(body.get("parameters") or {}) if isinstance(body, dict) else {}
+    params["call_id"] = str(body.get("call_id") or "") if isinstance(body, dict) else ""
+    params.pop("call_direction", None)
+    return PlainTextResponse(tools(settings()).run(name, params))
+```
+
+## Make a test call from the browser with only an API key
+
+The Try it page talks to the same agent over the Managed Agents WebSocket. Your API key stays on the server. `POST /api/token` mints a 60 second access token with only the `agent` grant and returns it with the agent id, at most 10 per minute per address.
+
+```python filename="front_desk/cartesia.py"
+    def mint_agent_token(self, expires_in: int = 60) -> str:
+        data = self.request(
+            "POST", "/access-token", json={"grants": {"agent": True}, "expires_in": expires_in}
+        )
+        token = (data or {}).get("token")
+        if not isinstance(token, str) or not token:
+            raise CartesiaError(502, "No token in the access-token response.")
+        return token
+```
+
+The page opens the call with the `CartesiaAgentClient` bundled from `packages/agents-web`. When a `client_tool_call` event arrives, it posts the call to the server and sends the text back with `respond`, which the client delivers as a `client_tool_result`.
+
+```js filename="front_desk/static/call.js"
+async function runTool(name, parameters) {
+  bubble(`tool-${Math.random()}`, "tool", `Used ${name}`);
+  const res = await fetch(`/api/client-tools/${encodeURIComponent(name)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ call_id: callId, parameters }),
+  });
+  if (!res.ok) throw new Error(`Tool ${name} failed.`);
+  return await res.text();
+}
+```
+
+```js filename="front_desk/static/call.js"
+  client = new CartesiaAgentClient({ agentId: button.dataset.agentId, getToken });
+  client.on("ready", (e) => {
+    callId = e.callId;
+    setStatus("On the call", "Say hello. Ask to book an appointment.", "live");
+  });
+  // ...
+  client.on("client_tool_call", async (e) => {
+    try {
+      e.respond(await runTool(e.toolName, e.parameters));
+    } catch (err) {
+      e.respond(String(err.message || err), { isError: true, errorType: "tool_failed" });
+    }
+  });
+```
+
+A local server has no public URL for call webhooks, so after hang-up the page calls `POST /api/calls/<id>/sync`. That route reads `GET /agents/calls/<id>` and stores the call the same way a `call_completed` webhook would.
+
+## Put the agent on a phone number
+
+The template does not buy or attach a number for you. The steps from its README:
+
+1. Deploy the server to any host with HTTPS, or run a tunnel. Cartesia blocks private and non-HTTPS addresses, and setup refuses a `PUBLIC_BASE_URL` that does not start with `https://`.
+2. Set `PUBLIC_BASE_URL` and run `uv run scripts/setup_agent.py` again. It swaps the client tools for webhook tools, generates `TOOL_SECRET`, and registers a call webhook at `/webhooks/cartesia`.
+3. Attach a number to the agent. Every plan includes at least one free US number from [Cartesia numbers](https://docs.cartesia.ai/line/integrations/telephony/cartesia-numbers). Outside the US, [import a Twilio number](https://docs.cartesia.ai/line/integrations/telephony/twilio/integration) or use [SIP trunking](https://docs.cartesia.ai/line/integrations/telephony/sip-trunking). Then assign it as described in [Phone numbers](https://docs.cartesia.ai/line/integrations/telephony/phone-numbers).
+4. Set `TRANSFER_NUMBER` and run setup again for live handoff. Transfers only work on Twilio or SIP calls.
+
+Cartesia does not sign webhook bodies. It echoes the secret you registered in `x-webhook-secret`, so the webhook route compares that in constant time, rejects events for other agents, and drops retries by `webhook_request_id`.
+
+```python filename="front_desk/webhooks.py"
+    given = headers.get("x-webhook-secret", "")
+    if not hmac.compare_digest(given.encode(), secret.encode()):
+        return Verdict(401, "unauthorized")
+    if not isinstance(body, dict) or not isinstance(body.get("type"), str):
+        return Verdict(400, "Not a webhook event.")
+    if agent_id and body.get("agent_id") != agent_id:
+        return Verdict(400, "Event is for another agent.")
+```
+
+To see a phone call in the dashboard without a phone, `uv run scripts/send_test_webhook.py` replays a recorded-shape sequence of `call_started`, `call_turn`, `call_completed` and `post_call_analysis` events.
+
+## Run it
+
+```sh
+cd examples/front-desk
+cp .env.example .env                  # put your key in CARTESIA_API_KEY
+uv run scripts/setup_agent.py         # creates the agent and its tools, writes CARTESIA_AGENT_ID to .env
+uv run uvicorn front_desk.main:app --port 8000
+```
+
+Open http://localhost:8000/try, press Start call and say "I'd like to book a haircut tomorrow afternoon." Use headphones, or the agent hears itself. The booking shows up under Inbox, and the call shows up under Calls with its transcript and latency. Set the `BUSINESS_*` variables to describe your business and run setup again after you change them.
+
+While writing this recipe we ran `setup_agent.py --dry-run` in both tool modes and the template's `pytest` suite (23 tests). No agent or number was created against the live API.
+
+## Before you deploy
+
+The dashboard, `/api/token` and `/api/client-tools/*` have no login. Anyone with the URL can read your calls and start calls on your account. Put the app behind your own auth, or expose only `/tools/*` and `/webhooks/cartesia`, which check their secrets. The token rate limit is in memory and per process. See [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
+
+Recording callers has legal requirements that depend on where you and they are. Cartesia records agent calls by default; see [call recordings](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings).
+
+## Next steps
+
+- Read the full template in [`examples/front-desk`](../../../examples/front-desk/README.md), including the Cal.com calendar and the call log.
+- [Connect to a Managed Agent from the browser](../15-agents/01-talk-to-a-managed-agent.mdx) covers the browser WebSocket connection in more detail.
+- [Build an AI language speaking partner](../15-agents/03-speaking-partner.mdx) uses a client tool that runs entirely in the browser.

@@ -1,0 +1,65 @@
+[
+  {
+    "id": 0,
+    "title": "Say hello",
+    "difficulty": "Easy",
+    "desc": "Meet your new neighbor and ask about their day.",
+    "target_role": "New Neighbor"
+  },
+  {
+    "id": 5,
+    "title": "Order a coffee",
+    "difficulty": "Easy",
+    "desc": "Get a drink and something to eat at a busy café.",
+    "target_role": "Busy Barista"
+  },
+  {
+    "id": 1,
+    "title": "Buy a bus ticket",
+    "difficulty": "Medium",
+    "desc": "Ask for a ticket downtown and find out when the bus leaves.",
+    "target_role": "Tired Bus Driver"
+  },
+  {
+    "id": 2,
+    "title": "Order dinner with a roommate",
+    "difficulty": "Medium",
+    "desc": "Your roommate is hungry, find out what he wants.",
+    "target_role": "Picky Roommate"
+  },
+  {
+    "id": 6,
+    "title": "Return a shirt",
+    "difficulty": "Medium",
+    "desc": "Bring back a shirt that doesn't fit and ask for your money back.",
+    "target_role": "Shop Clerk"
+  },
+  {
+    "id": 3,
+    "title": "Ask for directions",
+    "difficulty": "Hard",
+    "desc": "Find your way to the train station.",
+    "target_role": "Local Passerby"
+  },
+  {
+    "id": 8,
+    "title": "Haggle at a market",
+    "difficulty": "Hard",
+    "desc": "Talk the price of a souvenir down.",
+    "target_role": "Market Seller"
+  },
+  {
+    "id": 4,
+    "title": "Negotiate your rent",
+    "difficulty": "Expert",
+    "desc": "Your landlord wants more money. Talk them down.",
+    "target_role": "Landlord"
+  },
+  {
+    "id": 9,
+    "title": "Do a job interview",
+    "difficulty": "Expert",
+    "desc": "Tell the recruiter what you're good at and what you're still learning.",
+    "target_role": "Hiring Manager"
+  }
+]

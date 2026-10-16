@@ -1,0 +1,171 @@
+---
+title: Transcribe and summarize meetings in Next.js
+description: Record audio in the browser, transcribe it with ink-whisper, and turn the transcript into a summary, decisions and action items.
+tags: ['next', 'speech-to-text', 'structured data']
+---
+
+# Transcribe and summarize meetings in Next.js
+
+This recipe records a meeting in the browser and turns it into notes. One route handler sends the audio to Cartesia's `ink-whisper` model for a transcript. A second route handler asks an LLM for a summary, the decisions that were made and the action items, as validated JSON.
+
+The two steps are separate routes on purpose. The page can show "Transcribing" and then "Writing notes", and if the LLM call fails you still have the transcript and can retry only that step.
+
+## Prerequisites
+
+- A Next.js App Router app
+- `pnpm add @cartesia/cartesia-js ai zod`
+- `CARTESIA_API_KEY` in `.env.local`
+- `LLM_MODEL` in `.env.local`, as `provider/model`. The AI SDK sends a plain string like this through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway), which needs `AI_GATEWAY_API_KEY` (or OIDC on Vercel). To call a provider directly, install its package, for example `@ai-sdk/openai`, and pass `createOpenAI()(modelId)` as `model` instead.
+
+## Server: transcribe
+
+```ts filename="app/api/transcribe/route.ts"
+import Cartesia from '@cartesia/cartesia-js';
+
+const client = new Cartesia({ apiKey: process.env.CARTESIA_API_KEY });
+
+const MAX_BYTES = 4 * 1024 * 1024;
+
+export async function POST(req: Request) {
+  const form = await req.formData();
+  const file = form.get('file');
+  if (!(file instanceof File) || file.size === 0 || file.size > MAX_BYTES) {
+    return Response.json({ error: 'Send an audio file under 4 MB' }, { status: 400 });
+  }
+
+  try {
+    const res = await client.stt.transcribe({
+      file,
+      model: 'ink-whisper',
+      language: 'en',
+    });
+    return Response.json({ transcript: res.text, duration: res.duration });
+  } catch (err) {
+    if (err instanceof Cartesia.APIError && err.status) {
+      const error = err.status === 429 ? 'Too many requests. Try again shortly.' : 'Transcription failed';
+      return Response.json({ error }, { status: err.status });
+    }
+    throw err;
+  }
+}
+```
+
+`ink-whisper` is the model for file transcription. `ink-2` is for streaming and does not work on this endpoint. The file from `formData()` goes to the SDK as it is. Send a `language` code (ISO 639-1) if the meeting is not in English. The SDK sends the `Cartesia-Version` header for you.
+
+## Server: summarize
+
+```ts filename="app/api/summarize/route.ts"
+import { generateText, Output } from 'ai';
+import { z } from 'zod';
+
+const MeetingNotes = z.object({
+  title: z.string().describe('Short title, under 80 characters'),
+  summary: z.string().describe('Neutral third-person summary, 3 to 6 sentences'),
+  decisions: z
+    .array(z.string())
+    .describe('Decisions that were made, one sentence each. Empty array if none.'),
+  actionItems: z.array(
+    z.object({
+      task: z.string().describe('Short, imperative, self-contained'),
+      owner: z.string().nullable().describe('Person named as responsible, or null'),
+    }),
+  ),
+});
+
+export async function POST(req: Request) {
+  const { transcript } = await req.json();
+  if (typeof transcript !== 'string' || !transcript.trim()) {
+    return Response.json({ error: 'The transcript is empty' }, { status: 400 });
+  }
+
+  const { output } = await generateText({
+    model: process.env.LLM_MODEL!,
+    instructions:
+      'Turn the meeting transcript into notes. Only use what the transcript says. ' +
+      'Never invent owners or decisions. Open questions are not decisions.',
+    prompt: transcript,
+    output: Output.object({ schema: MeetingNotes }),
+  });
+
+  return Response.json(output);
+}
+```
+
+The schema makes every key required, and `owner` is nullable instead of optional. OpenAI's strict structured outputs reject optional keys, and this shape works with the other providers too. The `describe` text on `decisions` matters. Without it, models list open questions as decisions.
+
+## Client: record and post
+
+```tsx filename="app/page.tsx"
+'use client';
+
+import { useRef, useState } from 'react';
+
+export default function Page() {
+  const recorder = useRef<MediaRecorder | null>(null);
+  const chunks = useRef<Blob[]>([]);
+  const [recording, setRecording] = useState(false);
+  const [notes, setNotes] = useState<unknown>(null);
+
+  async function start() {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'].find(
+      t => MediaRecorder.isTypeSupported(t),
+    );
+    const r = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 24_000 });
+    chunks.current = [];
+    r.ondataavailable = e => chunks.current.push(e.data);
+    r.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const type = r.mimeType;
+      const ext = type.startsWith('audio/mp4') ? 'm4a' : type.startsWith('audio/ogg') ? 'ogg' : 'webm';
+
+      const form = new FormData();
+      form.append('file', new Blob(chunks.current, { type }), `meeting.${ext}`);
+      const t = await fetch('/api/transcribe', { method: 'POST', body: form }).then(r => r.json());
+
+      const n = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ transcript: t.transcript }),
+      }).then(r => r.json());
+      setNotes(n);
+    };
+    r.start(1000);
+    recorder.current = r;
+    setRecording(true);
+  }
+
+  function stop() {
+    recorder.current?.stop();
+    setRecording(false);
+  }
+
+  return (
+    <div>
+      <button onClick={recording ? stop : start}>{recording ? 'Stop' : 'Record'}</button>
+      <pre>{JSON.stringify(notes, null, 2)}</pre>
+    </div>
+  );
+}
+```
+
+Chrome and Firefox record `audio/webm` or `audio/ogg`. Safari records `audio/mp4`. The code picks the first type the browser supports and names the file to match. At 24 kbps, 20 minutes of speech is about 3.6 MB.
+
+## How it works
+
+1. `MediaRecorder` collects Opus chunks in the browser. On stop, the page posts the blob as form data.
+2. `/api/transcribe` forwards the file to Cartesia and returns the text. The key stays on the server.
+3. `/api/summarize` calls `generateText` with `Output.object`. The SDK validates the model's JSON against the zod schema and throws if it does not match, so `output` is always the right shape.
+
+The speech-to-text endpoint returns no speaker labels. An action item's owner is only as good as the names spoken in the meeting, and the prompt tells the model not to guess.
+
+## Limits
+
+- Vercel serverless functions reject request bodies over 4.5 MB, which is about 20 minutes of Opus at 24 kbps. Cartesia accepted a 45 MB, 25 minute WAV file in testing, so the cap comes from the host and not from the API. For longer meetings, run the route somewhere without that limit.
+- The summarize route sends the whole transcript in one call. A very long transcript needs chunking, which this recipe does not do.
+- Both routes spend your credits for anyone who can reach them. Put them behind your own auth before you deploy.
+
+## Next steps
+
+- Run the full app, with a library of past meetings, a retry button and an action items page: [examples/meeting-notes](../../../examples/meeting-notes/README.md).
+- Lock the routes down with your own auth. See [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).

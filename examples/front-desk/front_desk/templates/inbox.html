@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Inbox · Front desk{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Inbox</h1>
+    <p>Appointments the receptionist booked and messages it took. Bookings go to {{ "Cal.com" if s.calcom_api_key else "the local calendar in data/front-desk.db" }}.</p>
+  </div>
+</div>
+<div class="stack-40">
+  <section>
+    <h2 class="block-title">Appointments</h2>
+    {% if appointments %}
+    <div class="list">
+      {% for a in appointments %}
+      <div class="row">
+        <div class="row-main">
+          <span class="row-title">{{ a.name }}</span>
+          <span class="row-meta">{{ when(a.start_at) }}{% if a.service %} · {{ a.service }}{% endif %}{% if a.phone %} · {{ a.phone }}{% endif %}</span>
+        </div>
+        {% if a.call_id %}<div class="row-end"><a class="btn btn-ghost" href="/calls/{{ a.call_id }}">View call</a></div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+      <span class="empty-icon">{{ icon("calendar") }}</span>
+      <div><p class="empty-title">No appointments yet</p><p class="empty-desc">Ask the receptionist to book one from Try it.</p></div>
+    </div>
+    {% endif %}
+  </section>
+  <section>
+    <h2 class="block-title">Messages</h2>
+    {% if messages %}
+    <div class="list">
+      {% for m in messages %}
+      <div class="row">
+        <div class="row-main">
+          <span class="row-title">{{ m.name }}{% if m.phone %} · {{ m.phone }}{% endif %}</span>
+          <span class="row-meta wrap-text">{{ m.body }}</span>
+        </div>
+        <div class="row-end">
+          {% if m.urgent %}<span class="badge badge-outline">Urgent</span>{% endif %}
+          {% if m.call_id %}<a class="btn btn-ghost" href="/calls/{{ m.call_id }}">View call</a>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+      <span class="empty-icon">{{ icon("message") }}</span>
+      <div><p class="empty-title">No messages</p><p class="empty-desc">When a caller leaves a message, it shows up here.</p></div>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
