@@ -94,7 +94,7 @@ async function generatePart(model: LanguageModel, o: Options, material: string, 
     generateText({
       model,
       temperature: o.creativity,
-      system: buildSystemPrompt(o),
+      instructions: buildSystemPrompt(o),
       prompt: buildUserPrompt(o, material, { index, total, previous }),
       output: Output.object({ schema: ScriptSchema }),
       maxRetries: 2,

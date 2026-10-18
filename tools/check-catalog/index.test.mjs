@@ -20,6 +20,7 @@ const template = (over = {}) => ({
   readme: 'examples/demo/README.md',
   agents: 'examples/demo/AGENTS.md',
   deploy: {},
+  license: 'Apache-2.0',
   ...over,
 });
 const pkg = {
@@ -27,9 +28,10 @@ const pkg = {
   description: 'A demo.',
   keywords: ['cartesia'],
   repository: { type: 'git', url: 'https://github.com/cartesia-ai/cookbook.git', directory: 'examples/demo' },
+  license: 'Apache-2.0',
 };
 const recipe = '---\ntitle: Say hello\ndescription: D\ntags: [a]\n---\n\n# Say hello\n';
-const llmsOk = `${mention}\n[Demo](${raw}examples/demo/README.md) ${raw}examples/demo/AGENTS.md\n- [Say hello](${raw}content/cookbook/00-a/01-hello.mdx): D\n`;
+const llmsOk = `${mention}\n[Demo](${raw}examples/demo/README.md): A demo. Features: barge-in. ${raw}examples/demo/AGENTS.md\n- [Say hello](${raw}content/cookbook/00-a/01-hello.mdx): D\n`;
 
 function tree(over = {}) {
   const files = {
@@ -101,7 +103,7 @@ test('a package.json without keywords or repository fails', () => {
 test('a Python template needs description and keywords in pyproject.toml', () => {
   const ok = '[project]\nname = "demo"\ndescription = "A demo."\nkeywords = ["cartesia", "tts"]\n';
   const withPy = (toml) => {
-    const root = tree({ 'examples/demo/pyproject.toml': toml });
+    const root = tree({ 'examples/demo/pyproject.toml': `${toml}license = "Apache-2.0"\n` });
     rmSync(join(root, 'examples/demo/package.json'));
     return checkCatalog(root).errors;
   };
@@ -121,4 +123,42 @@ test('a missing CLAUDE.md is an error', () => {
   const root = tree();
   rmSync(join(root, 'examples/demo/CLAUDE.md'));
   assert.deepEqual(checkCatalog(root).errors, ['examples/demo/CLAUDE.md is missing']);
+});
+
+test('a templates.json license that differs from the manifest fails', () => {
+  const t = template({ license: 'MIT' });
+  const { errors } = checkCatalog(
+    tree({ 'templates.json': JSON.stringify({ categories: { 'voice-agents': 'V' }, templates: [t] }) }),
+  );
+  assert.deepEqual(errors, ['templates.json demo: license MIT does not match the manifest license Apache-2.0']);
+});
+
+test('a pyproject license is compared too', () => {
+  const root = tree({ 'examples/demo/pyproject.toml': '[project]\ndescription = "A demo."\nkeywords = ["a"]\nlicense = "MIT"\n' });
+  rmSync(join(root, 'examples/demo/package.json'));
+  assert.deepEqual(checkCatalog(root).errors, ['templates.json demo: license Apache-2.0 does not match the manifest license MIT']);
+});
+
+test('a template README link that climbs out of the template fails', () => {
+  const { errors } = checkCatalog(
+    tree({ 'examples/demo/README.md': '# Demo\n\nSee [the guide](../../content/cookbook/00-a/01-hello.mdx).\n' }),
+  );
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /^examples\/demo\/README.md:3: link points outside the template/);
+});
+
+test('an llms.txt template line that drifts from templates.json fails', () => {
+  const { errors } = checkCatalog(tree({ 'llms.txt': llmsOk.replace(': A demo.', ': A demo with extra words.') }));
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /llms.txt entry for demo should read/);
+});
+
+test('a README deploy button that differs from templates.json fails', () => {
+  const url = 'https://vercel.com/new/clone?repository-url=examples%2Fdemo&env=A';
+  const t = template({ deploy: { vercel: url } });
+  const cat = JSON.stringify({ categories: { 'voice-agents': 'V' }, templates: [t] });
+  assert.deepEqual(checkCatalog(tree({ 'templates.json': cat, 'examples/demo/README.md': `[![Deploy](b)](${url})` })).errors, []);
+  assert.deepEqual(checkCatalog(tree({ 'templates.json': cat, 'examples/demo/README.md': `[![Deploy](b)](${url}%2CB)` })).errors, [
+    'examples/demo/README.md: deploy button does not match deploy.vercel in templates.json',
+  ]);
 });

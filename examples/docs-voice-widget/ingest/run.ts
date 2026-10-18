@@ -15,7 +15,7 @@ export interface IngestStats {
 const MIN_TEXT_CHARS = 40;
 
 export function chunkId(url: string, anchor: string, part: number): string {
-  return 's' + createHash('sha1').update(`${url}#${anchor}#${part}`).digest('hex').slice(0, 7);
+  return 's' + createHash('sha1').update(`${url}#${anchor}#${part}`).digest('hex').slice(0, 12);
 }
 
 export function pageChunks(page: RawPage): { title: string; checksum: string; chunks: Omit<Chunk, 'vector'>[] } {
@@ -43,7 +43,7 @@ export async function ingest(
   pages: RawPage[],
   index: DocIndex,
   embed: Embedder,
-  opts: { force?: boolean; prune?: boolean; log?: (s: string) => void } = {},
+  opts: { force?: boolean; prune?: boolean; keep?: string[]; log?: (s: string) => void } = {},
 ): Promise<IngestStats> {
   const log = opts.log ?? (() => {});
   const stats: IngestStats = { pages: pages.length, embedded: 0, skipped: 0, removed: 0, chunks: 0 };
@@ -65,7 +65,7 @@ export async function ingest(
     log(`${page.url}  ${chunks.length} sections`);
   }
   if (opts.prune) {
-    const keep = new Set(pages.map((p) => p.url));
+    const keep = new Set([...pages.map((p) => p.url), ...(opts.keep ?? [])]);
     for (const url of [...index.pages.keys()]) {
       if (!keep.has(url)) {
         index.removePage(url);

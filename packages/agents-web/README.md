@@ -79,11 +79,11 @@ await client.stop();
 
 ## Audio
 
-- Input defaults to `pcm_16000`: mono, 16-bit, little-endian, sent in 40 ms chunks (`chunkMs`, 20 to 100). The browser captures at the AudioContext rate (often 44.1 or 48 kHz), so the client asks for a 16 kHz context first and resamples itself when the browser ignores that. 16 kHz is a third of the bytes of 44.1 kHz and enough for speech. `pcm_24000` and `pcm_44100` are available through `inputFormat`. `mulaw_8000` is telephony only and not offered.
+- Input defaults to `pcm_16000`: mono, 16-bit, little-endian, sent in 40 ms chunks (`chunkMs`, 20 to 100). The browser captures at the AudioContext rate (often 44.1 or 48 kHz), and the client resamples it to the input format. It uses the browser's default context rate, because Firefox before 148 throws when a mic at one rate meets a context at another. 16 kHz is a third of the bytes of 44.1 kHz and enough for speech. `pcm_24000` and `pcm_44100` are available through `inputFormat`. `mulaw_8000` is telephony only and not offered.
 - The resampler averages the input span of each output sample. It has no proper low-pass filter, which is fine for speech recognition.
 - Output defaults to `as_available`: the server sends audio as fast as it has it and the client plays it on its own clock, starting 80 ms late (`prerollMs`) so a late chunk does not cause a gap. This gives the lowest latency, but the client owns barge-in, which is why `audio_output_clear` empties the queue synchronously. Set `outputDelivery: 'speaking_pace'` to let the server pace instead.
 - Muting sends silence rather than stopping, because the server closes a session after 120 seconds without a valid client event.
-- If the queue grows past 30 s (a stalled tab), the backlog is dropped.
+- If playback falls more than a second behind the wall clock and the queue grows past 30 s (a stalled or suspended tab), the backlog is dropped. A long reply that arrives fast is never trimmed.
 
 ## Errors and closing
 

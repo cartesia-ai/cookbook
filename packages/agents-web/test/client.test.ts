@@ -20,6 +20,26 @@ async function ready(over: Record<string, unknown> = {}) {
 }
 
 describe('start', () => {
+  it('creates the AudioContext at the browser default rate and captures at the input rate', async () => {
+    const seen: unknown[] = [];
+    const h = makeHarness();
+    let target = 0;
+    const factory = h.options.audioContextFactory;
+    const capture = h.options.captureFactory;
+    await ready({
+      audioContextFactory: (o: unknown) => {
+        seen.push(o);
+        return factory();
+      },
+      captureFactory: (o: { targetRate: number }) => {
+        target = o.targetRate;
+        return capture(o as never);
+      },
+    });
+    expect(seen).toEqual([{}]);
+    expect(target).toBe(16000);
+  });
+
   it('sends session_create first, with input_format', async () => {
     const h = makeHarness();
     const client = new CartesiaAgentClient(h.options as never);

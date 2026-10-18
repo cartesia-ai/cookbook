@@ -24,12 +24,10 @@ function int16ToFloat(i16) {
   return out;
 }
 var Resampler = class {
-  // read position (fractional) into buf, in input samples
   constructor(inRate, outRate) {
     this.inRate = inRate;
     this.outRate = outRate;
     __publicField(this, "ratio");
-    // input samples per output sample
     __publicField(this, "buf", []);
     __publicField(this, "pos", 0);
     if (!(inRate > 0) || !(outRate > 0)) throw new Error("sample rates must be positive");
@@ -96,7 +94,6 @@ var Chunker = class {
     this.pending = merged.slice(offset);
     return chunks;
   }
-  /** Returns whatever is left (shorter than a chunk) and empties the buffer. */
   flush() {
     const rest = this.pending;
     this.pending = new Int16Array(0);
@@ -227,7 +224,6 @@ var CartesiaAgentError = class extends Error {
   constructor(code, message, opts = {}) {
     super(message, opts.cause !== void 0 ? { cause: opts.cause } : void 0);
     __publicField(this, "code");
-    /** WebSocket close code, when the error came from a close. */
     __publicField(this, "closeCode");
     this.name = "CartesiaAgentError";
     this.code = code;
@@ -339,13 +335,23 @@ async function startCapture(opts) {
   } finally {
     URL.revokeObjectURL(url);
   }
-  const source = ctx.createMediaStreamSource(stream);
-  const node = new AudioWorkletNode(ctx, CAPTURE_PROCESSOR_NAME);
-  const silent = ctx.createGain();
-  silent.gain.value = 0;
-  source.connect(node);
-  node.connect(silent);
-  silent.connect(ctx.destination);
+  let source;
+  let node;
+  let silent;
+  try {
+    source = ctx.createMediaStreamSource(stream);
+    node = new AudioWorkletNode(ctx, CAPTURE_PROCESSOR_NAME);
+    silent = ctx.createGain();
+    silent.gain.value = 0;
+    source.connect(node);
+    node.connect(silent);
+    silent.connect(ctx.destination);
+  } catch (err) {
+    stream.getTracks().forEach((t) => t.stop());
+    throw new CartesiaAgentError("mic_unavailable", "Could not connect the microphone to audio.", {
+      cause: err
+    });
+  }
   const resampler = new Resampler(ctx.sampleRate, opts.targetRate);
   const chunker = new Chunker(samplesForChunk(opts.targetRate, opts.chunkMs));
   let muted = false;
@@ -376,6 +382,7 @@ async function startCapture(opts) {
 }
 
 // ../../packages/agents-web/src/audio/playback.ts
+var STALL_MS = 1e3;
 var PlaybackQueue = class {
   constructor(ctx, opts) {
     this.ctx = ctx;
@@ -384,10 +391,14 @@ var PlaybackQueue = class {
     __publicField(this, "nextStartTime", 0);
     __publicField(this, "generation", 0);
     __publicField(this, "disposed", false);
+    __publicField(this, "anchorWall", 0);
+    __publicField(this, "anchorCtx", 0);
     __publicField(this, "prerollMs");
     __publicField(this, "maxQueueMs");
+    __publicField(this, "clock");
     this.prerollMs = opts.prerollMs ?? 80;
     this.maxQueueMs = opts.maxQueueMs ?? 3e4;
+    this.clock = opts.clock ?? (() => performance.now());
   }
   get bufferedMs() {
     if (this.live.length === 0) return 0;
@@ -402,10 +413,11 @@ var PlaybackQueue = class {
     if (this.disposed || pcm.length === 0) return;
     const ctx = this.ctx;
     const wasEmpty = this.live.length === 0;
+    if (wasEmpty) this.setAnchor();
     this.trimOverflow(pcm.length / this.opts.sampleRate * 1e3);
     const now = ctx.currentTime;
     const earliest = now + this.prerollMs / 1e3;
-    if (wasEmpty || this.nextStartTime < now) {
+    if (this.live.length === 0 || this.nextStartTime < now) {
       this.nextStartTime = earliest;
     }
     const buffer = ctx.createBuffer(1, pcm.length, this.opts.sampleRate);
@@ -427,13 +439,18 @@ var PlaybackQueue = class {
     this.live.push(entry);
     if (wasEmpty) this.opts.onStart?.();
   }
-  /**
-   * Past maxQueueMs the backlog is stale (a stalled tab, for example). Drop all
-   * audio that has not started yet so playback resumes near real time instead
-   * of lagging further behind. Runs before a new chunk is scheduled.
-   */
+  setAnchor() {
+    this.anchorWall = this.clock();
+    this.anchorCtx = this.ctx.currentTime;
+  }
+  get stalledMs() {
+    const wall = this.clock() - this.anchorWall;
+    const played = (this.ctx.currentTime - this.anchorCtx) * 1e3;
+    return wall - played;
+  }
   trimOverflow(incomingMs) {
     if (this.bufferedMs + incomingMs <= this.maxQueueMs) return;
+    if (this.stalledMs < STALL_MS) return;
     const now = this.ctx.currentTime;
     let dropped = 0;
     const keep = [];
@@ -452,6 +469,7 @@ var PlaybackQueue = class {
     }
     this.live = keep;
     this.nextStartTime = keep.length ? keep[keep.length - 1].end : 0;
+    this.setAnchor();
     if (dropped > 0) this.opts.onOverflow?.(dropped);
   }
   clear() {
@@ -518,10 +536,6 @@ var CartesiaAgentClient = class extends Emitter {
     this._status = status;
     this.emit("status", { status });
   }
-  /**
-   * Resolves at session_ready. Rejects on any failure or timeout. Call it from
-   * a click handler: browsers require a user gesture for the mic and audio.
-   */
   start() {
     if (this._status !== "idle" && this._status !== "closed" && this._status !== "error") {
       return Promise.reject(
@@ -638,14 +652,8 @@ var CartesiaAgentClient = class extends Emitter {
     }
   }
   createContext() {
-    const factory = this.opts.audioContextFactory ?? ((o) => {
-      try {
-        return new AudioContext(o);
-      } catch {
-        return new AudioContext();
-      }
-    });
-    return factory({ sampleRate: this.rate });
+    const factory = this.opts.audioContextFactory ?? (() => new AudioContext());
+    return factory({});
   }
   onMicChunk(s, pcm) {
     if (s.done || this._status !== "ready" || !s.ws || s.ws.readyState !== OPEN) return;
@@ -795,7 +803,6 @@ var CartesiaAgentClient = class extends Emitter {
       })
     );
   }
-  /** Keeps sending silence while muted, so the server's 120 s idle timer never fires. */
   setMuted(muted) {
     this._muted = muted;
     this.session?.capture?.setMuted(muted);
@@ -823,10 +830,6 @@ var CartesiaAgentClient = class extends Emitter {
     this.setStatus("error");
     this.teardown(s, 1e3, "client error", err, false);
   }
-  /**
-   * Single exit path. Idempotent per session. `socketClosed` is true when the
-   * server already closed the socket, so we only report it.
-   */
   teardown(s, code, reason, err = null, socketClosed = false) {
     if (s.done) return;
     s.done = true;
@@ -881,7 +884,6 @@ var CartesiaAgentClient = class extends Emitter {
     }
     s.closeWaiters.splice(0).forEach((f) => f());
   }
-  /** Idempotent. Closes with 1000 and releases the mic and the AudioContext. */
   stop(reason = "session completed") {
     const s = this.session;
     if (!s || s.done) return Promise.resolve();

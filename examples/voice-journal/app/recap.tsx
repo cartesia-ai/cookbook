@@ -101,8 +101,8 @@ export default function RecapScreen() {
     <Screen>
       <JournalHeader active="recap" />
       <AppMain width="narrow">
-        <SetupAlert />
         <PageHeader title="Weekly recap" description="The app reads your last seven days of entries, writes a short note about the week and reads it to you in a Sonic 3.6 voice." />
+        <SetupAlert />
 
         <FormPanel>
           <FormSection title="This week" description={rangeLabel(from, to)} aside={<Badge>{`${week.length} ${week.length === 1 ? "entry" : "entries"}`}</Badge>}>
@@ -149,7 +149,7 @@ export default function RecapScreen() {
 
         {error ? (
           <View style={{ marginTop: 24 }}>
-            <Alert title="Could not finish">{error}</Alert>
+            <Alert variant="destructive" title="Could not finish">{error}</Alert>
           </View>
         ) : null}
 
@@ -160,7 +160,7 @@ export default function RecapScreen() {
             </Text>
             <FormPanel>
               <FormSection title={shown.title} description={`${rangeLabel(shown.from, shown.to)} · ${shown.entryCount} ${shown.entryCount === 1 ? "entry" : "entries"} · read by ${shown.voiceName}`}>
-                <RecapPlayer uri={audio[shown.id] ?? null} autoPlay={autoPlay} loading={voicing} onNeedAudio={() => void voiceRecap(shown, true)} />
+                <RecapPlayer key={shown.id} uri={audio[shown.id] ?? null} autoPlay={autoPlay} loading={voicing} onNeedAudio={() => void voiceRecap(shown, true)} />
               </FormSection>
               <FormSection>
                 <Text style={{ lineHeight: 24 }} selectable>

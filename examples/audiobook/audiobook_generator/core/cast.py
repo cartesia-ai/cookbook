@@ -293,7 +293,8 @@ def detect_utterances(text: str, expressive: bool = True) -> List[Utterance]:
 
         for i, piece in enumerate(pieces):
             if piece.kind == "narration":
-                out.append(Utterance(piece.text, NARRATOR, None, p_idx))
+                if any(ch.isalnum() for ch in piece.text):
+                    out.append(Utterance(piece.text, NARRATOR, None, p_idx))
                 continue
             if not any(ch.isalnum() for ch in piece.text):
                 continue

@@ -1,6 +1,6 @@
-import { CorrectRequestSchema, correctLine } from "../../../lib/corrections";
-import { resolveModel } from "../../../lib/model";
-import { clientIp, createRateLimiter, tooManyRequests } from "../../../lib/rate-limit";
+import { CorrectRequestSchema, correctLine } from "@/lib/corrections";
+import { resolveModel } from "@/lib/model";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
 
 const headers = { "Cache-Control": "no-store" };
 const allow = createRateLimiter(10, 60_000);

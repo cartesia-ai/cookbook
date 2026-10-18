@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Call not found · Front desk{% endblock %}
+{% block content %}
+<div class="empty">
+  <span class="empty-icon">{{ icon("file-question") }}</span>
+  <div><p class="empty-title">Call not found</p><p class="empty-desc">This app only lists calls it received through the webhook or synced from Cartesia.</p></div>
+  <a class="btn btn-outline" href="/">{{ icon("arrow-left") }} All calls</a>
+</div>
+{% endblock %}

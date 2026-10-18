@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chunkCap, defaultOptions, languageCode, OptionsSchema } from "../lib/config";
+import { chunkCap, defaultOptions, languageCode, OptionsSchema } from "@/lib/config";
 
 describe("OptionsSchema", () => {
   it("has the documented defaults", () => {

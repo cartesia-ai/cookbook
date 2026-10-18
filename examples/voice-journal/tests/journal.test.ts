@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { entriesInRange, formatDuration, groupByDay, lastSevenDays, searchEntries, toRecapEntries, type Entry } from "@/lib/journal";
+import { entriesInRange, formatDuration, groupByDay, lastSevenDays, recapPrompt, searchEntries, toRecapEntries, type Entry } from "@/lib/journal";
+import { MAX_RECAP_ENTRIES, MAX_RECAP_INPUT_CHARS, MAX_TRANSCRIPT_CHARS } from "@/lib/limits";
+import { RecapRequestSchema } from "@/lib/schema";
 
 const now = new Date(2026, 9, 16, 21, 0);
 function entry(id: string, daysAgo: number, hour: number, patch: Partial<Entry> = {}): Entry {
@@ -40,6 +42,21 @@ describe("week window", () => {
     const out = toRecapEntries([entry("a", 3, 9), entry("b", 1, 9, { title: null, mood: null }), entry("c", 0, 9)]);
     expect(out.map((e) => e.title)).toEqual(["Title a", "Title c"]);
     expect(out[1].day).toBe("Friday, October 16");
+  });
+
+  it("trims a full week of long entries to fit the server's recap limit", () => {
+    const long = "word ".repeat(MAX_TRANSCRIPT_CHARS / 5);
+    const week = Array.from({ length: MAX_RECAP_ENTRIES }, (_, i) => entry(`e${i}`, i % 7, 8, { transcript: long, title: "T".repeat(120) }));
+    const out = toRecapEntries(week);
+    expect(out).toHaveLength(MAX_RECAP_ENTRIES);
+    expect(RecapRequestSchema.safeParse({ entries: out }).success).toBe(true);
+    expect(recapPrompt(out).length).toBeLessThanOrEqual(MAX_RECAP_INPUT_CHARS);
+    expect(out[0].transcript.length).toBeGreaterThan(1000);
+  });
+
+  it("keeps short weeks whole", () => {
+    const out = toRecapEntries([entry("a", 1, 9, { transcript: "x".repeat(5000) })]);
+    expect(out[0].transcript).toHaveLength(5000);
   });
 });
 

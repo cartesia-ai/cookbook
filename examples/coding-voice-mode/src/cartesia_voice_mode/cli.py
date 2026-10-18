@@ -118,7 +118,7 @@ def install(client, scope, project, voice, save_key, skill, dry_run) -> None:
     )
     if want_skill and "claude" in names and "claude" not in failed and not dry_run:
         click.echo(f"skill: {inst.install_skill(Path.home())}")
-    if not (save_key or os.environ.get("CARTESIA_API_KEY") or load_settings().api_key):
+    if not (save_key or os.environ.get("CARTESIA_API_KEY") or _settings().api_key):
         click.echo("note: no API key found yet. Set CARTESIA_API_KEY or run install again with --save-key.")
     if failed:
         raise click.ClickException(f"install failed for: {', '.join(failed)}")

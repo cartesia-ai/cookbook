@@ -1,6 +1,7 @@
 from multiprocessing import Process
 from typing import Optional
 import os
+from pathlib import Path
 from datetime import datetime
 
 import gradio as gr
@@ -110,10 +111,30 @@ HEADER_HTML = (
     '<header class="ab-header"><div class="ab-header-inner">'
     '<a class="ab-brand" href="./">Audiobook</a>'
     '<button type="button" class="ab-mode" aria-label="Toggle dark mode" '
-    'onclick="document.body.classList.toggle(\'dark\')">'
+    'onclick="abToggleTheme()">'
     f'<span class="ab-sun">{_SUN}</span><span class="ab-moon">{_MOON}</span></button>'
     '</div></header>'
 )
+THEME_HEAD = """<script>
+(() => {
+  const read = () => { try { return localStorage.getItem("theme"); } catch { return null; } };
+  const apply = () => {
+    const t = read();
+    if (t === "dark" && !document.body.classList.contains("dark")) document.body.classList.add("dark");
+    if (t === "light" && document.body.classList.contains("dark")) document.body.classList.remove("dark");
+  };
+  window.abToggleTheme = () => {
+    const dark = document.body.classList.toggle("dark");
+    try { localStorage.setItem("theme", dark ? "dark" : "light"); } catch {}
+  };
+  const start = () => {
+    apply();
+    new MutationObserver(apply).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+  else start();
+})();
+</script>"""
 PAGE_HEADER_HTML = (
     '<div class="ab-page-header"><h1>Turn an EPUB into an audiobook</h1>'
     '<p>Sonic 3.6 reads each chapter, with its own voice for every speaker.</p></div>'
@@ -138,7 +159,7 @@ def _html(value, cls=None):
     return gr.HTML(value, container=False, padding=False, elem_classes=cls)
 
 def build_ui(default_output_dir):
-    with gr.Blocks(analytics_enabled=False, title="Ebook to audiobook") as ui:
+    with gr.Blocks(analytics_enabled=False, title="Audiobook") as ui:
         _html(HEADER_HTML, "ab-header-wrap")
         _html(PAGE_HEADER_HTML)
 
@@ -248,4 +269,5 @@ def host_ui(config):
     default_output_dir = os.path.join("audiobook_output", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     print(f"Default audiobook output directory: {default_output_dir}")
     ui, _ = build_ui(default_output_dir)
-    ui.launch(server_name=config.host, server_port=config.port, theme=CartesiaTheme(), css=load_css())
+    ui.launch(server_name=config.host, server_port=config.port, theme=CartesiaTheme(), css=load_css(),
+              head=THEME_HEAD, favicon_path=str(Path(__file__).parent / "assets" / "icon.svg"))

@@ -30,7 +30,7 @@ echo "CARTESIA_WEBHOOK_SECRET=$(openssl rand -hex 24)" >> .env   # skip if setup
 uv run scripts/send_test_webhook.py   # posts call_started, call_turn x9, call_completed, post_call_analysis
 ```
 
-Pass `--url http://localhost:4511/webhooks/cartesia` to send to another address. Run it twice and the second run is ignored as a retry.
+Pass `--url https://your-host.example.com/webhooks/cartesia` to send to another address. Run it twice and the second run is ignored as a retry.
 
 ## Environment variables
 
@@ -153,6 +153,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy front_desk sc
 
 ## Learn more
 
+- Recipe: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/20-telephony/01-ai-receptionist-that-books-appointments.mdx
 - Managed Agents: https://docs.cartesia.ai/agents/introduction
 - Tools: https://docs.cartesia.ai/agents/tools
 - Call webhooks and recordings: https://docs.cartesia.ai/line/infrastructure/observability

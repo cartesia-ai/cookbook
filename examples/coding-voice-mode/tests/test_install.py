@@ -1,4 +1,5 @@
 import json
+import os
 import stat
 import tomllib
 from pathlib import Path
@@ -81,3 +82,18 @@ def test_save_key_mode_and_no_key_in_configs(tmp_path):
 def test_skill_has_no_banned_words():
     text = inst.skill_text()
     assert "converse" in text and "\u2014" not in text
+
+def test_atomic_write_keeps_the_existing_mode(tmp_path):
+    p = tmp_path / "mcp.json"
+    p.write_text("{}")
+    os.chmod(p, 0o600)
+    inst.merge_cursor(p, inst.server_entry(D))
+    assert stat.S_IMODE(p.stat().st_mode) == 0o600
+    os.chmod(p, 0o640)
+    assert inst.remove_cursor(p)
+    assert stat.S_IMODE(p.stat().st_mode) == 0o640
+
+def test_atomic_write_creates_new_files_private(tmp_path):
+    p = tmp_path / "new" / "config.toml"
+    inst.merge_codex(p, inst.server_entry(D))
+    assert stat.S_IMODE(p.stat().st_mode) == 0o600

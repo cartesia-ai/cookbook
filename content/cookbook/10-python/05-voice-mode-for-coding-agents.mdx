@@ -66,23 +66,39 @@ Speed goes in `generation_config`, not at the top level of the request.
 The `auto_finalize` WebSocket takes raw audio and returns turn events. You do not run a voice activity detector or choose a silence timeout.
 
 ```python filename="src/cartesia_voice_mode/stt.py"
-return client.stt.auto_finalize.websocket(
-    encoding="pcm_s16le",
-    model=s.stt_model,
-    sample_rate=s.sample_rate_in,
+def open_turns(client, s: Settings):
+    return client.stt.auto_finalize.websocket(
+        encoding="pcm_s16le",
+        model=s.stt_model,
+        sample_rate=s.sample_rate_in,
+        keyterm=list(s.keyterms) or omit,
+        turn_start_threshold=s.turn_start_threshold if s.turn_start_threshold is not None else omit,
+        turn_eager_end_threshold=s.turn_eager_end_threshold if s.turn_eager_end_threshold is not None else omit,
+        turn_end_threshold=s.turn_end_threshold if s.turn_end_threshold is not None else omit,
+        turn_end_timeout_ms=s.turn_end_timeout_ms if s.turn_end_timeout_ms is not None else omit,
+    )
 ```
+
+Each tuning field is sent only when you set it, so `omit` leaves the API default in place.
 
 The listening loop reads one event at a time and keeps only what it needs.
 
 ```python filename="src/cartesia_voice_mode/stt.py"
+kind = ev.type
 if kind == "turn.start":
     started = True
+    turn_started_at = turn_started_at or loop.time()
 elif kind == "turn.update":
     partial = ev.transcript
 elif kind == "turn.end":
+    if ev.transcript.strip():
+        return TurnResult(ev.transcript.strip(), True, "turn_end", (loop.time() - t0) * 1000)
+    started, partial = False, ""
+elif kind == "error":
+    raise ListenError(f"speech-to-text error {ev.status_code}: {ev.title}. {ev.message}")
 ```
 
-`turn.end` carries the definitive text, so the server returns that and ignores `turn.eager_end`. An eager end can be followed by `turn.resume`, and acting on it early would hand the agent half a command.
+`turn.end` carries the definitive text, so the server returns that and ignores `turn.eager_end`. An eager end can be followed by `turn.resume`, and acting on it early would hand the agent half a command. An empty `turn.end` resets the loop and keeps listening.
 
 ## Tune turn detection
 

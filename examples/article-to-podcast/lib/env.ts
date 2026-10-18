@@ -7,9 +7,13 @@ export class ConfigError extends Error {
   }
 }
 
+export function cartesiaConfigured(env: Record<string, string | undefined> = process.env): boolean {
+  return Boolean(env.CARTESIA_API_KEY?.trim());
+}
+
 export function cartesiaApiKey(env: Record<string, string | undefined> = process.env): string {
   const key = env.CARTESIA_API_KEY?.trim();
-  if (!key) throw new ConfigError("Set CARTESIA_API_KEY in .env.local to record audio.");
+  if (!key) throw new ConfigError("CARTESIA_API_KEY is not set. Add it to .env.local and restart.");
   return key;
 }
 

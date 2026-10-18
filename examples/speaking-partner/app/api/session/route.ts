@@ -1,10 +1,10 @@
 import { after } from "next/server";
 import { z } from "zod";
-import { createAgentsApi } from "../../../lib/agents-api";
-import { getApiKey } from "../../../lib/env";
-import { LANGUAGE_CODES } from "../../../lib/languages";
-import { MODES } from "../../../lib/modes";
-import { clientIp, createRateLimiter, tooManyRequests } from "../../../lib/rate-limit";
+import { createAgentsApi } from "@/lib/agents-api";
+import { getApiKey } from "@/lib/env";
+import { LANGUAGE_CODES } from "@/lib/languages";
+import { MODES } from "@/lib/modes";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
 import {
   countClientSessions,
   countLiveSessions,
@@ -15,7 +15,7 @@ import {
   rememberClientSession,
   SessionAgentError,
   sweepStaleAgents,
-} from "../../../lib/session-agent";
+} from "@/lib/session-agent";
 
 const headers = { "Cache-Control": "no-store" };
 const allow = createRateLimiter(10, 60_000);

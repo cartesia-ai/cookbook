@@ -4,8 +4,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Download, Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { activeLineIndex } from "../../lib/wav";
-import type { ScriptLine } from "../../lib/types";
+import { activeLineIndex } from "@/lib/wav";
+import type { ScriptLine } from "@/lib/types";
 
 type Props = {
   title: string;

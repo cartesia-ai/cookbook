@@ -4,7 +4,7 @@ Two people who don't share a language talk through one phone: Cartesia Ink 2 str
 
 ![A phone-width screen split in two. The top half, turned upside down for the person across the table, shows the conversation in Spanish. The bottom half shows it in English, with "heard, translated 0.53 s, speaking 1.17 s" under the translated turn.](./docs/screenshot-phone.png)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fpocket-interpreter&env=CARTESIA_API_KEY%2CLLM_MODEL%2COPENAI_API_KEY%2CAPP_PASSWORD&envDescription=Your%20Cartesia%20API%20key%2C%20LLM_MODEL%20as%20provider%2Fmodel%20%28for%20example%20openai%2Fgpt-5.4-mini%29%2C%20and%20the%20key%20for%20that%20provider.&envLink=https%3A%2F%2Fplay.cartesia.ai%2Fkeys&project-name=pocket-interpreter&repository-name=pocket-interpreter)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fpocket-interpreter&env=CARTESIA_API_KEY%2CLLM_MODEL%2CAPP_PASSWORD&envDescription=Cartesia%20API%20key%2C%20an%20LLM%20as%20provider%2Fmodel%20%28on%20Vercel%20the%20AI%20Gateway%20needs%20no%20key%29%2C%20and%20a%20password%20for%20the%20app%20%28or%20none%29.&envLink=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fpocket-interpreter%23environment-variables&project-name=pocket-interpreter&repository-name=pocket-interpreter)
 
 The screen splits in two so each person reads the conversation in their own language, and one half can turn upside down for a phone lying flat between you. Languages: English, Spanish, French, Hindi and Japanese, any two of them. These are the five languages Ink 2 streams today.
 
@@ -18,7 +18,9 @@ npm install
 npm run dev
 ```
 
-Before `npm run dev`, add `CARTESIA_API_KEY`, `LLM_MODEL` and the matching provider key to `.env.local`. pnpm works too. Node 22.22 or newer.
+Node 22.22 or newer. pnpm works too.
+
+Before `npm run dev`, add `CARTESIA_API_KEY`, `LLM_MODEL` and the matching provider key to `.env.local`.
 
 Open http://localhost:3000, pick the two languages, press Start talking and say something. If a key is missing, the page says which one. A phone needs HTTPS for the microphone, so to try it on one, deploy it or use a tunnel such as `cloudflared tunnel --url http://localhost:3000`.
 
@@ -112,7 +114,7 @@ Uses `ink-2` for streaming speech to text, `sonic-3.6` for speech, and `Cartesia
 
 Set `APP_PASSWORD`. `proxy.ts` then asks for that password (HTTP Basic auth, any username) on every page and API route. On Vercel (production and preview) the app returns 503 until `APP_PASSWORD` is set, or set to `none` to make the app public. On hosts other than Vercel, set `APP_PASSWORD` yourself, because the gate only enforces it on Vercel.
 
-`/api/token` and `/api/translate` also have an in-memory rate limit of 10 requests a minute per client IP. It is per process and only slows casual abuse; the password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
+`/api/token` allows 10 requests a minute and `/api/translate` 60 a minute per client IP, with an in-memory rate limit. It is per process and only slows casual abuse; the password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
 
 Both people's speech goes to Cartesia, and the text of each turn goes to your LLM provider for translation. Tell the other person before you start.
 
@@ -146,6 +148,7 @@ npm test
 
 ## Learn more
 
+- Recipe: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/01-next/40-real-time-voice-translation.mdx
 - Cartesia docs: https://docs.cartesia.ai
 - Ink 2 turn events: https://docs.cartesia.ai/use-the-api/stt/turns
 - Agent skills: `npx skills add cartesia-ai/skills`

@@ -49,7 +49,7 @@ async function generatePart(model: LanguageModel, o: Options, material: string, 
     generateText({
       model,
       temperature: o.creativity,
-      system: buildSystemPrompt(o),
+      instructions: buildSystemPrompt(o),
       prompt: buildUserPrompt(o, material, { index, total, previous }),
       output: Output.object({ schema: ScriptSchema }),
       maxRetries: 2,
@@ -165,13 +165,14 @@ The audio route returns the WAV in 64 KB chunks with `Content-Length` and an `X-
 
 ## Swap the model provider
 
-`lib/model.ts` turns `LLM_MODEL` into an AI SDK model. An `openai/` or `anthropic/` id uses that provider directly when its key is set. Any other id goes through the Vercel AI Gateway, so `google/<model id>` with `AI_GATEWAY_API_KEY` needs no code change. To call another provider directly, return its model from `getModel`.
+`lib/llm.ts` turns `LLM_MODEL` into an AI SDK model. An `openai/` or `anthropic/` id uses that provider directly when its key is set. Any other id goes through the Vercel AI Gateway, so `google/<model id>` with `AI_GATEWAY_API_KEY` needs no code change. To call another provider directly, add a branch for its prefix in `getModel`.
 
 ## Deploying
 
 - Both routes set `maxDuration = 300`. A long episode can take one to two minutes, so check your plan allows it.
 - A five minute episode is about 14 MB as WAV. Vercel limits non-streamed responses to 4.5 MB, so the route streams the body.
-- The routes have no auth and no rate limiting, and they spend money. Add both before the app is public.
+- Both routes spend money. The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and route when it is set, and on Vercel the app returns 503 until you set it, or set it to `none` to make the app public.
+- Each route also has an in-memory rate limit per client IP (10 scripts and 5 recordings a minute). It lives in one server process and only slows casual abuse; the password is the real guard. `clientIp` in `lib/rate-limit.ts` reads `x-forwarded-for` only on Vercel or with `TRUST_PROXY=1`, so elsewhere every caller shares one bucket.
 
 ## Limits
 
@@ -181,4 +182,4 @@ The streamed WAV response has not been tried on a Vercel deployment. If a long e
 
 - Run the finished app: [`examples/article-to-podcast`](../../../examples/article-to-podcast).
 - Stream speech as it is generated: [Stream text to speech in Next.js](./01-stream-speech.mdx).
-- Lock the routes down: [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
+- Move speech into the browser safely: [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).

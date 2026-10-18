@@ -703,6 +703,8 @@ importers:
 
   tools/check-facts: {}
 
+  tools/check-snippets: {}
+
 packages:
 
   2g@1.0.1:

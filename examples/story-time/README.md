@@ -16,7 +16,9 @@ npm install
 npm run dev
 ```
 
-Before `npm run dev`, add `CARTESIA_API_KEY`, `LLM_MODEL` and the matching provider key to `.env.local`. pnpm works too. Node 22.22 or newer.
+Node 22.22 or newer. pnpm works too.
+
+Before `npm run dev`, add `CARTESIA_API_KEY`, `LLM_MODEL` and the matching provider key to `.env.local`.
 
 Open [localhost:3000](http://localhost:3000), pick a theme and a tone, optionally name the hero, and press Start the story. When the narrator asks what to do, tap a choice, or press Answer out loud and say "the first one" or "the rocket". If a key is missing, the page says which one.
 
@@ -140,10 +142,11 @@ npm test
 
 ## Learn more
 
-- [Cartesia docs](https://docs.cartesia.ai)
-- [Contexts on the TTS WebSocket](https://docs.cartesia.ai/use-the-api/tts-websocket/contexts)
-- [Turn detection with Ink 2](https://docs.cartesia.ai/use-the-api/stt/turns)
-- [Volume, speed and emotion](https://docs.cartesia.ai/build-with-cartesia/capability-guides/volume-speed-emotion)
+- Recipe: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/01-next/30-multi-voice-narration-with-word-timestamps.mdx
+- Cartesia docs: https://docs.cartesia.ai
+- Contexts on the TTS WebSocket: https://docs.cartesia.ai/use-the-api/tts-websocket/contexts
+- Turn detection with Ink 2: https://docs.cartesia.ai/use-the-api/stt/turns
+- Volume, speed and emotion: https://docs.cartesia.ai/build-with-cartesia/capability-guides/volume-speed-emotion
 - Agent skills: `npx skills add cartesia-ai/skills`
 
 ## License

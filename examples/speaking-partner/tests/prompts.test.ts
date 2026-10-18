@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { LANGUAGE_CODES } from "../lib/languages";
-import { MISSIONS } from "../lib/missions";
-import { MODES } from "../lib/modes";
-import { buildInstructions, completeMissionToolBody, COMPLETE_TOOL_NAME } from "../lib/prompts";
+import { LANGUAGE_CODES } from "@/lib/languages";
+import { MISSIONS } from "@/lib/missions";
+import { MODES } from "@/lib/modes";
+import { buildInstructions, completeMissionToolBody, COMPLETE_TOOL_NAME } from "@/lib/prompts";
 
 const mission = MISSIONS.find((m) => m.title === "Order a coffee")!;
 

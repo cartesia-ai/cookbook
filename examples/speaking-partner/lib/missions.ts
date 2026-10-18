@@ -1,5 +1,5 @@
 import { z } from "zod";
-import raw from "../data/missions.json";
+import raw from "@/data/missions.json";
 
 export const DIFFICULTIES = ["Easy", "Medium", "Hard", "Expert"] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];

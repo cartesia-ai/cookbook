@@ -125,7 +125,12 @@ class Store:
         }
         with self._conn() as c:
             c.execute("insert or ignore into calls (id, updated_at) values (?, ?)", (call["id"], now_iso()))
-            sets = [f"{k} = coalesce(?, {k})" for k in fields]
+            sets = [
+                f"{k} = case when {k} in ('completed', 'failed') then {k} else coalesce(?, {k}) end"
+                if k == "status"
+                else f"{k} = coalesce(?, {k})"
+                for k in fields
+            ]
             c.execute(
                 f"update calls set {', '.join(sets)}, updated_at = ? where id = ?",  # noqa: S608
                 (*fields.values(), now_iso(), call["id"]),

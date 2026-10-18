@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Loader2, Mic, MicOff, Play, Square } from "lucide-react";
+import { Check, FileQuestion, Loader2, Mic, MicOff, Play, Square } from "lucide-react";
 import { PageHeader } from "@/components/blocks/app-shell";
 import { EmptyState } from "@/components/blocks/empty-state";
 import { FormFooter } from "@/components/blocks/form-section";
@@ -65,6 +65,8 @@ export function StoryPlayer({ id }: { id: string }) {
   const storyRef = useRef<Story | null>(null);
   const narration = useRef<Narration | null>(null);
   const listener = useRef<{ stop(): void } | null>(null);
+  const listenAttempt = useRef(0);
+  const listenStarting = useRef(false);
   const busy = useRef(false);
 
   const commit = useCallback(async (s: Story) => {
@@ -74,6 +76,8 @@ export function StoryPlayer({ id }: { id: string }) {
   }, []);
 
   const stopListening = useCallback(() => {
+    listenAttempt.current++;
+    listenStarting.current = false;
     listener.current?.stop();
     listener.current = null;
     setListening(false);
@@ -87,15 +91,19 @@ export function StoryPlayer({ id }: { id: string }) {
   const startListening = useCallback(async () => {
     const s = storyRef.current;
     const scene = s?.scenes.at(-1);
-    if (!s || !scene || scene.choices.length !== 2 || listener.current) return;
+    if (!s || !scene || scene.choices.length !== 2 || listener.current || listenStarting.current) return;
+    listenStarting.current = true;
+    const id = ++listenAttempt.current;
+    const current = () => id === listenAttempt.current;
     setHeard("");
     setUnclear(false);
     setMicBlocked(false);
     try {
       await unlockAudio();
       const client = await cartesiaClient();
+      if (!current()) return;
       setListening(true);
-      listener.current = await listenForChoice(client, audioContext(), {
+      const started = await listenForChoice(client, audioContext(), {
         onPartial: (t) => {
           setHeard(t);
           setUnclear(false);
@@ -113,10 +121,18 @@ export function StoryPlayer({ id }: { id: string }) {
           return false;
         },
       });
+      if (!current()) {
+        started.stop();
+        return;
+      }
+      listener.current = started;
     } catch {
+      if (!current()) return;
       listener.current = null;
       setListening(false);
       setMicBlocked(true);
+    } finally {
+      if (current()) listenStarting.current = false;
     }
   }, []);
 
@@ -213,6 +229,7 @@ export function StoryPlayer({ id }: { id: string }) {
     return () => {
       live = false;
       narration.current?.stop();
+      listenAttempt.current++;
       listener.current?.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,6 +242,7 @@ export function StoryPlayer({ id }: { id: string }) {
   if (phase === "missing") {
     return (
       <EmptyState
+        icon={<FileQuestion />}
         title="This story is not in this browser"
         description="Stories are saved only in the browser that made them."
         action={

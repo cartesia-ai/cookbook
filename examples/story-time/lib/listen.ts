@@ -19,8 +19,15 @@ async function startMic(ctx: AudioContext, onChunk: (chunk: ArrayBuffer) => void
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
   });
-  const source = ctx.createMediaStreamSource(stream);
-  const node = new AudioWorkletNode(ctx, "story-pcm-capture");
+  let source: MediaStreamAudioSourceNode;
+  let node: AudioWorkletNode;
+  try {
+    source = ctx.createMediaStreamSource(stream);
+    node = new AudioWorkletNode(ctx, "story-pcm-capture");
+  } catch (err) {
+    stream.getTracks().forEach((t) => t.stop());
+    throw err;
+  }
   const size = Math.round((ctx.sampleRate * CHUNK_MS) / 1000);
   let pending = new Float32Array(0);
   node.port.onmessage = (e: MessageEvent<Float32Array>) => {
@@ -49,7 +56,7 @@ export interface ListenHandlers {
 }
 
 export async function listenForChoice(client: Cartesia, ctx: AudioContext, handlers: ListenHandlers) {
-  const ws = client.stt.autoFinalize.websocket({ model: "ink-2", encoding: "pcm_f32le", sample_rate: ctx.sampleRate, language: "en" });
+  const ws = client.stt.autoFinalize.websocket({ model: "ink-2", encoding: "pcm_f32le", sample_rate: ctx.sampleRate });
   ws.on("error", (err) => console.error(err.message));
   let stopMic: (() => void) | null = null;
   let closed = false;
@@ -61,7 +68,19 @@ export async function listenForChoice(client: Cartesia, ctx: AudioContext, handl
       ws.send({ type: "close" });
     } catch {}
   };
-  stopMic = await startMic(ctx, (chunk) => !closed && ws.sendRaw(chunk));
+  try {
+    stopMic = await startMic(ctx, (chunk) => !closed && ws.sendRaw(chunk));
+  } catch (err) {
+    closed = true;
+    try {
+      ws.close();
+    } catch {}
+    throw err;
+  }
+  if (closed) {
+    stopMic();
+    return { stop };
+  }
 
   void (async () => {
     for await (const event of ws.stream()) {

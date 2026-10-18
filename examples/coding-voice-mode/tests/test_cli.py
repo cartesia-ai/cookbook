@@ -115,3 +115,12 @@ def test_install_all_with_broken_codex_config_changes_nothing(clean_env, monkeyp
     assert not (clean_env / ".config" / "cartesia-voice-mode" / "env").exists()
     assert not (clean_env / ".cursor" / "mcp.json").exists()
     assert codex.read_text() == "[mcp_servers\n"
+
+def test_install_with_bad_config_shows_a_clean_error(clean_env, monkeypatch):
+    monkeypatch.delenv("CARTESIA_API_KEY")
+    monkeypatch.setenv("CARTESIA_SPEED", "fast")
+    (clean_env / ".cursor").mkdir()
+    r = CliRunner().invoke(cli.main, ["install", "cursor"])
+    assert r.exit_code == 1
+    assert "Error: CARTESIA_SPEED must be a number" in r.output
+    assert "Traceback" not in r.output

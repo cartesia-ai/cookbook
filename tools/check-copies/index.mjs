@@ -10,7 +10,11 @@ const NOTICES = [
 export const GROUPS = [
   NEXT.map((s) => `examples/${s}/proxy.ts`),
   [...NEXT.map((s) => `examples/${s}/lib/rate-limit.ts`), 'examples/voice-journal/lib/server/rate-limit.ts'],
-  ['examples/article-to-podcast/test/proxy.test.ts', ...NEXT.slice(1).map((s) => `examples/${s}/tests/proxy.test.ts`)],
+  NEXT.map((s) => `examples/${s}/tests/proxy.test.ts`),
+  [
+    ...['meeting-notes', 'pocket-interpreter', 'story-time', 'article-to-podcast'].map((s) => `examples/${s}/lib/llm.ts`),
+    'examples/voice-journal/lib/server/llm.ts',
+  ],
   ['THIRD_PARTY_NOTICES.md', ...NOTICES.map((d) => `${d}/THIRD_PARTY_NOTICES.md`)],
 ];
 

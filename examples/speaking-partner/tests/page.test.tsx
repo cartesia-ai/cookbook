@@ -2,7 +2,7 @@
 import "./setup-dom";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import Page from "../app/page";
+import Page from "@/app/page";
 
 const saved = { ...process.env };
 beforeEach(() => {

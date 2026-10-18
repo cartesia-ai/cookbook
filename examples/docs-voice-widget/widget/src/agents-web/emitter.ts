@@ -19,9 +19,7 @@ export class Emitter<M extends { [K in keyof M]: unknown }> {
     for (const fn of [...set]) {
       try {
         (fn as (e: M[K]) => void)(event);
-      } catch {
-        // a throwing listener must not break the audio path or other listeners
-      }
+      } catch {}
     }
   }
 }

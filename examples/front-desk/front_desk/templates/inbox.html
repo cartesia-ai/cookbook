@@ -5,7 +5,7 @@
 <div class="page-header">
   <div>
     <h1>Inbox</h1>
-    <p>Appointments the receptionist booked and messages it took. Bookings go to {{ "Cal.com" if s.calcom_api_key else "the local calendar in data/front-desk.db" }}.</p>
+    <p>Appointments the receptionist booked and messages it took. Bookings go to {{ "Cal.com" if s.calcom_api_key else "the local calendar in " ~ db_path }}.</p>
   </div>
 </div>
 <div class="stack-40">

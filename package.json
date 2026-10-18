@@ -33,9 +33,10 @@
     "node": ">=22.22"
   },
   "scripts": {
-    "check": "pnpm check:facts && pnpm check:content && pnpm check:catalog && pnpm check:copies && pnpm typecheck && pnpm test",
+    "check": "pnpm check:facts && pnpm check:content && pnpm check:snippets && pnpm check:catalog && pnpm check:copies && pnpm typecheck && pnpm test",
     "check:facts": "node tools/check-facts/index.mjs",
     "check:content": "node tools/check-content/index.mjs",
+    "check:snippets": "node tools/check-snippets/index.mjs",
     "check:catalog": "node tools/check-catalog/index.mjs",
     "check:copies": "node tools/check-copies/index.mjs",
     "typecheck": "pnpm -r typecheck",

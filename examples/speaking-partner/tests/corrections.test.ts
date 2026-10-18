@@ -1,7 +1,7 @@
 import { MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it } from "vitest";
-import { clampCorrection, CorrectRequestSchema, correctLine, systemPrompt } from "../lib/corrections";
-import { llmConfigured, resolveModel } from "../lib/model";
+import { clampCorrection, CorrectRequestSchema, correctLine, systemPrompt } from "@/lib/corrections";
+import { llmConfigured, resolveModel } from "@/lib/model";
 
 function modelReturning(json: unknown) {
   return new MockLanguageModelV4({

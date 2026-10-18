@@ -1,7 +1,7 @@
 ---
 title: Build a browser voice chat with a Managed Agent
 description: Talk to a Cartesia Managed Agent in the browser with barge-in and live captions in Next.js, plus a variant with your own LLM, Ink 2 and Sonic 3.6.
-tags: ['agents', 'next', 'voice', 'streaming', 'managed agents']
+tags: ['agents', 'next', 'voice', 'streaming', 'managed-agents']
 ---
 
 # Build a browser voice chat with a Managed Agent
@@ -52,6 +52,12 @@ Write the prompt for the ear: one or two short sentences, no lists or markdown, 
 The browser needs a token to open the WebSocket. This route creates one that lasts 60 seconds and carries only the `agent` grant, so it cannot be used for speech synthesis or transcription.
 
 ```ts filename="lib/token-handler.ts"
+import { createAgentTokenHandler } from "@/lib/agents-web/server";
+import { getApiKey } from "./env";
+import { clientIp, createRateLimiter, tooManyRequests } from "./rate-limit";
+
+const headers = { "Cache-Control": "no-store" };
+
 export function createTokenRoute(allow = createRateLimiter(10, 60_000)) {
   return async function POST(req: Request): Promise<Response> {
     const apiKey = getApiKey();
@@ -61,29 +67,43 @@ export function createTokenRoute(allow = createRateLimiter(10, 60_000)) {
         { status: 503, headers },
       );
     }
-    const handler = createAgentTokenHandler({
-      apiKey,
-      expiresIn: 60,
-      authorize: (r) => allow(r.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local"),
-    });
-    const res = await handler(req);
-    if (res.status === 401) {
-      return Response.json({ error: "Too many requests. Try again in a minute." }, { status: 429, headers });
+    if (!allow(clientIp(req))) return tooManyRequests(headers);
+    const res = await createAgentTokenHandler({ apiKey, expiresIn: 60 })(req);
+    if (!res.ok) {
+      return Response.json({ error: "Could not get a Cartesia token. Check the API key." }, { status: 502, headers });
     }
     return res;
   };
 }
 ```
 
-`app/api/token/route.ts` is one line, `export const POST = createTokenRoute();`. The rate limit lives in memory on one server instance and keys on `x-forwarded-for`, which a client can spoof unless a trusted proxy sets it. Treat it as a demo guard and replace `authorize` with your own session check, as in [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx). Anyone who can call this route can start calls on your account.
+`app/api/token/route.ts` is one line, `export const POST = createTokenRoute();`. The route checks the rate limit (10 tokens a minute per client IP) before it asks Cartesia for a token, answers 429 when the limit is hit, and answers 502 with a fixed message when Cartesia refuses. The upstream error body never reaches the page.
+
+`clientIp` in `lib/rate-limit.ts` decides which IP the limit counts against:
+
+```ts filename="lib/rate-limit.ts"
+export function clientIp(request: Request): string {
+  const forwarded = (request.headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (process.env.VERCEL) return forwarded[0] ?? "global";
+  if (process.env.TRUST_PROXY === "1") return forwarded[forwarded.length - 1] ?? "global";
+  return "global";
+}
+```
+
+A caller can write anything into `x-forwarded-for`, so the function only reads it where a proxy you trust sets it: on Vercel, or behind your own proxy with `TRUST_PROXY=1`. Anywhere else every caller shares one bucket. The limit lives in memory on one server instance, so treat it as a demo guard. The template's `proxy.ts` asks for `APP_PASSWORD` on every page and route when it is set, and that password is the real guard. For per-user access, add your own session check before the token call, as in [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx). Anyone who can call this route can start calls on your account.
 
 The agent id is not secret. The page reads `CARTESIA_AGENT_ID` on the server and passes it down as a prop.
 
 ## Connect from the browser
 
-`useCartesiaAgent` (from [`packages/agents-web`](../../../packages/agents-web/README.md)) asks for the microphone, opens the socket, sends `session_create` first, streams 16 kHz microphone audio, plays the agent's audio, and drops queued audio the moment the agent is interrupted.
+`useCartesiaAgent` (from [`packages/agents-web`](../../../packages/agents-web/README.md), which the template copies into `lib/agents-web`) asks for the microphone, opens the socket, sends `session_create` first, streams 16 kHz microphone audio, plays the agent's audio, and drops queued audio the moment the agent is interrupted.
 
 ```tsx filename="components/voice-chat.tsx"
+import { useCartesiaAgent } from "@/lib/agents-web/react";
+
 async function getToken(): Promise<string> {
   const res = await fetch("/api/token", { method: "POST" });
   const body = (await res.json().catch(() => ({}))) as { token?: string; error?: string };
@@ -91,10 +111,14 @@ async function getToken(): Promise<string> {
   return body.token;
 }
 
-const agent = useCartesiaAgent({ agentId, getToken });
+export function VoiceChat({ agentId }: { agentId: string }) {
+  const agent = useCartesiaAgent({
+    agentId,
+    getToken,
+  });
 ```
 
-The template's view takes plain props (`agent.status`, `agent.messages`, `agent.isSpeaking`, `agent.muted`, `agent.error`), so its tests render every state without a socket. Call `start()` from a click, because browsers only allow the microphone and audio playback after a user gesture. `getToken` runs once per `start()`, so a retry always gets a fresh token. Output delivery stays at `as_available`, which means the client owns the playback queue and can empty it on interruption.
+The template's view takes plain props (`agent.status`, `agent.messages`, `agent.isSpeaking`, `agent.muted`, `agent.error`), so its tests render every state without a socket. Call `start()` from a click, because browsers only allow the microphone and audio playback after a user gesture. `getToken` runs once per `start()`, so a retry always gets a fresh token. The client sets `output_delivery: "as_available"` in `session_create`, so Cartesia sends audio as soon as it is ready and the client owns the playback queue and can empty it on interruption.
 
 These are the server events the client handles for you.
 

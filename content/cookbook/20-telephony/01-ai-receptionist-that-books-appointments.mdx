@@ -1,7 +1,7 @@
 ---
 title: Build an AI receptionist that answers the phone and books appointments
 description: Put a Cartesia Managed Agent (Ink 2 speech to text, an LLM, Sonic 3.6 text to speech) on a phone number and give it booking tools served by a Python FastAPI app.
-tags: ['python', 'agents', 'telephony', 'fastapi', 'managed agents']
+tags: ['python', 'agents', 'telephony', 'fastapi', 'managed-agents']
 ---
 
 # Build an AI receptionist that answers the phone and books appointments
@@ -135,7 +135,7 @@ Never say an appointment is booked unless book_appointment returned "booked": tr
 
 ## Answer webhook tool calls
 
-Webhook tool calls come straight from Cartesia, so the route checks the shared secret in constant time before it runs anything. `_json_object` answers 400 unless the body is a JSON object. The browser test page forwards client tool calls to a second route that ends in the same `Tools.run`.
+Webhook tool calls come straight from Cartesia, so the route checks the shared secret in constant time before it runs anything. `_json_object` answers 400 unless the body is a JSON object. `Tools.run` is synchronous, so the route runs it in a thread pool instead of blocking the event loop. The browser test page forwards client tool calls to a second route that ends in the same `Tools.run`.
 
 ```python filename="front_desk/main.py"
 @app.post("/tools/{name}")
@@ -146,7 +146,8 @@ async def webhook_tool(name: str, request: Request) -> PlainTextResponse:
     given = request.headers.get("x-tool-secret", "")
     if not s.tool_secret or not hmac.compare_digest(given.encode(), s.tool_secret.encode()):
         raise HTTPException(401, "unauthorized")
-    return PlainTextResponse(tools(s).run(name, await _json_object(request)))
+    params = await _json_object(request)
+    return PlainTextResponse(await run_in_threadpool(tools(s).run, name, params))
 ```
 
 ## Check call webhooks

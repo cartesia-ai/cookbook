@@ -1,35 +1,30 @@
+import { Info } from "lucide-react";
 import { PageHeader } from "@/components/blocks/app-shell";
-import { FormPanel, FormSection } from "@/components/blocks/form-section";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Shell } from "./shell";
-
-function Code({ children }: { children: React.ReactNode }) {
-  return <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">{children}</code>;
-}
 
 export function SetupNotice() {
   return (
     <Shell width="narrow">
-      <PageHeader title="Add your API key" description="This app needs a Cartesia API key on the server. The key never reaches the browser." />
-      <FormPanel>
-        <FormSection title="Voice">
-          <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm text-muted-foreground marker:text-muted-foreground">
-            <li>
-              Copy <Code>.env.example</Code> to <Code>.env.local</Code>.
-            </li>
-            <li>
-              Put your key in <Code>CARTESIA_API_KEY</Code>.
-            </li>
-            <li>
-              Restart <Code>pnpm dev</Code>.
-            </li>
-          </ol>
-        </FormSection>
-        <FormSection title="Written corrections" description="Optional. Set these to check each line you say.">
-          <p className="text-sm text-muted-foreground">
-            <Code>LLM_MODEL</Code> as provider/model, for example <Code>openai/gpt-5.4-mini</Code>, plus <Code>OPENAI_API_KEY</Code> or <Code>ANTHROPIC_API_KEY</Code> to match
+      <PageHeader
+        title="Practice a language out loud"
+        description="Short role plays with a voice partner. After every line you say, a side panel shows what to fix."
+      />
+      <Alert className="mb-8">
+        <Info aria-hidden />
+        <AlertTitle>Finish setup</AlertTitle>
+        <AlertDescription>
+          <p>
+            Copy <code>.env.example</code> to <code>.env.local</code> and put your Cartesia key in{" "}
+            <code>CARTESIA_API_KEY</code>. The key stays on the server.
           </p>
-        </FormSection>
-      </FormPanel>
+          <p>
+            Optional: for written corrections, set <code>LLM_MODEL</code> as provider/model, for example{" "}
+            <code>openai/gpt-5.4-mini</code>, plus <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code> to match.
+          </p>
+          <p>Restart the dev server after editing the file.</p>
+        </AlertDescription>
+      </Alert>
     </Shell>
   );
 }

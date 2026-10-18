@@ -2,7 +2,7 @@
 
 Add a voice agent to any documentation site with one `<script>` tag: visitors ask a question out loud, and a Cartesia Managed Agent answers from your docs using client tools, cites the page and scrolls to the section it used.
 
-![Demo docs page with the voice panel open. The visitor asked how big a client tool result can be, the transcript shows the answer, and the cited "Handle a tool call" section is scrolled into view and tinted green.](./docs/screenshot.png)
+![Demo docs site with two pages, Client tools and Tools, and the voice panel open. The visitor asked how big a client tool result can be, the agent answered up to 4096 bytes, and the cited "Handle a tool call" section is scrolled into view and tinted green.](./docs/screenshot.png)
 
 ## Run it
 
@@ -16,7 +16,7 @@ npm run ingest               # indexes content/*.md into data/index.json
 npm run dev
 ```
 
-pnpm works too. Node 22.22 or newer.
+Node 22.22 or newer. pnpm works too.
 
 Open http://localhost:4512, press **Ask the docs**, then **Start talking**, and ask "How big can a client tool result be?". The demo site is two pages copied from docs.cartesia.ai.
 
@@ -35,7 +35,7 @@ npm run ingest -- ./my-docs --base-url /docs/                    # a folder of .
 npm run ingest -- --sitemap https://docs.example.com/sitemap.xml # or a live site
 ```
 
-Sitemap mode fetches `<page>.md` first (Mintlify and GitBook serve one) and falls back to the HTML, keeping the page's own heading ids so citations land on the right anchor. It only fetches pages, and follows redirects, on the sitemap's own host. Running ingest again only re-indexes pages whose content changed. Only ingest sites you own or are allowed to index.
+Sitemap mode fetches `<page>.md` first (Mintlify and GitBook serve one) and falls back to the HTML, keeping the page's own heading ids so citations land on the right anchor. It only fetches pages, and follows redirects, on the sitemap's own host. Running ingest again only re-indexes pages whose content changed. Pages that fail to fetch keep their old sections in the index; ingest does not prune them. Only ingest sites you own or are allowed to index.
 
 Optional attributes on the script tag: `data-theme="light|dark"` (default follows the page) and `data-title="Ask the docs"`. Host pages with a Content Security Policy need `connect-src wss://api.cartesia.ai https://your-server.example.com` and `worker-src blob:`.
 
@@ -48,8 +48,8 @@ Optional attributes on the script tag: `data-theme="light|dark"` (default follow
 | `CARTESIA_AGENT_ID`, `CARTESIA_TOOL_IDS` | yes | Written by `npm run setup:agent` |
 | `ALLOWED_ORIGINS` | for your site | Comma-separated origins that may start sessions. The server's own origin is always allowed |
 | `PUBLIC_URL`, `TRUST_PROXY` | behind a proxy | Public origin, and `1` to rate limit by the last `X-Forwarded-For` address, the one your proxy appended |
-| `MAX_SESSION_SECS` | no | The widget ends a session after this long. Default 300 |
-| `PORT`, `WIDGET_TITLE`, `DEMO_SITE` | no | Port (4512), panel title, `0` turns off the demo site |
+| `MAX_SESSION_SECS` | no | The widget ends a session after this many seconds. Default 300 |
+| `PORT`, `WIDGET_TITLE`, `DEMO_SITE` | no | Port (default 4512), panel title (default "Ask the docs"), `0` turns off the demo site |
 | `AGENT_MODEL_ID`, `CARTESIA_VOICE_ID`, `AGENT_LANGUAGE` | no | Read by `npm run setup:agent` |
 
 ## How it works
@@ -117,10 +117,12 @@ npm run typecheck
 
 ## Learn more
 
+- Recipe: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/15-agents/04-voice-search-for-your-docs.mdx
 - Managed Agents: https://docs.cartesia.ai/agents/introduction
 - Client tools: https://docs.cartesia.ai/agents/client-tools
 - WebSocket API: https://docs.cartesia.ai/line/integrations/websocket-api
-- Access tokens in the browser: [browser auth guide](../../content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx)
+- Browser auth guide: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx
+- Agent skills: `npx skills add cartesia-ai/skills`
 
 ## License
 

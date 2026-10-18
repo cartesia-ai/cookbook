@@ -32,13 +32,15 @@ const index =
   existing && existing.model === model && existing.dimensions === dimensions ? existing : new DocIndex(model, dimensions);
 
 const started = Date.now();
-const pages = values.sitemap
+const { pages, failed } = values.sitemap
   ? await sitemapPages(values.sitemap, { match: values.match, limit: values.limit ? Number(values.limit) : undefined, log: console.log })
-  : await folderPages(resolve(positionals[0] ?? 'content'), values['base-url']!);
+  : { pages: await folderPages(resolve(positionals[0] ?? 'content'), values['base-url']!), failed: [] };
+if (failed.length) console.log(`${failed.length} pages failed to fetch; their old sections stay in the index.`);
 
 const stats = await ingest(pages, index, embed, {
   force: values.force,
   prune: true,
+  keep: failed,
   log: console.log,
 });
 index.save(out);

@@ -2,12 +2,12 @@
 import "./setup-dom";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CorrectionsPanel } from "../components/corrections-panel";
-import { MissionPicker } from "../components/mission-picker";
-import { Splash } from "../components/splash";
-import { Summary } from "../components/summary";
-import { MISSIONS } from "../lib/missions";
-import type { CorrectionItem } from "../lib/use-corrections";
+import { CorrectionsPanel } from "@/components/corrections-panel";
+import { MissionPicker } from "@/components/mission-picker";
+import { Splash } from "@/components/splash";
+import { Summary } from "@/components/summary";
+import { MISSIONS } from "@/lib/missions";
+import type { CorrectionItem } from "@/lib/use-corrections";
 
 afterEach(cleanup);
 

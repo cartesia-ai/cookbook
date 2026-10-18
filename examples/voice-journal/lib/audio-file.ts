@@ -6,3 +6,12 @@ export async function bytesToPlayableUri(bytes: ArrayBuffer, name: string): Prom
   await file.write(new Uint8Array(bytes));
   return file.uri;
 }
+
+export function deleteRecording(uri: string): void {
+  try {
+    const file = new File(uri);
+    if (file.exists) file.delete();
+  } catch {
+    return;
+  }
+}

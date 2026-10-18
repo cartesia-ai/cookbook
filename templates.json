@@ -76,7 +76,7 @@
       "env": {
         "required": ["CARTESIA_API_KEY"],
         "oneOf": [],
-        "optional": ["LLM_MODEL", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "AI_GATEWAY_API_KEY", "AGENT_MODEL_ID", "VOICE_ID_EN", "VOICE_ID_ES", "VOICE_ID_FR", "VOICE_ID_HI", "VOICE_ID_JA", "APP_PASSWORD", "TRUST_PROXY"]
+        "optional": ["LLM_MODEL", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "AI_GATEWAY_API_KEY", "AGENT_MODEL_ID", "CARTESIA_TOOL_ID_COMPLETE", "VOICE_ID_EN", "VOICE_ID_ES", "VOICE_ID_FR", "VOICE_ID_HI", "VOICE_ID_JA", "APP_PASSWORD", "TRUST_PROXY"]
       },
       "path": "examples/speaking-partner",
       "readme": "examples/speaking-partner/README.md",
@@ -122,7 +122,7 @@
       "path": "examples/docs-voice-widget",
       "readme": "examples/docs-voice-widget/README.md",
       "agents": "examples/docs-voice-widget/AGENTS.md",
-      "recipe": null,
+      "recipe": "content/cookbook/15-agents/04-voice-search-for-your-docs.mdx",
       "screenshot": "examples/docs-voice-widget/docs/screenshot.png",
       "run": {
         "clone": "npx degit cartesia-ai/cookbook/examples/docs-voice-widget docs-voice-widget",
@@ -169,7 +169,7 @@
         "vercel": null,
         "note": "Runs on your machine next to the coding agent. Needs a microphone and headphones."
       },
-      "license": "MIT"
+      "license": "Apache-2.0"
     },
     {
       "slug": "article-to-podcast",
@@ -239,7 +239,7 @@
       "run": {
         "clone": "npx degit cartesia-ai/cookbook/examples/audiobook audiobook",
         "setup": null,
-        "dev": "uv run python main.py samples/alice_sample.epub out --tts cartesia --no_prompt",
+        "dev": "uv run python main_ui.py",
         "url": "http://127.0.0.1:7860"
       },
       "deploy": {
@@ -269,7 +269,7 @@
       "path": "examples/story-time",
       "readme": "examples/story-time/README.md",
       "agents": "examples/story-time/AGENTS.md",
-      "recipe": null,
+      "recipe": "content/cookbook/01-next/30-multi-voice-narration-with-word-timestamps.mdx",
       "screenshot": "examples/story-time/docs/screenshot.png",
       "run": {
         "clone": "npx degit cartesia-ai/cookbook/examples/story-time story-time",
@@ -322,7 +322,7 @@
         "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fmeeting-notes&env=CARTESIA_API_KEY%2CLLM_MODEL%2CAPP_PASSWORD&envDescription=Cartesia%20API%20key%2C%20an%20LLM%20as%20provider%2Fmodel%20%28on%20Vercel%20the%20AI%20Gateway%20needs%20no%20key%29%2C%20and%20a%20password%20for%20the%20app%20%28or%20none%29.&envLink=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fmeeting-notes%23environment-variables&project-name=meeting-notes&repository-name=meeting-notes",
         "note": "Uploads are capped at 4 MB because of the Vercel request body limit."
       },
-      "license": "MIT"
+      "license": "Apache-2.0"
     },
     {
       "slug": "pocket-interpreter",
@@ -351,7 +351,7 @@
       "path": "examples/pocket-interpreter",
       "readme": "examples/pocket-interpreter/README.md",
       "agents": "examples/pocket-interpreter/AGENTS.md",
-      "recipe": null,
+      "recipe": "content/cookbook/01-next/40-real-time-voice-translation.mdx",
       "screenshot": "examples/pocket-interpreter/docs/screenshot-phone.png",
       "run": {
         "clone": "npx degit cartesia-ai/cookbook/examples/pocket-interpreter pocket-interpreter",
@@ -360,7 +360,7 @@
         "url": "http://localhost:3000"
       },
       "deploy": {
-        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fpocket-interpreter&env=CARTESIA_API_KEY%2CLLM_MODEL%2COPENAI_API_KEY%2CAPP_PASSWORD&envDescription=Your%20Cartesia%20API%20key%2C%20LLM_MODEL%20as%20provider%2Fmodel%20%28for%20example%20openai%2Fgpt-5.4-mini%29%2C%20and%20the%20key%20for%20that%20provider.&envLink=https%3A%2F%2Fplay.cartesia.ai%2Fkeys&project-name=pocket-interpreter&repository-name=pocket-interpreter",
+        "vercel": "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fpocket-interpreter&env=CARTESIA_API_KEY%2CLLM_MODEL%2CAPP_PASSWORD&envDescription=Cartesia%20API%20key%2C%20an%20LLM%20as%20provider%2Fmodel%20%28on%20Vercel%20the%20AI%20Gateway%20needs%20no%20key%29%2C%20and%20a%20password%20for%20the%20app%20%28or%20none%29.&envLink=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Fpocket-interpreter%23environment-variables&project-name=pocket-interpreter&repository-name=pocket-interpreter",
         "note": "Phones only allow the microphone over HTTPS, so a deploy is the easiest way to try it on one."
       },
       "license": "Apache-2.0"
@@ -410,7 +410,7 @@
       "path": "examples/front-desk",
       "readme": "examples/front-desk/README.md",
       "agents": "examples/front-desk/AGENTS.md",
-      "recipe": null,
+      "recipe": "content/cookbook/20-telephony/01-ai-receptionist-that-books-appointments.mdx",
       "screenshot": "examples/front-desk/docs/screenshot.png",
       "run": {
         "clone": "npx degit cartesia-ai/cookbook/examples/front-desk front-desk",
@@ -451,7 +451,7 @@
       "path": "examples/voice-journal",
       "readme": "examples/voice-journal/README.md",
       "agents": "examples/voice-journal/AGENTS.md",
-      "recipe": null,
+      "recipe": "content/cookbook/25-mobile/01-voice-notes-in-expo.mdx",
       "screenshot": "examples/voice-journal/docs/screenshot.png",
       "run": {
         "clone": "npx degit cartesia-ai/cookbook/examples/voice-journal voice-journal",
@@ -463,7 +463,7 @@
         "vercel": null,
         "note": "Deploy the API routes with eas deploy (EAS Hosting) and point the expo-router origin at that URL for store builds."
       },
-      "license": "MIT"
+      "license": "Apache-2.0"
     }
   ]
 }

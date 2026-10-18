@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 from unittest.mock import MagicMock
 
@@ -20,6 +22,20 @@ class TestGetBookParser(unittest.TestCase):
         for _, text in chapters:
             self.assertNotIn("Gutenberg", text)
             self.assertIn("@BRK#", text)
+
+    def test_search_and_replace_keeps_last_char_without_trailing_newline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "replace.txt")
+            with open(path, "w") as f:
+                f.write("# comment\ncolour==color\na==b==c\nMr.==Mister")
+            config = get_cartesia_config()
+            config.search_and_replace_file = path
+            parser = get_book_parser(config)
+            self.assertEqual(parser.get_search_and_replaces(), [
+                {"search": "colour", "replace": "color"},
+                {"search": "a", "replace": "b==c"},
+                {"search": "Mr.", "replace": "Mister"},
+            ])
 
     def test_unsupported_file_format(self):
         config = MagicMock(input_file='book.unsupported')

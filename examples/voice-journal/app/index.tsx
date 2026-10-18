@@ -13,6 +13,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
+import { deleteRecording } from "@/lib/audio-file";
 import type { Entry } from "@/lib/journal";
 import { createEntry, ENTRY_STEPS } from "@/lib/pipeline";
 import { MOOD_LABELS } from "@/lib/schema";
@@ -35,6 +36,7 @@ export default function JournalScreen() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save the entry");
     } finally {
+      deleteRecording(uri);
       setStep(null);
     }
   }, []);
@@ -45,8 +47,8 @@ export default function JournalScreen() {
     <Screen>
       <JournalHeader active="journal" />
       <AppMain width="narrow">
-        <SetupAlert />
         <PageHeader title="How was today?" description="Record a voice entry. Ink transcribes it, then the app adds a title, a mood and a one-line reflection." />
+        <SetupAlert />
         <RecorderPanel busy={step !== null} onRecorded={onRecorded} />
 
         {step !== null ? (
@@ -59,7 +61,7 @@ export default function JournalScreen() {
 
         {error ? (
           <View style={{ marginTop: 24 }}>
-            <Alert title="Could not finish">{error}</Alert>
+            <Alert variant="destructive" title="Could not finish">{error}</Alert>
           </View>
         ) : null}
 

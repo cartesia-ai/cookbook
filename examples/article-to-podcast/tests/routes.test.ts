@@ -2,30 +2,30 @@ import { writeFileSync } from "node:fs";
 import { APIError } from "@cartesia/cartesia-js";
 import { APICallError } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConfigError } from "../lib/env";
-import { UnreadablePageError } from "../lib/extract";
-import { FetchBlockedError } from "../lib/safe-fetch";
-import { concatPcm, toWav } from "../lib/wav";
+import { ConfigError } from "@/lib/env";
+import { UnreadablePageError } from "@/lib/extract";
+import { FetchBlockedError } from "@/lib/safe-fetch";
+import { concatPcm, toWav } from "@/lib/wav";
 
 const generateScript = vi.fn();
 const fetchArticle = vi.fn();
 const renderEpisode = vi.fn();
 
-vi.mock("../lib/script", async (importActual) => ({
-  ...(await importActual<typeof import("../lib/script")>()),
+vi.mock("@/lib/script", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/script")>()),
   generateScript: (...args: unknown[]) => generateScript(...args),
 }));
-vi.mock("../lib/extract", async (importActual) => ({
-  ...(await importActual<typeof import("../lib/extract")>()),
+vi.mock("@/lib/extract", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/extract")>()),
   fetchArticle: (...args: unknown[]) => fetchArticle(...args),
 }));
-vi.mock("../lib/tts", async (importActual) => ({
-  ...(await importActual<typeof import("../lib/tts")>()),
+vi.mock("@/lib/tts", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/tts")>()),
   renderEpisode: (...args: unknown[]) => renderEpisode(...args),
 }));
 
-const { POST: postScript } = await import("../app/api/script/route");
-const { POST: postAudio } = await import("../app/api/audio/route");
+const { POST: postScript } = await import("@/app/api/script/route");
+const { POST: postAudio } = await import("@/app/api/audio/route");
 
 const SENTINEL = "sk-test-sentinel";
 let ip = 0;
@@ -93,7 +93,7 @@ describe("POST /api/script", () => {
   it("names the missing variables and no values when no LLM key is set", async () => {
     delete process.env.ANTHROPIC_API_KEY;
     const res = await postScript(json({ text: "A paragraph about tides. ".repeat(10) }));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     expect((await res.json()).error).toMatch(/ANTHROPIC_API_KEY/);
   });
 
@@ -161,9 +161,9 @@ describe("POST /api/audio", () => {
   });
 
   it("names CARTESIA_API_KEY when it is missing", async () => {
-    renderEpisode.mockRejectedValue(new ConfigError("Set CARTESIA_API_KEY in .env.local to record audio."));
+    renderEpisode.mockRejectedValue(new ConfigError("CARTESIA_API_KEY is not set. Add it to .env.local and restart."));
     const res = await postAudio(json({ script }));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     expect((await res.json()).error).toMatch(/CARTESIA_API_KEY/);
   });
 });

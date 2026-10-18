@@ -2,12 +2,14 @@ import { APIError, APIUserAbortError } from "@cartesia/cartesia-js";
 import { APICallError } from "ai";
 import { ConfigError } from "./env";
 import { UnreadablePageError } from "./extract";
+import { LlmConfigError } from "./llm";
 import { FetchBlockedError } from "./safe-fetch";
 
 export function errorResponse(err: unknown): Response {
   let status = 500;
   let message = "Something went wrong. Try again.";
-  if (err instanceof ConfigError) {
+  if (err instanceof ConfigError || err instanceof LlmConfigError) {
+    status = 503;
     message = err.message;
   } else if (err instanceof FetchBlockedError) {
     status = 400;

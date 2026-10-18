@@ -1,14 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ text: "" }));
+const state = vi.hoisted(() => ({ text: "", unconfigured: false }));
 
 vi.mock("@/lib/llm", async () => {
   const { MockLanguageModelV4 } = await import("ai/test");
   class LlmConfigError extends Error {}
   return {
     LlmConfigError,
-    getModel: () =>
-      new MockLanguageModelV4({
+    getModel: () => {
+      if (state.unconfigured) throw new LlmConfigError("LLM_MODEL is not set.");
+      return new MockLanguageModelV4({
         doGenerate: async () => ({
           finishReason: { unified: "stop", raw: "stop" },
           usage: {
@@ -18,7 +19,8 @@ vi.mock("@/lib/llm", async () => {
           warnings: [],
           content: [{ type: "text", text: state.text }],
         }),
-      }),
+      });
+    },
   };
 });
 
@@ -73,5 +75,13 @@ describe("POST /api/summarize", () => {
   it("rejects an oversized transcript", async () => {
     const res = await post({ transcript: "a".repeat(120_001) });
     expect(res.status).toBe(413);
+  });
+
+  it("returns 503 when LLM_MODEL is not set", async () => {
+    state.unconfigured = true;
+    const res = await post({ transcript: "We agreed to ship on Friday." });
+    state.unconfigured = false;
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("LLM_MODEL is not set.");
   });
 });

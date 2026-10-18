@@ -1,7 +1,7 @@
 ---
 title: Transcribe and summarize meetings in Next.js
 description: Record audio in the browser, transcribe it with ink-whisper, and turn the transcript into a summary, decisions and action items.
-tags: ['next', 'speech-to-text', 'structured data']
+tags: ['next', 'stt', 'structured-data']
 ---
 
 # Transcribe and summarize meetings in Next.js
@@ -26,7 +26,7 @@ import Cartesia from "@cartesia/cartesia-js";
 
 export class MissingKeyError extends Error {
   constructor() {
-    super("CARTESIA_API_KEY is not set");
+    super("CARTESIA_API_KEY is not set. Add it to .env.local and restart.");
   }
 }
 
@@ -37,7 +37,7 @@ export function getCartesia(): Cartesia {
 }
 ```
 
-Both routes spend money, so each one gets an in-memory rate limiter keyed by client IP. It is per process and only slows casual abuse.
+Both routes spend money, so each one gets an in-memory rate limiter of 10 requests a minute per client IP. It is per process and only slows casual abuse. `clientIp` trusts `x-forwarded-for` only where a proxy sets it: on Vercel it takes the first entry, with `TRUST_PROXY=1` it takes the entry your own proxy appended, and anywhere else every caller shares one bucket. A caller can write anything into that header, so keying on its raw first entry lets anyone skip the limit.
 
 ```ts filename="lib/rate-limit.ts"
 export function createRateLimiter(limit: number, windowMs: number, now: () => number = Date.now) {
@@ -57,21 +57,34 @@ export function createRateLimiter(limit: number, windowMs: number, now: () => nu
     return true;
   };
 }
+
+export function clientIp(request: Request): string {
+  const forwarded = (request.headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (process.env.VERCEL) return forwarded[0] ?? "global";
+  if (process.env.TRUST_PROXY === "1") return forwarded[forwarded.length - 1] ?? "global";
+  return "global";
+}
+
+export function tooManyRequests(headers?: HeadersInit): Response {
+  return Response.json({ error: "Too many requests. Try again in a minute." }, { status: 429, headers });
+}
 ```
 
 ```ts filename="app/api/transcribe/route.ts"
 import Cartesia from "@cartesia/cartesia-js";
 import { getCartesia, MissingKeyError } from "@/lib/cartesia";
-import { createRateLimiter } from "@/lib/rate-limit";
-
-const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+import { MAX_AUDIO_BYTES, normalizeLanguage } from "@/lib/limits";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
 
 const UPSTREAM_ERRORS: Record<number, string> = {
   400: "Cartesia could not read this audio. Try MP3, M4A, WAV, WebM or FLAC.",
   401: "The Cartesia API key was rejected. Check CARTESIA_API_KEY.",
   402: "The Cartesia account is out of credits.",
   413: "The audio file is too large for Cartesia.",
-  429: "Too many transcription requests. Wait a moment and try again.",
+  429: "Cartesia is rate limiting this account. Try again in a minute.",
 };
 
 export const runtime = "nodejs";
@@ -80,10 +93,7 @@ export const maxDuration = 60;
 const allow = createRateLimiter(10, 60_000);
 
 export async function POST(req: Request) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  if (!allow(ip)) {
-    return Response.json({ error: "Too many requests. Wait a minute and try again." }, { status: 429 });
-  }
+  if (!allow(clientIp(req))) return tooManyRequests();
   let form: FormData;
   try {
     form = await req.formData();
@@ -92,30 +102,40 @@ export async function POST(req: Request) {
   }
 
   const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) {
+  if (!(file instanceof File)) {
     return Response.json({ error: "Missing audio file" }, { status: 400 });
   }
-  if (file.size > MAX_AUDIO_BYTES) {
-    return Response.json({ error: "File too large (4 MB limit)" }, { status: 413 });
+  if (file.size === 0) {
+    return Response.json({ error: "The audio file is empty" }, { status: 400 });
   }
-  const language = typeof form.get("language") === "string" ? String(form.get("language")) : "en";
+  if (file.size > MAX_AUDIO_BYTES) {
+    return Response.json(
+      { error: "File too large for the hosted limit (4 MB). Run locally or see the README for large files." },
+      { status: 413 },
+    );
+  }
+  const language = normalizeLanguage(form.get("language"));
 
   try {
     const res = await getCartesia().stt.transcribe({ file, model: "ink-whisper", language });
-    return Response.json({ transcript: res.text, duration: res.duration ?? null, language: res.language ?? language });
+    return Response.json({
+      transcript: res.text,
+      duration: res.duration ?? null,
+      language: res.language ?? language,
+    });
   } catch (err) {
     if (err instanceof MissingKeyError) {
-      return Response.json({ error: err.message }, { status: 500 });
+      return Response.json({ error: err.message }, { status: 503 });
     }
     if (err instanceof Cartesia.APIError && typeof err.status === "number") {
-      return Response.json({ error: UPSTREAM_ERRORS[err.status] ?? "Transcription failed" }, { status: err.status });
+      return Response.json({ error: UPSTREAM_ERRORS[err.status] ?? "Transcription failed" }, { status: 502 });
     }
     return Response.json({ error: "Transcription failed" }, { status: 500 });
   }
 }
 ```
 
-`ink-whisper` is the model for file transcription. `ink-2` is for streaming and does not work on this endpoint. The file from `formData()` goes to the SDK as it is. Send a `language` code (ISO 639-1) if the meeting is not in English; the template checks it against a list of supported languages. The SDK sends the `Cartesia-Version` header for you. Upstream errors map to fixed messages, so the provider's error body never reaches the page.
+`ink-whisper` is the model for file transcription. `ink-2` is for streaming and does not work on this endpoint. The file from `formData()` goes to the SDK as it is. Send a `language` code (ISO 639-1) if the meeting is not in English; `normalizeLanguage` in `lib/limits.ts` checks it against a list of supported languages and falls back to English. `MAX_AUDIO_BYTES` in the same file is 4 MB. The SDK sends the `Cartesia-Version` header for you. Upstream errors map to fixed messages and a 502, so the provider's error body never reaches the page.
 
 ## Server: summarize
 
@@ -137,16 +157,35 @@ export const MeetingNotesSchema = z.object({
     }),
   ),
 });
+
+export type MeetingNotes = z.infer<typeof MeetingNotesSchema>;
+
+export type ActionItem = {
+  id: string;
+  task: string;
+  owner: string | null;
+  done: boolean;
+};
+
+export type MeetingStatus = "transcribing" | "summarizing" | "ready" | "error";
+
+export type Meeting = {
+  id: string;
+  createdAt: number;
+  title: string;
+  language: string;
+  durationSec?: number;
+  status: MeetingStatus;
+  error?: string;
+  transcript?: string;
+  summary?: string;
+  decisions: string[];
+  actionItems: ActionItem[];
+};
 ```
 
-```ts filename="app/api/summarize/route.ts"
-import { generateText, NoObjectGeneratedError, NoOutputGeneratedError, Output } from "ai";
-import { createRateLimiter } from "@/lib/rate-limit";
-import { MeetingNotesSchema } from "@/lib/schema";
-
-const MAX_TRANSCRIPT_CHARS = 120_000;
-
-const NOTES_INSTRUCTIONS = `You turn meeting transcripts into notes.
+```ts filename="lib/prompt.ts"
+export const NOTES_INSTRUCTIONS = `You turn meeting transcripts into notes.
 
 Rules:
 - Write the notes in the language of the transcript.
@@ -155,6 +194,15 @@ Rules:
 - An action item is a task someone committed to or was asked to do. Set owner to the person's name only if the transcript names them, otherwise null.
 - The transcript has no speaker labels. Do not guess who said what.
 - Ignore filler words and small talk.`;
+```
+
+```ts filename="app/api/summarize/route.ts"
+import { generateText, NoObjectGeneratedError, NoOutputGeneratedError, Output } from "ai";
+import { getModel, LlmConfigError } from "@/lib/llm";
+import { MAX_TRANSCRIPT_CHARS } from "@/lib/limits";
+import { NOTES_INSTRUCTIONS } from "@/lib/prompt";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
+import { MeetingNotesSchema } from "@/lib/schema";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -162,22 +210,22 @@ export const maxDuration = 60;
 const allow = createRateLimiter(10, 60_000);
 
 export async function POST(req: Request) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  if (!allow(ip)) {
-    return Response.json({ error: "Too many requests. Wait a minute and try again." }, { status: 429 });
-  }
+  if (!allow(clientIp(req))) return tooManyRequests();
   const body = await req.json().catch(() => null);
   const transcript = typeof body?.transcript === "string" ? body.transcript.trim() : "";
   if (!transcript) {
     return Response.json({ error: "The transcript is empty" }, { status: 400 });
   }
   if (transcript.length > MAX_TRANSCRIPT_CHARS) {
-    return Response.json({ error: "The transcript is too long to summarize in one pass" }, { status: 413 });
+    return Response.json(
+      { error: "The transcript is too long to summarize in one pass (about 120,000 characters)" },
+      { status: 413 },
+    );
   }
 
   try {
     const result = await generateText({
-      model: process.env.LLM_MODEL!,
+      model: getModel(),
       instructions: NOTES_INSTRUCTIONS,
       prompt: transcript,
       output: Output.object({ schema: MeetingNotesSchema }),
@@ -188,6 +236,9 @@ export async function POST(req: Request) {
     const notes = result.output;
     return Response.json({ ...notes, title: notes.title.slice(0, 80), summary: notes.summary.slice(0, 1200) });
   } catch (err) {
+    if (err instanceof LlmConfigError) {
+      return Response.json({ error: err.message }, { status: 503 });
+    }
     if (NoObjectGeneratedError.isInstance(err) || NoOutputGeneratedError.isInstance(err)) {
       return Response.json({ error: "The model did not return valid notes" }, { status: 502 });
     }
@@ -196,11 +247,11 @@ export async function POST(req: Request) {
 }
 ```
 
-The schema makes every key required, and `owner` is nullable instead of optional. OpenAI's strict structured outputs reject optional keys, and this shape works with the other providers too. The `describe` text on `decisions` matters. Without it, models list open questions as decisions. The template's `lib/llm.ts` also accepts an OpenAI or Anthropic key directly instead of the AI Gateway.
+The schema makes every key required, and `owner` is nullable instead of optional. OpenAI's strict structured outputs reject optional keys, and this shape works with the other providers too. The `describe` text on `decisions` matters. Without it, models list open questions as decisions. `getModel()` in `lib/llm.ts` reads `LLM_MODEL` and accepts an AI Gateway key or an OpenAI or Anthropic key directly. `MAX_TRANSCRIPT_CHARS` in `lib/limits.ts` is 120,000.
 
 ## Client: record and post
 
-```tsx filename="app/page.tsx"
+```tsx filename="app/record/page.tsx"
 'use client';
 
 import { useRef, useState } from 'react';
@@ -254,7 +305,7 @@ export default function Page() {
 }
 ```
 
-This page is the minimal version. The template moves recording into `lib/use-recorder.ts`, stops at 3.6 MB, and creates and resumes an `AudioContext` inside the click handler for its level meter, because Safari only starts audio from a user gesture.
+This page is a minimal version you can drop into your own app. The template keeps `app/page.tsx` for the meeting list, moves recording into `lib/use-recorder.ts`, stops at 3.6 MB, and creates and resumes an `AudioContext` inside the click handler for its level meter, because Safari only starts audio from a user gesture.
 
 Chrome and Firefox record `audio/webm` or `audio/ogg`. Safari records `audio/mp4`. The code picks the first type the browser supports and names the file to match. At 24 kbps, 20 minutes of speech is about 3.6 MB.
 
@@ -270,7 +321,7 @@ The speech-to-text endpoint returns no speaker labels. An action item's owner is
 
 - Vercel serverless functions reject request bodies over 4.5 MB, which is about 20 minutes of Opus at 24 kbps. That cap comes from the host, not from the Cartesia API. For longer meetings, run the route somewhere without that limit.
 - The summarize route sends the whole transcript in one call. A very long transcript needs chunking, which this recipe does not do.
-- Both routes spend your credits for anyone who can reach them. Put them behind your own auth before you deploy.
+- Both routes spend your credits for anyone who can reach them. The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and route when it is set, and on Vercel the app returns 503 until you set it, or set it to `none` to make the app public. The rate limit only slows casual abuse; the password is the real guard.
 
 ## Next steps
 

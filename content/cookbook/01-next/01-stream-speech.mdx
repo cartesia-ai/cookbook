@@ -12,14 +12,12 @@ This recipe turns text into speech and starts playing it before the full audio e
 
 - A Next.js App Router app
 - `npm install @cartesia/cartesia-js`
-- `CARTESIA_API_KEY` and `CARTESIA_VOICE_ID` is optional in `.env.local`; the code falls back to a public voice.
+- `CARTESIA_API_KEY` in `.env.local`. `CARTESIA_VOICE_ID` is optional; without it the code uses a public voice.
 
 ## Server: the route handler
 
 ```ts filename="app/api/speak/route.ts"
 import Cartesia from '@cartesia/cartesia-js';
-
-const client = new Cartesia({ apiKey: process.env.CARTESIA_API_KEY });
 
 export async function POST(req: Request) {
   const { text } = await req.json();
@@ -27,6 +25,7 @@ export async function POST(req: Request) {
     return new Response('Invalid text', { status: 400 });
   }
 
+  const client = new Cartesia({ apiKey: process.env.CARTESIA_API_KEY });
   const response = await client.tts.generate({
     model_id: 'sonic-3.6',
     transcript: text,
@@ -40,7 +39,7 @@ export async function POST(req: Request) {
 }
 ```
 
-The key never leaves the server, so the page needs no access token. Gate this route before you ship. As written, anyone who finds it can generate speech on your account.
+The route reads the key when a request comes in, so `next build` works with no environment set. The key never leaves the server, so the page needs no access token. Gate this route before you ship. As written, anyone who finds it can generate speech on your account.
 
 The SDK sends the `Cartesia-Version` header for you. You don't set it.
 
@@ -49,7 +48,7 @@ The SDK sends the `Cartesia-Version` header for you. You don't set it.
 ```tsx filename="app/page.tsx"
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 const SAMPLE_RATE = 44100;
 const BYTES_PER_SAMPLE = 4;
@@ -57,10 +56,15 @@ const BYTES_PER_SAMPLE = 4;
 export default function Page() {
   const [text, setText] = useState('Hello! This audio plays while it is still being generated.');
   const [busy, setBusy] = useState(false);
+  const ctxRef = useRef<AudioContext | null>(null);
 
   async function speak() {
+    ctxRef.current ??= new AudioContext({ sampleRate: SAMPLE_RATE });
+    const ctx = ctxRef.current;
+    const resumed = ctx.resume();
     setBusy(true);
     try {
+      await resumed;
       const res = await fetch('/api/speak', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,7 +72,6 @@ export default function Page() {
       });
       if (!res.ok || !res.body) throw new Error(`Request failed: ${res.status}`);
 
-      const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
       let nextStart = ctx.currentTime;
       let leftover = new Uint8Array(0);
       const reader = res.body.getReader();
@@ -118,7 +121,8 @@ export default function Page() {
 
 1. `tts.generate` returns a standard `Response` whose body is a stream of raw 32-bit float samples.
 2. The route returns that body unchanged, so bytes reach the browser as Cartesia produces them.
-3. The page reads the stream, turns whole samples into an `AudioBuffer`, and schedules each buffer to start right after the previous one ends.
+3. The page creates one `AudioContext` on the first click and reuses it. It creates and resumes the context before the first `await`, because Safari only lets audio start inside the click handler's own call stack. A context per click would also pile up, since browsers cap how many can be open.
+4. The page reads the stream, turns whole samples into an `AudioBuffer`, and schedules each buffer to start right after the previous one ends.
 
 The browser ends the loop when the stream closes. The buffers already scheduled keep playing after that.
 

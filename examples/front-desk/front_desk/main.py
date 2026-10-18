@@ -16,12 +16,13 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from . import webhooks
 from .auth import bind_host, check_deploy_config, client_ip, require_dashboard
-from .calendars import make_calendar
+from .calendars import close_calcom_client, make_calendar
 from .cartesia import Cartesia, CartesiaError
-from .config import Settings, load_env, settings
+from .config import ROOT, Settings, load_env, settings
 from .store import CallRow, Store
 from .tools import TOOL_NAMES, Tools
 
@@ -33,7 +34,10 @@ HERE = Path(__file__).resolve().parent
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     check_deploy_config(settings(), bind_host())
-    yield
+    try:
+        yield
+    finally:
+        close_calcom_client()
 
 
 app = FastAPI(title="Front desk", docs_url=None, redoc_url=None, lifespan=lifespan)
@@ -132,7 +136,9 @@ def calls_partial(request: Request) -> HTMLResponse:
 def call_page(request: Request, call_id: str) -> HTMLResponse:
     call = store().get_call(call_id)
     if call is None:
-        raise HTTPException(404, "No such call.")
+        resp = page(request, "call_missing.html", nav="calls")
+        resp.status_code = 404
+        return resp
     stt = [t.stt_ttfb for t in call.turns if t.stt_ttfb is not None]
     tts = [t.tts_ttfb for t in call.turns if t.tts_ttfb is not None]
     scale = max([*stt, *tts, 0.5])
@@ -151,9 +157,10 @@ def recording_partial(request: Request, call_id: str) -> HTMLResponse:
     available = False
     if s.cartesia_api_key and webhooks.CALL_ID.match(call_id):
         try:
-            resp = Cartesia(s.cartesia_api_key).open_call_audio(call_id)
-            available = resp.status_code == 200
-            resp.close()
+            with Cartesia(s.cartesia_api_key) as api:
+                resp = api.open_call_audio(call_id)
+                available = resp.status_code == 200
+                resp.close()
         except Exception:  # noqa: BLE001
             available = False
     return page(request, "_recording.html", call_id=call_id, available=available)
@@ -165,7 +172,8 @@ def summary_partial(call_id: str) -> HTMLResponse:
     call = store().get_call(call_id)
     if call and not call.summary and s.cartesia_api_key and webhooks.CALL_ID.match(call_id):
         try:
-            fresh = Cartesia(s.cartesia_api_key).get_call(call_id)
+            with Cartesia(s.cartesia_api_key) as api:
+                fresh = api.get_call(call_id)
             if not s.agent_id or fresh.get("agent_id") == s.agent_id:
                 store().upsert_call(fresh)
                 call = store().get_call(call_id)
@@ -180,9 +188,15 @@ def recording_audio(call_id: str) -> Response:
     s = settings()
     if not webhooks.CALL_ID.match(call_id):
         raise HTTPException(404)
-    resp = cartesia(s).open_call_audio(call_id)
+    api = cartesia(s)
+    try:
+        resp = api.open_call_audio(call_id)
+    except BaseException:
+        api.close()
+        raise
     if resp.status_code != 200:
         resp.close()
+        api.close()
         raise HTTPException(404, "No recording for this call.")
 
     def body():
@@ -190,6 +204,7 @@ def recording_audio(call_id: str) -> Response:
             yield from resp.iter_bytes()
         finally:
             resp.close()
+            api.close()
 
     return StreamingResponse(
         body(), media_type="audio/wav", headers={"Cache-Control": "private, max-age=300"}
@@ -199,7 +214,20 @@ def recording_audio(call_id: str) -> Response:
 @dashboard.get("/inbox", response_class=HTMLResponse)
 def inbox_page(request: Request) -> HTMLResponse:
     st = store()
-    return page(request, "inbox.html", appointments=st.list_appointments(), messages=st.list_messages())
+    return page(
+        request,
+        "inbox.html",
+        appointments=st.list_appointments(),
+        messages=st.list_messages(),
+        db_path=_display_path(settings().database_path),
+    )
+
+
+def _display_path(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(ROOT))
+    except ValueError:
+        return str(path)
 
 
 @dashboard.get("/try", response_class=HTMLResponse)
@@ -233,7 +261,8 @@ def token(request: Request) -> JSONResponse:
     if not _allow_token(client_ip(request, s), time.monotonic()):
         return JSONResponse({"error": "Too many calls. Wait a minute."}, 429)
     try:
-        tok = cartesia(s).mint_agent_token(60)
+        with cartesia(s) as api:
+            tok = api.mint_agent_token(60)
     except CartesiaError as e:
         log.warning("token mint failed: %s", e.status)
         return JSONResponse({"error": "Could not start a call."}, 502)
@@ -246,7 +275,8 @@ def sync_call(call_id: str) -> JSONResponse:
     if not webhooks.CALL_ID.match(call_id):
         raise HTTPException(400, "Bad call id.")
     try:
-        call = cartesia(s).get_call(call_id)
+        with cartesia(s) as api:
+            call = api.get_call(call_id)
     except CartesiaError as e:
         return JSONResponse({"error": "Could not load the call."}, 404 if e.status == 404 else 502)
     if s.agent_id and call.get("agent_id") != s.agent_id:
@@ -274,7 +304,7 @@ async def client_tool(name: str, request: Request) -> PlainTextResponse:
     params = dict(raw) if isinstance(raw, dict) else {}
     params["call_id"] = str(body.get("call_id") or "")
     params.pop("call_direction", None)
-    return PlainTextResponse(tools(settings()).run(name, params))
+    return PlainTextResponse(await run_in_threadpool(tools(settings()).run, name, params))
 
 
 @app.post("/tools/{name}")
@@ -285,7 +315,8 @@ async def webhook_tool(name: str, request: Request) -> PlainTextResponse:
     given = request.headers.get("x-tool-secret", "")
     if not s.tool_secret or not hmac.compare_digest(given.encode(), s.tool_secret.encode()):
         raise HTTPException(401, "unauthorized")
-    return PlainTextResponse(tools(s).run(name, await _json_object(request)))
+    params = await _json_object(request)
+    return PlainTextResponse(await run_in_threadpool(tools(s).run, name, params))
 
 
 @app.post("/webhooks/cartesia")

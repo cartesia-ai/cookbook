@@ -70,6 +70,7 @@ export class DocsAgentElement extends HTMLElement {
   private fallbackTimer: ReturnType<typeof setTimeout> | null = null;
   private footKey = '';
   private triggerKey = '';
+  private gen = 0;
 
   constructor() {
     super();
@@ -94,6 +95,8 @@ export class DocsAgentElement extends HTMLElement {
   connectedCallback(): void {
     this.server = (this.getAttribute('server') || location.origin).replace(/\/+$/, '');
     this.root.innerHTML = `<style>${STYLES}</style><div class="root"></div>`;
+    this.footKey = '';
+    this.triggerKey = '';
     this.mount();
     this.stopTheme = watchTheme((this.getAttribute('theme') as ThemeSetting) || 'auto', (t) => {
       this.theme = t;
@@ -146,6 +149,8 @@ export class DocsAgentElement extends HTMLElement {
 
   private async start(): Promise<void> {
     if (this.client) return;
+    const gen = ++this.gen;
+    const stale = () => gen !== this.gen || !this.isConnected;
     this.error = null;
     this.ended = '';
     this.messages = [];
@@ -157,8 +162,10 @@ export class DocsAgentElement extends HTMLElement {
     let config: WidgetConfig;
     try {
       config = await this.loadConfig();
+      if (stale()) return;
       if (!config.ready || !config.agentId) throw new HttpError(503);
     } catch (err) {
+      if (stale()) return;
       this.fail(err);
       return;
     }
@@ -197,13 +204,22 @@ export class DocsAgentElement extends HTMLElement {
     });
     try {
       await client.start();
+      if (stale()) {
+        if (this.client === client) this.client = null;
+        await client.stop().catch(() => {});
+        return;
+      }
       this.setPhase('listening');
       const secs = config.maxSessionSecs || 300;
       this.capTimer = setTimeout(() => {
-        void this.end(`Sessions end after ${Math.round(secs / 60)} minutes. Start again to keep going.`);
+        void this.end(`Sessions end after ${sessionLength(secs)}. Start again to keep going.`);
       }, secs * 1000);
     } catch (err) {
-      this.client = null;
+      if (this.client === client) this.client = null;
+      if (stale()) {
+        this.lastHttpError = null;
+        return;
+      }
       this.fail(this.lastHttpError ?? err);
       this.lastHttpError = null;
     }
@@ -224,6 +240,7 @@ export class DocsAgentElement extends HTMLElement {
   }
 
   private async end(note = ''): Promise<void> {
+    this.gen++;
     this.clearCap();
     const client = this.client;
     this.client = null;
@@ -394,6 +411,12 @@ export class DocsAgentElement extends HTMLElement {
   clearHighlight(): void {
     clearHighlight();
   }
+}
+
+export function sessionLength(secs: number): string {
+  if (secs < 60) return `${secs} ${secs === 1 ? 'second' : 'seconds'}`;
+  const mins = Math.round(secs / 60);
+  return `${mins} ${mins === 1 ? 'minute' : 'minutes'}`;
 }
 
 function esc(s: string): string {

@@ -42,7 +42,7 @@ Return the token in the JSON body. Do not put it in an httpOnly cookie. Browser 
 
 Because a token lives 60 seconds, don't fetch it once at page load. Fetch it right before you connect.
 
-```tsx filename="lib/cartesia-client.ts"
+```ts filename="lib/cartesia-client.ts"
 import Cartesia from '@cartesia/cartesia-js';
 
 export async function createBrowserClient() {

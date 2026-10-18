@@ -102,7 +102,7 @@ export async function fetchOnHost(f: typeof fetch, url: string, host: string): P
 export async function sitemapPages(
   sitemap: string,
   opts: { match?: string; limit?: number; fetchImpl?: typeof fetch; log?: (s: string) => void } = {},
-): Promise<RawPage[]> {
+): Promise<{ pages: RawPage[]; failed: string[] }> {
   const f = opts.fetchImpl ?? fetch;
   const host = new URL(sitemap).host;
   const res = await fetchOnHost(f, sitemap, host);
@@ -114,6 +114,7 @@ export async function sitemapPages(
   if (opts.match) urls = urls.filter((u) => u.includes(opts.match!));
   if (opts.limit) urls = urls.slice(0, opts.limit);
   const pages: RawPage[] = [];
+  const failed: string[] = [];
   for (const url of urls) {
     try {
       const md = await fetchOnHost(f, `${url.replace(/\/$/, '')}.md`, host).catch(() => null);
@@ -125,13 +126,15 @@ export async function sitemapPages(
       const page = await fetchOnHost(f, url, host);
       if (!page.ok) {
         opts.log?.(`skip ${url} (${page.status})`);
+        failed.push(url);
         continue;
       }
       const { markdown, anchors } = htmlToMarkdown(await page.text());
       pages.push({ url, markdown, anchors });
     } catch (err) {
       opts.log?.(`skip ${url} (${err instanceof Error ? err.message : 'error'})`);
+      failed.push(url);
     }
   }
-  return pages;
+  return { pages, failed };
 }

@@ -66,3 +66,29 @@ describe("startInterpreter cleanup", () => {
     expect(contexts[0]!.closed).toBe(true);
   });
 });
+
+describe("startInterpreter reconnect", () => {
+  it("stops a listener that reconnects after the session was stopped", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => tokenOk()));
+    mocks.createSpeaker.mockResolvedValue({ close: mocks.speakerClose, busy: () => false, open: () => true });
+    let handlers!: { onClosed(reason: string): Promise<void> };
+    const first = { stop: vi.fn() };
+    mocks.listen.mockImplementationOnce(async (_c: unknown, _a: unknown, _m: unknown, h: typeof handlers) => {
+      handlers = h;
+      return first;
+    });
+    const session = await startInterpreter(["en", "es"], events);
+
+    let resolveNext!: (v: { stop: () => void }) => void;
+    mocks.listen.mockImplementationOnce(() => new Promise((r) => (resolveNext = r)));
+    const reconnect = handlers.onClosed("closed (1006)");
+    await vi.waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(2));
+    await session.stop();
+    const next = { stop: vi.fn() };
+    resolveNext(next);
+    await reconnect;
+    expect(first.stop).toHaveBeenCalledOnce();
+    expect(next.stop).toHaveBeenCalledOnce();
+    expect(events.onError).not.toHaveBeenCalled();
+  });
+});

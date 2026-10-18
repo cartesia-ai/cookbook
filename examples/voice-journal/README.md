@@ -16,7 +16,9 @@ npm install
 npm run dev
 ```
 
-Add `CARTESIA_API_KEY`, `LLM_MODEL` and the matching provider key to `.env.local` first. pnpm works too. Node 22.22 or newer.
+Node 22.22 or newer. pnpm works too.
+
+Before `npm run dev`, add `CARTESIA_API_KEY`, `LLM_MODEL` and the matching provider key to `.env.local`.
 
 Press `w` to open the web app at http://localhost:8081, or scan the QR code with Expo Go. Tap Start recording, talk for a few seconds, tap Stop and save. Then open Recap and tap Write my recap. If a key is missing, the app says which one.
 
@@ -73,7 +75,7 @@ lib/server/                Cartesia client, LLM resolver, prompts, error mapping
 components/ui, blocks      the cookbook kit rebuilt in React Native
 ```
 
-Audio is not stored. The transcribe route reads the file, sends it to Cartesia and forgets it. Entries, recaps and the chosen voice live in AsyncStorage, which is `localStorage` on the web and a local file on iOS and Android.
+Audio is not kept. The transcribe route reads the file, sends it to Cartesia and forgets it, and the app deletes its local recording once the transcript is back. Entries, recaps and the chosen voice live in AsyncStorage, which is `localStorage` on the web and a local file on iOS and Android.
 
 `ink-whisper` for file transcription, `sonic-3.6` for speech, through `@cartesia/cartesia-js`, which sends `Cartesia-Version: 2026-08-14`. Current model ids: https://docs.cartesia.ai/build-with-cartesia/tts-models/latest and https://docs.cartesia.ai/build-with-cartesia/stt/latest.
 
@@ -81,7 +83,7 @@ Audio is not stored. The transcribe route reads the file, sends it to Cartesia a
 
 - Use a different default voice: set `DEFAULT_VOICE_ID` in `lib/limits.ts` to any voice id from https://play.cartesia.ai/voices. The picker lists public English voices from `GET /voices`.
 - Transcribe another language: change `language: "en"` in `app/api/transcribe+api.ts`, and the TTS `language` in `app/api/speak+api.ts` with a voice that speaks it.
-- Change the moods or the tone of the reflection: edit `MOODS` in `lib/schema.ts` and the prompts in `lib/server/prompts.ts`.
+- Change the moods or the tone of the reflection: edit `MOODS` in `lib/schema.ts`, the instructions in `lib/server/prompts.ts`, and `recapPrompt` in `lib/journal.ts` for the weekly recap.
 - Swap the LLM: set `LLM_MODEL`. `lib/server/llm.ts` is the whole switch.
 - Store entries elsewhere: replace the functions in `lib/store.ts` and keep `useJournal()`.
 
@@ -103,7 +105,7 @@ Before you ship to the App Store, check [guideline 5.1.2(i)](https://developer.a
 
 ## FAQ
 
-The app never sees `CARTESIA_API_KEY`. If you want the phone to call Cartesia directly instead, see [Browser auth with access tokens](../../content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx).
+The app never sees `CARTESIA_API_KEY`. If you want the phone to call Cartesia directly instead, see [Browser auth with access tokens](https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx).
 
 ### Does it work on a real iPhone or Android phone?
 
@@ -129,9 +131,10 @@ npm test
 
 ## Learn more
 
+- Recipe: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/25-mobile/01-voice-notes-in-expo.mdx
 - Cartesia docs: https://docs.cartesia.ai
 - Batch STT: https://docs.cartesia.ai/api-reference/stt/transcribe
-- TTS bytes: https://docs.cartesia.ai/use-the-api/compare-tts-endpoints
+- Compare TTS endpoints: https://docs.cartesia.ai/use-the-api/compare-tts-endpoints
 - Expo Router API routes: https://docs.expo.dev/router/web/api-routes/
 - Agent skills: `npx skills add cartesia-ai/skills`
 

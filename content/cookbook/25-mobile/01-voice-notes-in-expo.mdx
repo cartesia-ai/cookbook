@@ -1,7 +1,7 @@
 ---
 title: Record and transcribe voice notes in an Expo app with ink-whisper
 description: Record a voice note with expo-audio, transcribe it with Cartesia ink-whisper speech to text through an Expo Router API route, and read a recap back with Sonic 3.6 text to speech on iOS, Android and the web.
-tags: ['expo', 'react native', 'stt', 'tts', 'mobile']
+tags: ['expo', 'react-native', 'stt', 'tts', 'mobile']
 ---
 
 # Record and transcribe voice notes in an Expo app with ink-whisper
@@ -53,18 +53,32 @@ export function useRecorder() {
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const state = useAudioRecorderState(recorder, 100);
   const [error, setError] = React.useState<string | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const lock = React.useRef(false);
+
+  const claim = React.useCallback(() => {
+    if (lock.current) return false;
+    lock.current = true;
+    setBusy(true);
+    return true;
+  }, []);
+  const release = React.useCallback(() => {
+    lock.current = false;
+    setBusy(false);
+  }, []);
 
   const seconds = Math.floor((state.durationMillis ?? 0) / 1000);
   const level = state.isRecording && state.metering != null ? Math.min(1, Math.max(0, (state.metering + 60) / 60)) : 0;
 
   const start = React.useCallback(async () => {
-    setError(null);
-    const permission = await AudioModule.requestRecordingPermissionsAsync();
-    if (!permission.granted) {
-      setError("Allow microphone access to record an entry.");
-      return false;
-    }
+    if (recorder.isRecording || !claim()) return false;
     try {
+      setError(null);
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        setError("Allow microphone access to record an entry.");
+        return false;
+      }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
@@ -72,27 +86,32 @@ export function useRecorder() {
     } catch {
       setError("Could not start recording. Check that no other app is using the microphone.");
       return false;
+    } finally {
+      release();
     }
-  }, [recorder]);
+  }, [recorder, claim, release]);
 
   const stop = React.useCallback(async (): Promise<{ uri: string; seconds: number } | null> => {
+    if (!recorder.isRecording || !claim()) return null;
     const secs = (recorder.currentTime ?? 0) || seconds;
     try {
       await recorder.stop();
       await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      const uri = recorder.uri;
+      return uri ? { uri, seconds: secs } : null;
     } catch {
       setError("Could not save the recording.");
       return null;
+    } finally {
+      release();
     }
-    const uri = recorder.uri;
-    return uri ? { uri, seconds: secs } : null;
-  }, [recorder, seconds]);
+  }, [recorder, seconds, claim, release]);
 
-  return { isRecording: state.isRecording, seconds, level, error, start, stop, maxSeconds: MAX_RECORDING_SECONDS };
+  return { isRecording: state.isRecording, busy, seconds, level, error, start, stop, maxSeconds: MAX_RECORDING_SECONDS };
 }
 ```
 
-The hook sets the audio mode to `allowsRecording: true` before `prepareToRecordAsync` and turns it off again after `stop()`. With `isMeteringEnabled`, the recorder state carries a dBFS level, polled every 100 ms here, which the screen draws as a meter.
+The hook sets the audio mode to `allowsRecording: true` before `prepareToRecordAsync` and turns it off again after `stop()`. With `isMeteringEnabled`, the recorder state carries a dBFS level, polled every 100 ms here, which the screen draws as a meter. `claim` and `release` hold a lock while a start or stop is in flight, so a double tap cannot start two recordings or stop one twice.
 
 ## Upload the recording from the phone and the browser
 
@@ -125,7 +144,7 @@ import Cartesia from "@cartesia/cartesia-js";
 
 export class MissingKeyError extends Error {
   constructor() {
-    super("CARTESIA_API_KEY is not set");
+    super("CARTESIA_API_KEY is not set. Add it to .env.local and restart.");
   }
 }
 
@@ -146,7 +165,7 @@ import { cartesiaError, json, rateLimited } from "@/lib/server/errors";
 import { MAX_AUDIO_BYTES, STT_MODEL } from "@/lib/limits";
 import { createRateLimiter } from "@/lib/server/rate-limit";
 
-const allow = createRateLimiter(20, 60_000);
+const allow = createRateLimiter(10, 60_000);
 
 export async function POST(req: Request) {
   const limited = rateLimited(req, allow);
@@ -178,7 +197,7 @@ export async function POST(req: Request) {
 
 `ink-whisper` is the only model on the batch endpoint. `ink-2` is for streaming over a WebSocket and does not work here. The SDK sends `Cartesia-Version: 2026-08-14` for you. To transcribe another language, change `language: "en"` to its ISO 639-1 code.
 
-`cartesiaError` in `lib/server/errors.ts` maps failures to fixed messages ("Cartesia rejected the API key", a rate limit notice, or the status code). It never forwards the provider's error body to the app.
+`cartesiaError` in `lib/server/errors.ts` maps failures to fixed messages ("Cartesia rejected the API key", a rate limit notice, or the status code). It never forwards the provider's error body to the app. `rateLimited` in the same file answers 429 after 10 requests a minute from one client IP. It gets the IP from `clientIp` in `lib/server/rate-limit.ts`, which reads `x-forwarded-for` only on Vercel or with `TRUST_PROXY=1` behind your own proxy, since any caller can set that header. Elsewhere every caller shares one bucket.
 
 The SDK call is a multipart `POST /stt`. Here is the same request with curl.
 

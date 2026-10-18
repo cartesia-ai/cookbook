@@ -1,8 +1,10 @@
 # Cartesia kit
 
-shadcn/ui (MIT, Copyright (c) 2023 shadcn), recolored for Cartesia. The components are the registry output from the shadcn CLI, unedited (style `new-york`, base color `neutral`, Radix, lucide icons, Tailwind v4). Only the CSS variables in `theme.css` are changed.
+shadcn/ui (MIT, Copyright (c) 2023 shadcn), recolored for Cartesia. The files in `components/ui` are the registry output from the shadcn CLI (style `new-york`, base color `neutral`, Radix, lucide icons, Tailwind v4), and the CSS variables in `theme.css` set the colors. The files in `components/blocks` are written for this kit on top of those components.
 
-Components here: button, card, input, textarea, select, label, tabs, alert, badge, skeleton, separator, tooltip, dialog, sonner, scroll-area, avatar.
+Components in `components/ui`: alert, avatar, badge, button, card, checkbox, dialog, input, label, scroll-area, select, separator, skeleton, sonner, tabs, textarea, toggle, toggle-group, tooltip.
+
+Blocks in `components/blocks`: app-shell, choice-chips, empty-state, field, file-dropzone, form-section, steps.
 
 ## Theme
 

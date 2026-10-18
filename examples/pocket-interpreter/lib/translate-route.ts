@@ -31,7 +31,7 @@ export function createTranslateRoute(
     const { text, pair } = parsed.data;
     const result = streamText({
       model: resolved,
-      system: translatePrompt(pair),
+      instructions: translatePrompt(pair),
       prompt: text,
       maxOutputTokens: 600,
       abortSignal: req.signal,

@@ -1,5 +1,5 @@
 import { Headphones } from "lucide-react";
-import { LANGUAGES, type LanguageCode } from "../lib/languages";
+import { LANGUAGES, type LanguageCode } from "@/lib/languages";
 import { FieldGrid } from "@/components/blocks/field";
 import { FormFooter, FormPanel, FormSection } from "@/components/blocks/form-section";
 import { PageHeader } from "@/components/blocks/app-shell";

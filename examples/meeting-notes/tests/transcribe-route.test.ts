@@ -72,12 +72,12 @@ describe("POST /api/transcribe", () => {
     expect(transcribe).not.toHaveBeenCalled();
   });
 
-  it("returns 500 without leaking the key when CARTESIA_API_KEY is missing", async () => {
+  it("returns 503 without leaking the key when CARTESIA_API_KEY is missing", async () => {
     delete process.env.CARTESIA_API_KEY;
     const res = await POST(request({ file: audio() }));
     const body = await res.json();
-    expect(res.status).toBe(500);
-    expect(body.error).toBe("CARTESIA_API_KEY is not set");
+    expect(res.status).toBe(503);
+    expect(body.error).toBe("CARTESIA_API_KEY is not set. Add it to .env.local and restart.");
   });
 
   it("maps an upstream API error to 502 with a fixed message", async () => {

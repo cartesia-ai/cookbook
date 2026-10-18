@@ -16,7 +16,7 @@ You need Python 3.10 to 3.12, uv and ffmpeg. The sample book is two public-domai
 cd examples/audiobook
 cp .env.example .env            # put your key in .env
 set -a; . ./.env; set +a
-uv run python main.py samples/alice_sample.epub out --tts cartesia --no_prompt
+uv run python main.py samples/alice_sample.epub out --no_prompt
 ```
 
 Add `--preview` to list the chapters and the speakers it found without calling the API.

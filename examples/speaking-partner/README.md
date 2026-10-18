@@ -8,7 +8,7 @@ A Next.js app for practicing a language out loud with a Cartesia Managed Agent t
 
 ## Run it
 
-Node 22.22 or newer. You need a Cartesia API key from https://play.cartesia.ai/keys and a microphone.
+You need a Cartesia API key from https://play.cartesia.ai/keys and a microphone.
 
 ```sh
 npx degit cartesia-ai/cookbook/examples/speaking-partner speaking-partner
@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-pnpm works too: `pnpm install`, `pnpm dev`.
+Node 22.22 or newer. pnpm works too.
 
 Open http://localhost:3000, pick your languages and a mission, press Start speaking, and speak first. A session lasts 3 minutes. Use headphones: on speakers the microphone can pick up the partner's voice and it may interrupt itself. M mutes and Escape ends the session.
 
@@ -36,7 +36,7 @@ Without `LLM_MODEL` and a matching key everything works except the corrections p
 | `AGENT_MODEL_ID` | no | The partner's LLM, from `GET /v1/agents/models`. Defaults to `claude-haiku-4.5` |
 | `VOICE_ID_EN`, `VOICE_ID_ES`, `VOICE_ID_FR`, `VOICE_ID_HI`, `VOICE_ID_JA` | no | Pin a voice per language. Ids from https://play.cartesia.ai/voices |
 | `CARTESIA_TOOL_ID_COMPLETE` | no | Id of an existing `complete_mission` tool. Otherwise the server finds or creates one |
-| `APP_PASSWORD` | no | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
+| `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
 The model ids are examples. Providers retire models, so check the provider's model page before you pick one. On Vercel, a model with no matching direct key goes through the AI Gateway without `AI_GATEWAY_API_KEY`, because the deployment authenticates to it for you.
@@ -95,6 +95,8 @@ Agent minutes and the agent's LLM are billed to your Cartesia account. Each line
 
 ## FAQ
 
+The browser never sees `CARTESIA_API_KEY`; it gets a 60 second token from `app/api/token/route.ts`. [Browser auth with access tokens](https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx) explains the token route.
+
 ### Why does my own line appear only after I stop talking?
 
 The Managed Agents WebSocket sends your words in `turn_ended`, once per turn. The partner's words stream in as it speaks. The corrections panel updates at the same moment your line appears.
@@ -102,10 +104,6 @@ The Managed Agents WebSocket sends your words in `turn_ended`, once per turn. Th
 ### Can I practice a language other than these five?
 
 Not with a Managed Agent, because Ink 2 transcribes only English, Spanish, French, Hindi and Japanese. For other languages, build your own pipeline with `ink-whisper` for speech to text, your LLM and Sonic.
-
-### How does the browser connect without my API key?
-
-It gets a short-lived access token from `app/api/token/route.ts`. See [Browser auth with access tokens](../../content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx).
 
 ## Tests
 
@@ -119,11 +117,11 @@ Browser audio and the quality of the conversation are not covered by tests. Ink 
 
 ## Learn more
 
+- Recipe: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/15-agents/03-speaking-partner.mdx
 - Cartesia docs: https://docs.cartesia.ai
 - Managed Agents: https://docs.cartesia.ai/agents/introduction
 - Client tools: https://docs.cartesia.ai/agents/client-tools
 - Agents WebSocket events: https://docs.cartesia.ai/line/integrations/websocket-api
-- The recipe for this app: [Language Speaking Partner](../../content/cookbook/15-agents/03-speaking-partner.mdx)
 - Agent skills: `npx skills add cartesia-ai/skills`
 
 ## License

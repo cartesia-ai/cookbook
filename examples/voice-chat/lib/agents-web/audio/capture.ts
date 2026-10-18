@@ -65,13 +65,23 @@ export async function startCapture(opts: CaptureOptions): Promise<Capture> {
     URL.revokeObjectURL(url);
   }
 
-  const source = ctx.createMediaStreamSource(stream);
-  const node = new AudioWorkletNode(ctx, CAPTURE_PROCESSOR_NAME);
-  const silent = ctx.createGain();
-  silent.gain.value = 0;
-  source.connect(node);
-  node.connect(silent);
-  silent.connect(ctx.destination);
+  let source: MediaStreamAudioSourceNode;
+  let node: AudioWorkletNode;
+  let silent: GainNode;
+  try {
+    source = ctx.createMediaStreamSource(stream);
+    node = new AudioWorkletNode(ctx, CAPTURE_PROCESSOR_NAME);
+    silent = ctx.createGain();
+    silent.gain.value = 0;
+    source.connect(node);
+    node.connect(silent);
+    silent.connect(ctx.destination);
+  } catch (err) {
+    stream.getTracks().forEach((t) => t.stop());
+    throw new CartesiaAgentError('mic_unavailable', 'Could not connect the microphone to audio.', {
+      cause: err,
+    });
+  }
 
   const resampler = new Resampler(ctx.sampleRate, opts.targetRate);
   const chunker = new Chunker(samplesForChunk(opts.targetRate, opts.chunkMs));
@@ -97,9 +107,7 @@ export async function startCapture(opts: CaptureOptions): Promise<Capture> {
         source.disconnect();
         node.disconnect();
         silent.disconnect();
-      } catch {
-        // already disconnected
-      }
+      } catch {}
       stream.getTracks().forEach((t) => t.stop());
     },
   };

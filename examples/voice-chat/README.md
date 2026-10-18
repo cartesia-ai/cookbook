@@ -10,7 +10,7 @@ Run `npm run setup:agent` on your machine before you press this button. The butt
 
 ## Run it
 
-Node 22.22 or newer. You need a Cartesia API key from https://play.cartesia.ai/keys.
+You need a Cartesia API key from https://play.cartesia.ai/keys.
 
 ```sh
 npx degit cartesia-ai/cookbook/examples/voice-chat voice-chat
@@ -21,7 +21,7 @@ npm run setup:agent          # creates the agent and writes CARTESIA_AGENT_ID to
 npm run dev
 ```
 
-pnpm works too: `pnpm install`, `pnpm setup:agent`, `pnpm dev`.
+Node 22.22 or newer. pnpm works too.
 
 Open http://localhost:3000, press Start call, wait for the greeting and ask a question. Talk over the answer to interrupt it. Use headphones: on speakers the microphone picks up the agent and it can interrupt itself.
 
@@ -35,7 +35,7 @@ Open http://localhost:3000, press Start call, wait for the greeting and ask a qu
 | `CARTESIA_AGENT_ID` | yes | Written by `npm run setup:agent`. You can also paste the id of an agent you already have |
 | `AGENT_MODEL_ID` | no | LLM for the agent, read by `npm run setup:agent`. Default `claude-haiku-4.5`. `GET /v1/agents/models` lists the others |
 | `CARTESIA_VOICE_ID` | no | Agent voice, read by `npm run setup:agent`. Pick one at https://play.cartesia.ai/voices |
-| `APP_PASSWORD` | no | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
+| `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
 After changing `AGENT_MODEL_ID` or `CARTESIA_VOICE_ID`, run `npm run setup:agent -- --force`.
@@ -72,7 +72,7 @@ The handler it calls adds the rate limit and fixed error messages. If you copy t
 ```ts
 import { createAgentTokenHandler } from "@/lib/agents-web/server";
 import { getApiKey } from "./env";
-import { createRateLimiter } from "./rate-limit";
+import { clientIp, createRateLimiter, tooManyRequests } from "./rate-limit";
 
 const headers = { "Cache-Control": "no-store" };
 
@@ -85,21 +85,17 @@ export function createTokenRoute(allow = createRateLimiter(10, 60_000)) {
         { status: 503, headers },
       );
     }
-    const handler = createAgentTokenHandler({
-      apiKey,
-      expiresIn: 60,
-      authorize: (r) => allow(r.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local"),
-    });
-    const res = await handler(req);
-    if (res.status === 401) {
-      return Response.json({ error: "Too many requests. Try again in a minute." }, { status: 429, headers });
+    if (!allow(clientIp(req))) return tooManyRequests(headers);
+    const res = await createAgentTokenHandler({ apiKey, expiresIn: 60 })(req);
+    if (!res.ok) {
+      return Response.json({ error: "Could not get a Cartesia token. Check the API key." }, { status: 502, headers });
     }
     return res;
   };
 }
 ```
 
-`createAgentTokenHandler` in `lib/agents-web/server.ts` calls `client.accessToken.create({ grants: { agent: true }, expires_in: 60 })` and returns `{ token }`. `lib/rate-limit.ts` holds `createRateLimiter`.
+It checks the key first (503), then the per-IP limit (429), then calls `createAgentTokenHandler` from `lib/agents-web/server.ts`, which runs `client.accessToken.create({ grants: { agent: true }, expires_in: 60 })` and returns `{ token }`. Any failure there becomes a fixed 502 message, so SDK error text never reaches the browser. `lib/rate-limit.ts` holds `createRateLimiter`, `clientIp` and `tooManyRequests`.
 
 In the browser:
 
@@ -167,7 +163,7 @@ The tests cover the setup script against a stub API, the token route, the rate l
 
 ## Learn more
 
-- Recipe: [Voice chat with a Managed Agent](https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/15-agents/02-voice-chat.mdx)
+- Recipe: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/15-agents/02-voice-chat.mdx
 - Managed Agents: https://docs.cartesia.ai/agents/introduction
 - Agent WebSocket events: https://docs.cartesia.ai/line/integrations/websocket-api
 - Create an agent: https://docs.cartesia.ai/api-reference/agents/create

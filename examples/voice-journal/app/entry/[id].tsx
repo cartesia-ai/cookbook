@@ -80,7 +80,7 @@ export default function EntryScreen() {
                 No title or reflection yet. The LLM step did not finish when this entry was saved.
               </Text>
             )}
-            {error ? <Alert title="Could not finish">{error}</Alert> : null}
+            {error ? <Alert variant="destructive" title="Could not finish">{error}</Alert> : null}
           </FormSection>
           <FormSection title="Transcript" description="Transcribed by Cartesia Ink. Recognition errors stay as they were heard.">
             <Text style={{ lineHeight: 24 }} selectable>

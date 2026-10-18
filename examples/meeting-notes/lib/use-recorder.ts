@@ -24,7 +24,7 @@ function pickMimeType(): string {
 
 function describeError(err: unknown): string {
   const name = err instanceof DOMException ? err.name : "";
-  if (name === "NotAllowedError") return "Microphone access was blocked. Allow it in the browser and try again.";
+  if (name === "NotAllowedError") return "Allow microphone access for this site in the address bar, then try again.";
   if (name === "NotFoundError") return "No microphone was found.";
   if (typeof MediaRecorder === "undefined") return "This browser cannot record audio. Upload a file instead.";
   return "Could not start the microphone.";
@@ -46,6 +46,7 @@ export function useRecorder(onFinish: (r: Recording) => void) {
   const startedAt = useRef(0);
   const size = useRef(0);
   const discard = useRef(false);
+  const mounted = useRef(false);
   const finish = useRef(onFinish);
   useEffect(() => {
     finish.current = onFinish;
@@ -81,6 +82,10 @@ export function useRecorder(onFinish: (r: Recording) => void) {
         throw new Error("unsupported");
       }
       const media = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!mounted.current) {
+        media.getTracks().forEach((t) => t.stop());
+        return;
+      }
       stream.current = media;
       setMedia(media);
       setAudioContext(ctx.current);
@@ -127,15 +132,16 @@ export function useRecorder(onFinish: (r: Recording) => void) {
     }
   }, [cleanup, stop]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       discard.current = true;
       const r = recorder.current;
       if (r && r.state !== "inactive") r.stop();
       cleanup();
-    },
-    [cleanup],
-  );
+    };
+  }, [cleanup]);
 
   return { state, seconds, bytes, error, stream: media, audioContext, start, stop };
 }

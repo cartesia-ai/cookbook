@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { defaultOptions, MAX_TEXT_CHARS, OptionsSchema } from "../../../lib/config";
-import { articleFromText, fetchArticle } from "../../../lib/extract";
-import { badRequest, errorResponse } from "../../../lib/http";
-import { getModel } from "../../../lib/model";
-import { clientIp, createRateLimiter, tooManyRequests } from "../../../lib/rate-limit";
-import { generateScript } from "../../../lib/script";
+import { defaultOptions, MAX_TEXT_CHARS, OptionsSchema } from "@/lib/config";
+import { articleFromText, fetchArticle } from "@/lib/extract";
+import { badRequest, errorResponse } from "@/lib/http";
+import { getModel } from "@/lib/llm";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
+import { generateScript } from "@/lib/script";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;

@@ -24,7 +24,15 @@ export async function listen(
   let stopped = false;
   ws.on("error", (err) => console.error(err.message));
 
-  const mic = await startMic(audioCtx, (chunk) => ws.sendRaw(chunk), isMuted);
+  let mic: Awaited<ReturnType<typeof startMic>>;
+  try {
+    mic = await startMic(audioCtx, (chunk) => ws.sendRaw(chunk), isMuted);
+  } catch (err) {
+    try {
+      ws.close();
+    } catch {}
+    throw err;
+  }
 
   void (async () => {
     let reason = "closed";

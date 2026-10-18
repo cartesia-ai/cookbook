@@ -73,7 +73,15 @@ export async function listen(
   let stopped = false;
   ws.on("error", (err) => console.error(err.message));
 
-  const mic = await startMic(audioCtx, (chunk) => ws.sendRaw(chunk), isMuted);
+  let mic: Awaited<ReturnType<typeof startMic>>;
+  try {
+    mic = await startMic(audioCtx, (chunk) => ws.sendRaw(chunk), isMuted);
+  } catch (err) {
+    try {
+      ws.close();
+    } catch {}
+    throw err;
+  }
 
   void (async () => {
     let reason = "closed";
@@ -98,7 +106,6 @@ export async function listen(
     mic.stop();
     if (!stopped) handlers.onClosed(reason);
   })();
-}
 ```
 
 The socket sets no language. Two people speak two languages into the same microphone, so the app leaves detection to Ink 2. Ink 2 does not report which language it heard, though, and `turn.end` has no language field. The translate route below works that out.
@@ -173,16 +180,16 @@ export function translatePrompt([a, b]: readonly [Lang, Lang]): string {
 The route validates the body with zod and streams plain text back with the AI SDK.
 
 ```ts filename="lib/translate-route.ts"
-    const { text, pair } = parsed.data;
-    const result = streamText({
-      model: resolved,
-      system: translatePrompt(pair),
-      prompt: text,
-      maxOutputTokens: 600,
-      abortSignal: req.signal,
-      onError: ({ error }) => console.error("translate failed", (error as Error)?.message ?? error),
-    });
-    return result.toTextStreamResponse({ headers: { "Cache-Control": "no-store" } });
+const { text, pair } = parsed.data;
+const result = streamText({
+  model: resolved,
+  instructions: translatePrompt(pair),
+  prompt: text,
+  maxOutputTokens: 600,
+  abortSignal: req.signal,
+  onError: ({ error }) => console.error("translate failed", (error as Error)?.message ?? error),
+});
+return result.toTextStreamResponse({ headers: { "Cache-Control": "no-store" } });
 ```
 
 `resolved` comes from `getModel()` in `lib/llm.ts`, which turns `LLM_MODEL` into a provider model or a Vercel AI Gateway id. The route passes no `temperature`, because reasoning models reject it.
@@ -240,36 +247,70 @@ The rest of the LLM stream goes to the speaker with that voice and `language: to
 The speaker opens one Sonic context per turn on the TTS WebSocket. It pushes whole sentences while the LLM is still writing, and schedules each audio chunk on Web Audio as it arrives.
 
 ```ts filename="lib/audio/speaker.ts"
-        const ctx = ws.context({
-          model_id: "sonic-3.6",
-          voice: { mode: "id", id: voice },
-          output_format: { container: "raw", encoding: "pcm_f32le", sample_rate: SAMPLE_RATE },
-          language,
-        });
-        let buffer = "";
-        let pushed = false;
-        for await (const piece of text) {
-          buffer += piece;
-          const { sentences, rest } = takeSentences(buffer);
-          buffer = rest;
-          for (const transcript of sentences) {
-            await ctx.push({ transcript: `${transcript} ` });
-            pushed = true;
+async speak(text, { voice, language, onFirstAudio }) {
+  active++;
+  try {
+    const ctx = ws.context({
+      model_id: "sonic-3.6",
+      voice: { mode: "id", id: voice },
+      output_format: { container: "raw", encoding: "pcm_f32le", sample_rate: SAMPLE_RATE },
+      language,
+      max_buffer_delay_ms: 0,
+    });
+    let first = true;
+
+    const playing = (async () => {
+      for await (const event of ctx.receive()) {
+        if (event.type === "chunk" && event.audio) {
+          const floats = new Float32Array(event.audio.buffer, event.audio.byteOffset, event.audio.byteLength / 4);
+          const buffer = audioCtx.createBuffer(1, floats.length, SAMPLE_RATE);
+          buffer.getChannelData(0).set(floats);
+          const source = audioCtx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioCtx.destination);
+          const at = Math.max(nextStart, audioCtx.currentTime);
+          source.start(at);
+          nextStart = at + buffer.duration;
+          if (first) {
+            first = false;
+            onFirstAudio?.();
           }
+        } else if (event.type === "error") {
+          throw new Error(event.message ?? "Speech failed");
         }
-        if (buffer.trim()) {
-          await ctx.push({ transcript: buffer.trim() });
-          pushed = true;
-        }
-        if (!pushed) {
-          await ctx.cancel();
-          return;
-        }
-        await ctx.no_more_inputs();
-        await playing;
+      }
+    })();
+
+    let buffer = "";
+    let pushed = false;
+    for await (const piece of text) {
+      buffer += piece;
+      const { sentences, rest } = takeSentences(buffer);
+      buffer = rest;
+      for (const transcript of sentences) {
+        await ctx.push({ transcript: `${transcript} ` });
+        pushed = true;
+      }
+    }
+    if (buffer.trim()) {
+      await ctx.push({ transcript: buffer.trim() });
+      pushed = true;
+    }
+    if (!pushed) {
+      await ctx.cancel();
+      return;
+    }
+    await ctx.no_more_inputs();
+    await playing;
+    const left = nextStart - audioCtx.currentTime;
+    if (left > 0) await new Promise((r) => setTimeout(r, left * 1000));
+  } finally {
+    active--;
+  }
+},
 ```
 
-`takeSentences` splits on `.`, `!` and `?` followed by a space, and on `。`, `！`, `？` and `।` on their own, so Japanese and Hindi sentences go to Sonic as soon as they end. `speaker.busy()` stays true while audio plays and for 0.35 s after, for room echo. That is the value the microphone gate reads.
+`takeSentences` splits on `.`, `!` and `?` followed by a space, and on `。`, `！`, `？` and `।` on their own, so Japanese and Hindi sentences go to Sonic as soon as they end. The context sets `max_buffer_delay_ms: 0` because every push is already a whole sentence, so Sonic has no reason to wait for more text before it starts generating. `speak` resolves only after the last scheduled chunk has played. `speaker.busy()` stays true while audio plays and for 0.35 s after, for room echo. That is the value the microphone gate reads.
 
 ## How is latency measured?
 

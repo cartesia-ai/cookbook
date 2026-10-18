@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FetchBlockedError, safeFetch, type RequestFn, type Resolver } from "../lib/safe-fetch";
+import { FetchBlockedError, safeFetch, type RequestFn, type Resolver } from "@/lib/safe-fetch";
 
 const publicResolver: Resolver = async () => [{ address: "93.184.216.34", family: 4 }];
 

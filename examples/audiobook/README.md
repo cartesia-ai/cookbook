@@ -140,10 +140,10 @@ The tests use a fake client, unset `CARTESIA_API_KEY` before they run and never 
 
 ## Learn more
 
+- Recipe: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/10-python/10-ebook-to-audiobook.mdx
 - Cartesia docs: https://docs.cartesia.ai
 - TTS over server-sent events: https://docs.cartesia.ai/api-reference/tts/sse
 - Volume, speed and emotion: https://docs.cartesia.ai/build-with-cartesia/capability-guides/volume-speed-emotion
-- The recipe for this tool: [Turn an ebook into an audiobook](../../content/cookbook/10-python/10-ebook-to-audiobook.mdx)
 - Agent skills: `npx skills add cartesia-ai/skills`
 
 ## License
@@ -152,4 +152,4 @@ MIT, unlike the rest of the cookbook. This folder is a fork of [p0n1/epub_to_aud
 
 The tool depends on EbookLib (AGPL-3.0) and mutagen (GPL-2.0-or-later). They are not bundled here, but anyone who redistributes or hosts the app should check those licenses.
 
-Third-party notices: THIRD_PARTY_NOTICES.md.
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

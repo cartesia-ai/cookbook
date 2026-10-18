@@ -1,7 +1,8 @@
 import { generateText, NoObjectGeneratedError, NoOutputGeneratedError, Output } from "ai";
 import { getModel } from "@/lib/server/llm";
 import { json, llmError, rateLimited } from "@/lib/server/errors";
-import { RECAP_INSTRUCTIONS, recapPrompt } from "@/lib/server/prompts";
+import { recapPrompt } from "@/lib/journal";
+import { RECAP_INSTRUCTIONS } from "@/lib/server/prompts";
 import { RecapRequestSchema, RecapSchema } from "@/lib/schema";
 import { MAX_RECAP_INPUT_CHARS } from "@/lib/limits";
 import { createRateLimiter } from "@/lib/server/rate-limit";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeLineIndex, concatPcm, pcmDuration, toWav, wavHeader } from "../lib/wav";
+import { activeLineIndex, concatPcm, pcmDuration, toWav, wavHeader } from "@/lib/wav";
 
 const ascii = (b: Uint8Array, from: number, to: number) => String.fromCharCode(...b.subarray(from, to));
 

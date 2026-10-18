@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { ApiError, createSession, endSession } from "../lib/client-api";
-import type { LanguageCode } from "../lib/languages";
-import type { Mission } from "../lib/missions";
-import type { Mode } from "../lib/modes";
+import { ApiError, createSession, endSession } from "@/lib/client-api";
+import type { LanguageCode } from "@/lib/languages";
+import type { Mission } from "@/lib/missions";
+import type { Mode } from "@/lib/modes";
 import { MissionPicker } from "./mission-picker";
 import { SessionView, type SessionResult } from "./session-view";
 import { Shell } from "./shell";

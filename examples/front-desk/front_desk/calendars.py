@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
-from typing import Protocol
+from typing import Any, Protocol
 
 import httpx
 
@@ -16,6 +17,39 @@ CALCOM_BOOKINGS_VERSION = "2026-02-25"
 
 class CalendarError(Exception):
     pass
+
+
+_shared_client: httpx.Client | None = None
+_shared_lock = threading.Lock()
+
+
+def calcom_client() -> httpx.Client:
+    global _shared_client
+    with _shared_lock:
+        if _shared_client is None or _shared_client.is_closed:
+            _shared_client = httpx.Client(base_url=CALCOM_BASE_URL, timeout=10)
+        return _shared_client
+
+
+def close_calcom_client() -> None:
+    global _shared_client
+    with _shared_lock:
+        if _shared_client is not None:
+            _shared_client.close()
+            _shared_client = None
+
+
+def _json_data(r: httpx.Response) -> dict[str, Any]:
+    try:
+        body = r.json()
+    except ValueError as e:
+        raise CalendarError("The calendar sent a reply we could not read.") from e
+    if not isinstance(body, dict):
+        raise CalendarError("The calendar sent a reply we could not read.")
+    data = body.get("data") or {}
+    if not isinstance(data, dict):
+        raise CalendarError("The calendar sent a reply we could not read.")
+    return data
 
 
 @dataclass
@@ -89,7 +123,11 @@ class CalComCalendar:
     def __init__(self, settings: Settings, store: Store, client: httpx.Client | None = None):
         self.s = settings
         self.store = store
-        self.client = client or httpx.Client(base_url=CALCOM_BASE_URL, timeout=10)
+        self._client = client
+
+    @property
+    def client(self) -> httpx.Client:
+        return self._client or calcom_client()
 
     def _headers(self, version: str) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.s.calcom_api_key}", "cal-api-version": version}
@@ -110,9 +148,10 @@ class CalComCalendar:
             raise CalendarError("The calendar did not answer.") from e
         if r.status_code != 200:
             raise CalendarError("The calendar did not answer.")
-        data = r.json().get("data") or {}
+        data = _json_data(r)
+        items = data.get(day.isoformat())
         out = []
-        for item in data.get(day.isoformat(), []):
+        for item in items if isinstance(items, list) else []:
             raw = item.get("start") if isinstance(item, dict) else item
             try:
                 out.append(datetime.fromisoformat(str(raw).replace("Z", "+00:00")).astimezone(self.s.tz))
@@ -136,8 +175,11 @@ class CalComCalendar:
             raise CalendarError("The calendar did not answer.") from e
         if r.status_code not in (200, 201):
             return Booking(ok=False, reason="The calendar would not take that booking.")
-        data = r.json().get("data") or {}
-        uid = str(data.get("uid") or data.get("id") or "") if isinstance(data, dict) else ""
+        try:
+            data = _json_data(r)
+        except CalendarError:
+            data = {}
+        uid = str(data.get("uid") or data.get("id") or "")
         end = start + timedelta(minutes=self.s.appointment_minutes)
         self.store.add_appointment(
             call_id=call_id,

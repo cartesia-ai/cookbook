@@ -14,8 +14,8 @@ vi.mock("@/lib/agents-web/server", () => ({
   createAgentTokenHandler: () => async () =>
     state.tokenStatus === 200 ? Response.json({ token: "tok_test" }) : Response.json({ error: "upstream" }, { status: state.tokenStatus }),
 }));
-vi.mock("../lib/agents-api", async (orig) => ({
-  ...(await orig<typeof import("../lib/agents-api")>()),
+vi.mock("@/lib/agents-api", async (orig) => ({
+  ...(await orig<typeof import("@/lib/agents-api")>()),
   createAgentsApi: () => ({
     get: async (path: string) => (path.endsWith("/tools") ? { data: [] } : path === "/v1/agents" ? { summaries: state.agents } : { name: state.agentName }),
     post: async (path: string, body: unknown) => {
@@ -59,7 +59,7 @@ afterEach(() => {
 });
 
 async function sessionRoute() {
-  return (await import("../app/api/session/route")).POST;
+  return (await import("@/app/api/session/route")).POST;
 }
 
 describe("POST /api/session", () => {
@@ -112,7 +112,7 @@ describe("POST /api/session", () => {
 
   it("allows two live sessions per address and frees a slot when one ends", async () => {
     const route = await sessionRoute();
-    const end = (await import("../app/api/session/end/route")).POST;
+    const end = (await import("@/app/api/session/end/route")).POST;
     const first = await (await route(post("/api/session", good, "4.4.4.4"))).json();
     expect((await route(post("/api/session", good, "4.4.4.4"))).status).toBe(200);
     const third = await route(post("/api/session", good, "4.4.4.4"));
@@ -134,7 +134,7 @@ describe("POST /api/session", () => {
 });
 
 describe("POST /api/session/end", () => {
-  const end = async () => (await import("../app/api/session/end/route")).POST;
+  const end = async () => (await import("@/app/api/session/end/route")).POST;
 
   it("deletes a session agent, including from a sendBeacon text/plain body", async () => {
     const res = await (await end())(post("/api/session/end", JSON.stringify({ agentId: "agent_abcdefghij1234" }), "1.1.1.1", true));
@@ -150,7 +150,7 @@ describe("POST /api/session/end", () => {
   });
 
   it("answers 400 for a bad id or a bad body", async () => {
-    expect((await (await end())(post("/api/session/end", { agentId: "../agents" }))).status).toBe(400);
+    expect((await (await end())(post("/api/session/end", { agentId: "@/agents" }))).status).toBe(400);
     expect((await (await end())(post("/api/session/end", "not json", "1.1.1.1", true))).status).toBe(400);
   });
 
@@ -165,7 +165,7 @@ describe("POST /api/session/end", () => {
 
 describe("POST /api/token", () => {
   it("returns a token, 503 without a key, and 429 past the limit", async () => {
-    const route = (await import("../app/api/token/route")).POST;
+    const route = (await import("@/app/api/token/route")).POST;
     expect(await (await route(post("/api/token", {}, "2.2.2.2"))).json()).toEqual({ token: "tok_test" });
     for (let i = 0; i < 9; i++) await route(post("/api/token", {}, "2.2.2.2"));
     const blocked = await route(post("/api/token", {}, "2.2.2.2"));
@@ -176,7 +176,7 @@ describe("POST /api/token", () => {
   });
 
   it("maps an upstream 401 to a fixed 502, not a rate limit", async () => {
-    const route = (await import("../app/api/token/route")).POST;
+    const route = (await import("@/app/api/token/route")).POST;
     state.tokenStatus = 401;
     const res = await route(post("/api/token", {}, "2.2.2.2"));
     expect(res.status).toBe(502);

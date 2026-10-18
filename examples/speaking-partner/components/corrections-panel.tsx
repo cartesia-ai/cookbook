@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/blocks/empty-state";
 import { MessageSquareText } from "lucide-react";
-import type { LanguageCode } from "../lib/languages";
-import type { CorrectionItem } from "../lib/use-corrections";
+import type { LanguageCode } from "@/lib/languages";
+import type { CorrectionItem } from "@/lib/use-corrections";
 
 export const CATEGORY_LABEL: Record<string, string> = {
   grammar: "Grammar",

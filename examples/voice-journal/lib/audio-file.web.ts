@@ -7,3 +7,7 @@ export async function bytesToPlayableUri(bytes: ArrayBuffer, name: string): Prom
   urls.set(name, url);
   return url;
 }
+
+export function deleteRecording(uri: string): void {
+  if (uri.startsWith("blob:")) URL.revokeObjectURL(uri);
+}

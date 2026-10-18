@@ -1,12 +1,12 @@
 ---
 title: Add voice search to your docs with a Managed Agent and client tools
 description: Add a one script tag voice widget to a docs site that answers from your pages with a Cartesia Managed Agent (ink-2 and sonic-3.6), cites the section and scrolls to it, using a web component and a Hono server.
-tags: ['agents', 'client tools', 'web component', 'rag', 'hono']
+tags: ['agents', 'client-tools', 'web-component', 'rag', 'hono']
 ---
 
 # Add voice search to your docs with a Managed Agent and client tools
 
-A voice button on any documentation site, added with one `<script>` tag. A visitor asks a question out loud, and a Cartesia Managed Agent answers from your docs, names the page it used, and scrolls the page to that section. The agent runs `ink-2` for speech recognition, `sonic-3.6` for its voice and `claude-haiku-4.5` as the LLM. The widget is a framework-free web component. The server is Hono on Node with a JSON vector store.
+A voice button on any documentation site, added with one `<script>` tag. A visitor asks a question out loud, and a Cartesia Managed Agent answers from your docs, names the page it used, and scrolls the page to that section. The agent runs `ink-2` for speech recognition, `sonic-3.6` for its voice and `gpt-4.1` as the LLM by default (set `AGENT_MODEL_ID` to pick another model from Cartesia's list). The widget is a framework-free web component. The server is Hono on Node with a JSON vector store.
 
 This recipe covers the Cartesia parts: the client tools, the result size limit and the token route. To run the finished widget and server, follow the [`examples/docs-voice-widget`](../../../examples/docs-voice-widget/README.md) README.
 
@@ -121,9 +121,23 @@ Results can be at most 4096 bytes. Per the Cartesia docs, a longer result is rep
 
 ## Search the docs index on the server
 
-`POST /api/search` takes the query and the visitor's current path. It embeds the query, ranks every section by cosine similarity (or by BM25 keyword score when the index was built without an OpenAI key), and adds a small boost for sections on the page the visitor is reading.
+`POST /api/search` takes the query and the visitor's current path. It embeds the query, ranks every section by cosine similarity (or by BM25 keyword score when the index was built without an OpenAI key), takes the top 50 candidates, adds a small boost to those on the page the visitor is reading, and keeps the top four. The boost is 3% of the best score, so it works on cosine and BM25 scales alike and only breaks near ties.
 
 ```ts filename="server/search.ts"
+export function boostSamePage(
+  ranked: Array<{ chunk: Chunk; score: number }>,
+  page: string | undefined,
+  k: number,
+): Array<{ chunk: Chunk; score: number }> {
+  if (ranked.length === 0) return [];
+  const top = ranked.reduce((m, r) => (r.score > m ? r.score : m), -Infinity);
+  const bump = SAME_PAGE_BOOST * Math.abs(top);
+  return ranked
+    .map((r) => ({ chunk: r.chunk, score: r.score + (samePage(r.chunk.url, page) ? bump : 0) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k);
+}
+
 export async function searchDocs(
   index: DocIndex,
   embed: Embedder,
@@ -132,10 +146,11 @@ export async function searchDocs(
 ): Promise<SearchResponse> {
   const q = query.trim().slice(0, MAX_QUERY_CHARS);
   if (!q || index.chunks.length === 0) return packResults([], page);
-  const boost = (c: Chunk) => (samePage(c.url, page) ? SAME_PAGE_BOOST : 0);
-  if (index.model === KEYWORD_MODEL) return packResults(keywordSearch(index.chunks, q, TOP_K, boost), page);
+  if (index.model === KEYWORD_MODEL) {
+    return packResults(boostSamePage(keywordSearch(index.chunks, q, CANDIDATES), page, TOP_K), page);
+  }
   const [vector] = await embed([q]);
-  return packResults(index.search(vector!, TOP_K, boost), page);
+  return packResults(boostSamePage(index.search(vector!, CANDIDATES), page, TOP_K), page);
 }
 ```
 

@@ -16,7 +16,7 @@ describe("page", () => {
     delete process.env.CARTESIA_AGENT_ID;
     const { default: Page } = await import("../app/page");
     render(<Page />);
-    expect(screen.getByText(/create the agent first/i)).toBeTruthy();
+    expect(screen.getByText("Finish setup")).toBeTruthy();
     expect(screen.getByText("npm run setup:agent")).toBeTruthy();
   });
 

@@ -50,7 +50,7 @@ export async function correctLine(model: LanguageModel, req: CorrectRequest, sig
     .join("\n\n");
   const { output } = await generateText({
     model,
-    system: systemPrompt(req.target, req.native),
+    instructions: systemPrompt(req.target, req.native),
     prompt: context,
     output: Output.object({ schema: CorrectionSchema }),
     maxOutputTokens: 2000,

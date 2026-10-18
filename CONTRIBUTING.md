@@ -16,9 +16,10 @@ pnpm check
 | Script | What it checks |
 | --- | --- |
 | `check:facts` | Sonic model ids and `Cartesia-Version` dates in every text file against `facts.json` |
-| `check:content` | The recipe tree: `NN-name` files, frontmatter, relative links, closed fences, no em dashes |
-| `check:catalog` | `templates.json`, `llms.txt` and the root README against `examples/`, each `.env.example`, the recipes and `facts.json` |
-| `check:copies` | Kit and agents-web files copied into templates match the package files, and `proxy.ts` and `rate-limit.ts` match article-to-podcast's |
+| `check:content` | The recipe tree: `NN-name` files, frontmatter, relative links, closed fences, no em dashes, no retired model ids |
+| `check:snippets` | Recipe code blocks with `filename="..."` are slices of that file in the recipe's template |
+| `check:catalog` | `templates.json`, `llms.txt` and the root README against `examples/`, each `.env.example`, each manifest license, the recipes and `facts.json`; no `](../` links in template READMEs |
+| `check:copies` | Kit and agents-web copies match the package files; the pinned groups (`proxy.ts`, `tests/proxy.test.ts`, `rate-limit.ts`, `llm.ts`, `THIRD_PARTY_NOTICES.md`) match their source |
 | `typecheck` | `pnpm -r typecheck` |
 | `test` | `pnpm -r test`, every workspace package that has tests |
 
@@ -33,6 +34,7 @@ packages/kit/                                   shared UI kit and design rules
 packages/agents-web/                            browser client for Managed Agents
 tools/check-facts/                              model ids against facts.json
 tools/check-content/                            the recipe tree
+tools/check-snippets/                           recipe code blocks against their template's files
 tools/check-catalog/                            templates.json, llms.txt and README against the repo
 tools/check-copies/                             template copies against packages/kit and packages/agents-web
 facts.json                                      current model ids and API version
@@ -47,7 +49,7 @@ Each template installs and builds on its own. Nothing imports from `packages/` a
 - [`packages/kit`](packages/kit) is the design kit: [shadcn/ui](https://ui.shadcn.com) components recolored through the CSS variables in `theme.css` (Verdant green primary, light and dark, Inter), plus layout and form blocks. [`DESIGN.md`](packages/kit/DESIGN.md) sets the rules every screen follows. Next.js templates copy the components into `components/ui` and `components/blocks`. The others carry the same tokens in their own form: hand-written CSS in docs-voice-widget and front-desk, a Gradio theme in audiobook, and React Native components in voice-journal.
 - [`packages/agents-web`](packages/agents-web) is a small browser client for the Managed Agents WebSocket. It mints nothing itself: you pass a `getToken` function. It captures the microphone with an AudioWorklet, plays agent audio through a jitter buffer, drops it on barge-in, and answers client tool calls. voice-chat and speaking-partner copy it to `lib/agents-web`, docs-voice-widget to `widget/src/agents-web`, and front-desk ships it as a bundled `examples/front-desk/front_desk/static/vendor/agents-web.js`.
 
-The package is the source of truth. Fix a bug there first, then copy the file over the template's copy. `pnpm check:copies` fails when a copy under `components/ui`, `components/blocks`, `lib/agents-web` or `widget/src/agents-web` differs from the package file of the same name (voice-journal is a React Native fork and is skipped). If a template needs different behavior, put it in a new file with a different name. Delete copied files the template does not import. The same check keeps the Next templates' `proxy.ts` (the `APP_PASSWORD` gate) and `lib/rate-limit.ts`, plus voice-journal's `lib/server/rate-limit.ts`, identical to the files in article-to-podcast.
+The package is the source of truth. Fix a bug there first, then copy the file over the template's copy. `pnpm check:copies` fails when a copy under `components/ui`, `components/blocks`, `lib/agents-web` or `widget/src/agents-web` differs from the package file of the same name (voice-journal is a React Native fork and is skipped). If a template needs different behavior, put it in a new file with a different name. Delete copied files the template does not import. The same check keeps a few files identical across templates. In all six Next templates, `proxy.ts` (the `APP_PASSWORD` gate), its test `tests/proxy.test.ts` and `lib/rate-limit.ts` (plus voice-journal's `lib/server/rate-limit.ts`) must match article-to-podcast's. `lib/llm.ts` in pocket-interpreter, story-time and article-to-podcast, and voice-journal's `lib/server/llm.ts`, must match meeting-notes'. Every `THIRD_PARTY_NOTICES.md` must match the root one.
 
 ## Current models and API version
 
@@ -113,16 +115,16 @@ Add every recipe to `llms.txt` as `[<frontmatter title>](<raw link>): <descripti
 Templates live in `examples/<name>` and are pnpm workspace packages (or uv projects for Python). Each one needs:
 
 - its own `package.json` or `pyproject.toml`, with a description, keywords, repository and license
-- a `README.md` with a one-command clone, the exact commands to run it, an env var table and a screenshot in `docs/`
+- a `README.md` with a one-command clone, the exact commands to run it, an env var table and, for templates with a UI, a screenshot in `docs/`. Link repo files outside the template with `https://github.com/cartesia-ai/cookbook/blob/main/...`, not `../`, because readers clone the folder on its own
 - a `.env.example` with empty values (real `.env` files are git-ignored)
 - an `AGENTS.md` with the rules a coding agent needs to work in it
 - a `CLAUDE.md` that contains only `@AGENTS.md`, because Claude Code reads `CLAUDE.md` and not `AGENTS.md`
 
 Then list it in the catalog files, so people and agents can find it:
 
-1. `templates.json`: slug, description, search phrases, stack, models, features, env keys (the same keys as `.env.example`), clone command and deploy link.
+1. `templates.json`: slug, description, search phrases, stack, models, features, env keys (the same keys as `.env.example`), recipe, license (the same as the manifest), clone command and deploy link.
 2. The root `README.md`: a row in the template table, with a short Setup cell.
-3. `llms.txt`: one line with the raw README and AGENTS links.
+3. `llms.txt`: one line, `[<title>](<raw README link>): <description> Features: ...`, with the title and description exactly as in `templates.json`, plus the raw AGENTS link.
 
 `pnpm check:catalog` fails when one of these is missing or out of date.
 

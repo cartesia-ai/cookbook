@@ -7,6 +7,7 @@ export interface PlaybackOptions {
   onStart?: () => void;
   onIdle?: () => void;
   onOverflow?: (droppedMs: number) => void;
+  clock?: () => number;
 }
 
 interface Live {
@@ -15,13 +16,18 @@ interface Live {
   start: number;
 }
 
+const STALL_MS = 1000;
+
 export class PlaybackQueue {
   private live: Live[] = [];
   private nextStartTime = 0;
   private generation = 0;
   private disposed = false;
+  private anchorWall = 0;
+  private anchorCtx = 0;
   private readonly prerollMs: number;
   private readonly maxQueueMs: number;
+  private readonly clock: () => number;
 
   constructor(
     private readonly ctx: AudioContext,
@@ -29,6 +35,7 @@ export class PlaybackQueue {
   ) {
     this.prerollMs = opts.prerollMs ?? 80;
     this.maxQueueMs = opts.maxQueueMs ?? 30000;
+    this.clock = opts.clock ?? (() => performance.now());
   }
 
   get bufferedMs(): number {
@@ -46,10 +53,11 @@ export class PlaybackQueue {
     if (this.disposed || pcm.length === 0) return;
     const ctx = this.ctx;
     const wasEmpty = this.live.length === 0;
+    if (wasEmpty) this.setAnchor();
     this.trimOverflow((pcm.length / this.opts.sampleRate) * 1000);
     const now = ctx.currentTime;
     const earliest = now + this.prerollMs / 1000;
-    if (wasEmpty || this.nextStartTime < now) {
+    if (this.live.length === 0 || this.nextStartTime < now) {
       this.nextStartTime = earliest;
     }
 
@@ -72,11 +80,22 @@ export class PlaybackQueue {
     this.nextStartTime = end;
     this.live.push(entry);
     if (wasEmpty) this.opts.onStart?.();
+  }
 
+  private setAnchor(): void {
+    this.anchorWall = this.clock();
+    this.anchorCtx = this.ctx.currentTime;
+  }
+
+  private get stalledMs(): number {
+    const wall = this.clock() - this.anchorWall;
+    const played = (this.ctx.currentTime - this.anchorCtx) * 1000;
+    return wall - played;
   }
 
   private trimOverflow(incomingMs: number): void {
     if (this.bufferedMs + incomingMs <= this.maxQueueMs) return;
+    if (this.stalledMs < STALL_MS) return;
     const now = this.ctx.currentTime;
     let dropped = 0;
     const keep: Live[] = [];
@@ -88,14 +107,13 @@ export class PlaybackQueue {
       l.source.onended = null;
       try {
         l.source.stop();
-      } catch {
-        // already stopped
-      }
+      } catch {}
       l.source.disconnect();
       dropped += (l.end - l.start) * 1000;
     }
     this.live = keep;
     this.nextStartTime = keep.length ? keep[keep.length - 1]!.end : 0;
+    this.setAnchor();
     if (dropped > 0) this.opts.onOverflow?.(dropped);
   }
 
@@ -106,9 +124,7 @@ export class PlaybackQueue {
       source.onended = null;
       try {
         source.stop();
-      } catch {
-        // not started or already stopped
-      }
+      } catch {}
       source.disconnect();
     }
     this.live = [];

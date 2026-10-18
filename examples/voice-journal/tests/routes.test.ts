@@ -122,3 +122,15 @@ describe("limits", () => {
     expect(generateText).not.toHaveBeenCalled();
   });
 });
+
+describe("missing configuration", () => {
+  it("answers 503 when the Cartesia key or the LLM is not set", async () => {
+    const { cartesiaError, llmError } = await import("@/lib/server/errors");
+    const { MissingKeyError } = await import("@/lib/server/cartesia");
+    const { LlmConfigError } = await import("@/lib/server/llm");
+    const key = cartesiaError(new MissingKeyError(), "Transcription");
+    expect(key.status).toBe(503);
+    expect(await key.json()).toEqual({ error: "CARTESIA_API_KEY is not set. Add it to .env.local and restart." });
+    expect(llmError(new LlmConfigError("LLM_MODEL is not set."), false).status).toBe(503);
+  });
+});

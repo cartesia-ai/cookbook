@@ -107,9 +107,11 @@ class EpubBookParser(BaseBookParser):
         if self.config.search_and_replace_file:
             with open(self.config.search_and_replace_file) as fp:
                 search_and_replace_content = fp.readlines()
-                for search_and_replace in search_and_replace_content:
-                    if '==' in search_and_replace and not search_and_replace.startswith('==') and not search_and_replace.endswith('==') and not search_and_replace.startswith('#'):
-                        search_and_replaces = search_and_replaces + [ {'search': r"{}".format(search_and_replace.split('==')[0]), 'replace': r"{}".format(search_and_replace.split('==')[1][:-1])} ]
+                for raw_line in search_and_replace_content:
+                    line = raw_line.rstrip("\n")
+                    if '==' in line and not line.startswith('==') and not line.endswith('==') and not line.startswith('#'):
+                        search, _, replace = line.partition('==')
+                        search_and_replaces.append({'search': search, 'replace': replace})
         return search_and_replaces
 
     @staticmethod

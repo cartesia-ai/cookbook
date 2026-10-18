@@ -33,6 +33,17 @@ def test_pages_render_with_no_data(client):
     assert "No calls yet" in client.get("/").text
 
 
+def test_unknown_call_renders_a_not_found_page(client):
+    r = client.get("/calls/ac_missing")
+    assert r.status_code == 404
+    assert r.headers["content-type"].startswith("text/html")
+    assert "Call not found" in r.text and 'href="/"' in r.text and "All calls" in r.text
+
+
+def test_inbox_names_the_configured_database(client, tmp_path):
+    assert str(tmp_path / "test.db") in client.get("/inbox").text
+
+
 def test_webhook_rejects_bad_secret_other_agent_and_missing_config(client, monkeypatch):
     ev = fixture("call_completed.json")
     assert post_event(client, ev, secret="nope").status_code == 401
@@ -166,3 +177,43 @@ def test_webhook_retry_after_a_failed_apply_is_not_dropped(client, monkeypatch):
     monkeypatch.setattr(webhooks, "_apply", real)
     assert post_event(client, ev).json()["result"] == "stored call"
     assert post_event(client, ev).json()["result"] == "duplicate"
+
+
+def test_tool_routes_run_tools_off_the_event_loop(client, monkeypatch):
+    import asyncio
+
+    from front_desk.tools import Tools
+
+    loops = []
+
+    def fake_run(self, name, params):
+        try:
+            loops.append(asyncio.get_running_loop())
+        except RuntimeError:
+            loops.append(None)
+        return "{}"
+
+    monkeypatch.setattr(Tools, "run", fake_run)
+    monkeypatch.setenv("TOOL_SECRET", "tool-secret")
+    client.post("/api/client-tools/take_message", json={"call_id": "ac_web", "parameters": {}})
+    client.post("/tools/take_message", json={}, headers={"x-tool-secret": "tool-secret"})
+    assert loops == [None, None]
+
+
+def test_late_call_started_does_not_undo_completed(client):
+    done = fixture("call_completed.json")
+    post_event(client, done)
+    started = {
+        "type": "call_started",
+        "call_id": done["call_id"],
+        "agent_id": "agent_simulated",
+        "webhook_request_id": "webhook_req_late_start",
+    }
+    assert post_event(client, started).json()["result"] == "stored call"
+    assert main.store().get_call(done["call_id"]).status == "completed"
+
+
+def test_cartesia_client_closes_its_http_client():
+    with Cartesia("sk_test") as api:
+        pass
+    assert api.http.is_closed

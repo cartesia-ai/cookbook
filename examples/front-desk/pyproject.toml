@@ -6,6 +6,12 @@ readme = "README.md"
 license = "Apache-2.0"
 keywords = ["cartesia", "voice-agent", "managed-agents", "receptionist", "telephony", "appointment-booking", "fastapi", "text-to-speech", "speech-to-text"]
 requires-python = ">=3.12"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: Communications :: Telephony",
+  "Topic :: Multimedia :: Sound/Audio :: Speech",
+  "Framework :: FastAPI",
+]
 dependencies = [
   "fastapi>=0.115,<1",
   "uvicorn[standard]>=0.32",
@@ -13,6 +19,11 @@ dependencies = [
   "httpx>=0.28",
   "python-dotenv>=1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/cartesia-ai/cookbook/tree/main/examples/front-desk"
+Repository = "https://github.com/cartesia-ai/cookbook"
+Documentation = "https://docs.cartesia.ai"
 
 [dependency-groups]
 dev = [
@@ -34,7 +45,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]
-ignore = ["S101", "E501"]  # the formatter wraps code; long prompt strings stay readable
+ignore = ["S101", "E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S105", "S106"]

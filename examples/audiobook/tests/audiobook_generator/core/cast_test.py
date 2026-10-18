@@ -118,6 +118,11 @@ class TestAttribution(unittest.TestCase):
         self.assertEqual(c.assign(cast.UNKNOWN_SPEAKER), cast.VOICE_POOL[cast.OTHER_VOICE])
         self.assertNotEqual(c.assign("Alice"), cast.VOICE_POOL[cast.OTHER_VOICE])
 
+    def test_punctuation_only_narration_is_skipped(self):
+        out = speakers("“Hi,” said Alice. “Run!” ... “Now!”")
+        self.assertTrue(all(any(ch.isalnum() for ch in o[1]) for o in out))
+        self.assertNotIn("...", [o[1] for o in out])
+
     def test_text_with_no_quotes_is_all_narrator(self):
         out = speakers("It was a quiet evening. Nothing happened.")
         self.assertTrue(all(o[0] == NARRATOR for o in out))

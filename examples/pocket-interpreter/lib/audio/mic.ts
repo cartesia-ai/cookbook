@@ -22,8 +22,15 @@ export async function startMic(
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
   });
-  const source = audioCtx.createMediaStreamSource(stream);
-  const node = new AudioWorkletNode(audioCtx, "pcm-capture");
+  let source: MediaStreamAudioSourceNode;
+  let node: AudioWorkletNode;
+  try {
+    source = audioCtx.createMediaStreamSource(stream);
+    node = new AudioWorkletNode(audioCtx, "pcm-capture");
+  } catch (err) {
+    stream.getTracks().forEach((t) => t.stop());
+    throw err;
+  }
 
   const chunkSamples = Math.round((audioCtx.sampleRate * CHUNK_MS) / 1000);
   let pending = new Float32Array(0);

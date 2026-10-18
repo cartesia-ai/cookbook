@@ -84,12 +84,12 @@ The exact payload shapes are in the [Managed Agents WebSocket guide](https://doc
 
 ## Step 4: skip the plumbing with the browser client
 
-Microphone capture, conversion to PCM, the playback queue and barge-in handling all sit on top of these events. The `packages/agents-web` package in this repo does that work and wraps it in a React hook. It takes the token route from step 1.
+Microphone capture, conversion to PCM, the playback queue and barge-in handling all sit on top of these events. The `packages/agents-web` package in this repo does that work and wraps it in a React hook. It is not published to npm. Copy `packages/agents-web/src` into your app as `lib/agents-web`, the way the voice-chat and speaking-partner templates do, and import it from there. It takes the token route from step 1.
 
 ```tsx filename="app/talk.tsx"
 'use client';
 
-import { useCartesiaAgent } from '@cartesia-cookbook/agents-web/react';
+import { useCartesiaAgent } from '@/lib/agents-web/react';
 
 export function Talk({ agentId }: { agentId: string }) {
   const { status, messages, start, stop } = useCartesiaAgent({

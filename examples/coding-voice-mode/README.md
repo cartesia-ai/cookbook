@@ -199,11 +199,14 @@ The tests use mocks and local fake servers. They need no key and no audio device
 
 ## Learn more
 
+- Recipe: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/10-python/05-voice-mode-for-coding-agents.mdx
 - Turn detection with Ink 2: https://docs.cartesia.ai/use-the-api/stt/turns
 - TTS over server-sent events: https://docs.cartesia.ai/api-reference/tts/sse
 - Current model ids: https://docs.cartesia.ai/build-with-cartesia/tts-models/latest and https://docs.cartesia.ai/build-with-cartesia/stt/latest
-- The recipe for this server: [Voice mode for coding agents](../../content/cookbook/10-python/05-voice-mode-for-coding-agents.mdx)
-- MCP setup per client: [Claude Code](https://code.claude.com/docs/en/mcp), [Cursor](https://cursor.com/docs/context/mcp), [Codex](https://developers.openai.com/codex/mcp)
+- MCP setup in Claude Code: https://code.claude.com/docs/en/mcp
+- MCP setup in Cursor: https://cursor.com/docs/context/mcp
+- MCP setup in Codex: https://developers.openai.com/codex/mcp
+- Agent skills: `npx skills add cartesia-ai/skills`
 
 ## License
 

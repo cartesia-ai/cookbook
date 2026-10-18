@@ -8,7 +8,7 @@ tags: ['next', 'tts', 'timestamps', 'stt']
 
 This recipe reads a scene aloud in the browser with Cartesia Sonic 3.6 (`sonic-3.6`). The narrator and each character get their own voice and their own emotion, the word being spoken lights up on screen, and the listener can say what happens next. Cartesia Ink 2 (`ink-2`) turns that answer into text, and a small matcher picks one of the two choices.
 
-Where the scene text comes from is up to you. A fixed script works, and so do lines an LLM writes as JSON. This page covers the voice and timing parts.
+The full app is the [story-time template](../../../examples/story-time). Where the scene text comes from is up to you. A fixed script works, and so do lines an LLM writes as JSON. This page covers the voice and timing parts.
 
 ## Prerequisites
 
@@ -23,18 +23,16 @@ The page opens WebSockets straight to Cartesia, one for Sonic per scene and one 
 
 ```ts filename="app/api/token/route.ts"
 import { getCartesia, MissingKeyError } from "@/lib/cartesia";
-import { createRateLimiter } from "@/lib/rate-limit";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const headers = { "Cache-Control": "no-store" };
-const allow = createRateLimiter(20, 60_000);
+const allow = createRateLimiter(10, 60_000);
 
 export async function POST(req: Request) {
-  if (!allow(req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local")) {
-    return Response.json({ error: "Too many requests. Try again in a minute." }, { status: 429, headers });
-  }
+  if (!allow(clientIp(req))) return tooManyRequests(headers);
   try {
     const { token } = await getCartesia().accessToken.create({ grants: { tts: true, stt: true }, expires_in: 60 });
     return Response.json({ token }, { headers });
@@ -46,6 +44,22 @@ export async function POST(req: Request) {
   }
 }
 ```
+
+The route allows 10 tokens a minute per client IP. `clientIp` in `lib/rate-limit.ts` only trusts `x-forwarded-for` where a proxy sets it, because a caller can put anything in that header:
+
+```ts filename="lib/rate-limit.ts"
+export function clientIp(request: Request): string {
+  const forwarded = (request.headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (process.env.VERCEL) return forwarded[0] ?? "global";
+  if (process.env.TRUST_PROXY === "1") return forwarded[forwarded.length - 1] ?? "global";
+  return "global";
+}
+```
+
+On Vercel the platform sets the first entry. Behind your own proxy, set `TRUST_PROXY=1` and the limiter uses the entry that proxy appended. Anywhere else every caller shares one bucket.
 
 `getCartesia()` in `lib/cartesia.ts` reads `CARTESIA_API_KEY` when the request comes in, so `next build` works with no environment set. On the client, a fresh token becomes a client with `new Cartesia({ token })`.
 
@@ -134,6 +148,10 @@ for (const [i, line] of lines.entries()) {
       throw new Error(ev.message ?? ev.title ?? "Sonic returned an error");
     }
   }
+  if (!started) timeline.lineStarts[i] = out.next;
+  const gap = new Float32Array(Math.round(GAP_SECONDS * SAMPLE_RATE));
+  pcm.push(gap);
+  length += gap.length;
   out.skip(GAP_SECONDS);
 }
 ```
@@ -143,7 +161,8 @@ A few choices in this loop matter:
 - Lines run one after another, not all at once. Sonic generates faster than the audio plays, so line two is ready before line one finishes. Opening a context for every line at the same time can hit concurrency limits.
 - A new context per line is also how the emotion changes. The Cartesia docs advise a separate context when the emotion changes. `generation_config.emotion` is in beta, works in English only, and works best when it matches the words, so write lines whose words carry the emotion.
 - `pcm_f32le` at 24 kHz is already Float32, so each chunk goes into an `AudioBuffer` without conversion. `out.play` schedules it right where the last chunk ends on the `AudioContext` clock, and `out.skip` leaves a 0.35 second pause between lines.
-- `timeline.lineStarts[i]` records the clock time of the line's first chunk. Sonic's word times count from the start of the line's audio, so that start time is all the page needs to line them up.
+- `timeline.lineStarts[i]` records the clock time of the line's first chunk. Sonic's word times count from the start of the line's audio, so that start time is all the page needs to line them up. A line that returns no audio still gets a start time, so the lines after it stay in order.
+- The pause also goes into `pcm` as silence. The saved audio then has the same gaps as the live playback, and each line's `offset` stays correct on replay.
 
 ## What do Sonic's word timestamps look like?
 
@@ -230,7 +249,7 @@ When the listener presses Answer out loud, the page streams the microphone to In
 
 ```ts filename="lib/listen.ts"
 export async function listenForChoice(client: Cartesia, ctx: AudioContext, handlers: ListenHandlers) {
-  const ws = client.stt.autoFinalize.websocket({ model: "ink-2", encoding: "pcm_f32le", sample_rate: ctx.sampleRate, language: "en" });
+  const ws = client.stt.autoFinalize.websocket({ model: "ink-2", encoding: "pcm_f32le", sample_rate: ctx.sampleRate });
   ws.on("error", (err) => console.error(err.message));
   let stopMic: (() => void) | null = null;
   let closed = false;
@@ -242,7 +261,19 @@ export async function listenForChoice(client: Cartesia, ctx: AudioContext, handl
       ws.send({ type: "close" });
     } catch {}
   };
-  stopMic = await startMic(ctx, (chunk) => !closed && ws.sendRaw(chunk));
+  try {
+    stopMic = await startMic(ctx, (chunk) => !closed && ws.sendRaw(chunk));
+  } catch (err) {
+    closed = true;
+    try {
+      ws.close();
+    } catch {}
+    throw err;
+  }
+  if (closed) {
+    stopMic();
+    return { stop };
+  }
 
   void (async () => {
     for await (const event of ws.stream()) {
@@ -257,10 +288,9 @@ export async function listenForChoice(client: Cartesia, ctx: AudioContext, handl
   })().catch((err) => console.error(err));
 
   return { stop };
-}
 ```
 
-`startMic` in the same file runs an `AudioWorklet` that posts raw Float32 samples and cuts them into 100 ms chunks at the context's own sample rate, which is the `sample_rate` sent to Ink 2. The audio streams to Cartesia for transcription; the app keeps none of it.
+`startMic` in the same file runs an `AudioWorklet` that posts raw Float32 samples and cuts them into 100 ms chunks at the context's own sample rate, which is the `sample_rate` sent to Ink 2. The socket sets no language: Ink 2 detects English, Spanish, French, Hindi and Japanese on its own. The audio streams to Cartesia for transcription; the app keeps none of it. If the microphone fails to start, the function closes the socket before it throws, and a `stop()` that comes in while the microphone is starting still releases it.
 
 The player tries to match on `turn.eager_end`, before the end-of-turn silence has passed, so a clear answer moves the story on sooner. Only an unclear `turn.end` tells the listener to try again.
 
@@ -283,8 +313,8 @@ The player tries to match on `turn.eager_end`, before the end-of-turn silence ha
 
 ## Limits
 
-- The routes have no auth. Anyone with the URL can spend your credits, and the token route's in-memory rate limit only slows casual abuse. Put the app behind your own login before you deploy.
-- Emotion control is English only. For another language, change `language` in the Sonic context and the Ink 2 socket, and drop `generation_config.emotion`.
+- The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and API route when it is set, and on Vercel the app returns 503 until you set it, or set it to `none` to make the app public. The in-memory rate limits on `/api/token` and `/api/scene` (10 a minute per client IP) are per process and only slow casual abuse. The password is the real guard.
+- Emotion control is English only. For another language, change `language` in the Sonic context and drop `generation_config.emotion`. The Ink 2 socket needs no change.
 - The Sonic loop was run from Node with a token client. The microphone path and the read-along UI were not tested against the live API.
 
 ## Next steps

@@ -12,8 +12,8 @@ export function SetupAlert() {
   }, []);
   if (!missing || missing.length === 0) return null;
   return (
-    <View style={{ marginBottom: 24 }}>
-      <Alert title="Setup needed">{`Set ${missing.join(" and ")} in .env.local, then restart pnpm dev.`}</Alert>
+    <View style={{ marginBottom: 32 }}>
+      <Alert title="Finish setup">{`Set ${missing.join(" and ")} in .env.local, then restart the dev server.`}</Alert>
     </View>
   );
 }

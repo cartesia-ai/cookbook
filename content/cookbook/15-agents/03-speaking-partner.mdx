@@ -1,7 +1,7 @@
 ---
 title: Build an AI language speaking partner with a Managed Agent
 description: Practice speaking a language with a Cartesia Managed Agent and get written corrections after every line, using Next.js.
-tags: ['agents', 'next', 'voice', 'language learning', 'managed agents']
+tags: ['agents', 'next', 'voice', 'language-learning', 'managed-agents']
 ---
 
 # Build an AI language speaking partner with a Managed Agent
@@ -115,7 +115,7 @@ export function completeMissionToolBody() {
 
 The hook runs the handler for you. The service sends audio faster than real time, so when the tool call arrives the goodbye is usually still queued in the browser. A fixed delay would cut it off, so the page waits until playback drains (at most 20 seconds), plays a chime, closes the call and shows the summary.
 
-```ts filename="components/session-view.tsx"
+```tsx filename="components/session-view.tsx"
   const agent = useCartesiaAgent({
     agentId,
     getToken: fetchToken,

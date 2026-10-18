@@ -141,8 +141,8 @@ export function renderDemoPage(pages: DemoPage[], page: DemoPage): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:,">
-<title>${escapeHtml(page.title)} | Cartesia docs demo</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<title>${escapeHtml(page.title)} · Cartesia docs demo</title>
 <meta name="description" content="A demo docs site with a talk-to-the-docs voice widget built on Cartesia Managed Agents.">
 <script>${THEME_SCRIPT}</script>
 <style>${CSS}</style>
@@ -162,8 +162,11 @@ ${page.html}
 </html>`;
 }
 
+const ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#309d4b"/></svg>';
+
 export function mountDemo(app: Hono, contentDir: string): void {
   const pages = loadDemoPages(contentDir);
+  app.get('/icon.svg', (c) => c.body(ICON_SVG, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }));
   app.get('/', (c) => c.redirect(`/docs/${pages[0]?.slug ?? ''}`));
   app.get('/docs/:slug', (c) => {
     const page = pages.find((p) => p.slug === c.req.param('slug'));

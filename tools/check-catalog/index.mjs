@@ -50,6 +50,31 @@ export function manifestErrors(root, slug) {
   return errors;
 }
 
+export function manifestLicense(root, slug) {
+  const dir = join(root, 'examples', slug);
+  const pkg = join(dir, 'package.json');
+  const py = join(dir, 'pyproject.toml');
+  if (existsSync(pkg)) return JSON.parse(readFileSync(pkg, 'utf8')).license;
+  if (existsSync(py)) {
+    const m = readFileSync(py, 'utf8').match(/^license\s*=\s*(?:\{\s*text\s*=\s*)?"([^"]+)"/m);
+    return m?.[1];
+  }
+  return undefined;
+}
+
+export function relativeLinkErrors(root, slug) {
+  const file = join(root, 'examples', slug, 'README.md');
+  if (!existsSync(file)) return [];
+  const errors = [];
+  readFileSync(file, 'utf8')
+    .split('\n')
+    .forEach((line, i) => {
+      if (line.includes('](../'))
+        errors.push(`examples/${slug}/README.md:${i + 1}: link points outside the template (breaks after degit), use a github.com URL`);
+    });
+  return errors;
+}
+
 export function recipes(root) {
   const base = join(root, 'content/cookbook');
   const out = [];
@@ -82,6 +107,7 @@ export function checkCatalog(root) {
   for (const d of dirs) {
     if (!slugs.includes(d)) errors.push(`examples/${d} is missing from templates.json`);
     errors.push(...manifestErrors(root, d));
+    errors.push(...relativeLinkErrors(root, d));
   }
 
   for (const t of catalog.templates) {
@@ -96,6 +122,9 @@ export function checkCatalog(root) {
     for (const m of t.models) if (!allowedModels.has(m)) errors.push(`${at}: model ${m} is not in facts.json`);
     if (!Array.isArray(t.features)) errors.push(`${at}: features must be an array`);
     else for (const f of t.features) if (!FEATURES.has(f)) errors.push(`${at}: unknown feature ${f}`);
+    const license = manifestLicense(root, t.slug);
+    if (license !== undefined && t.license !== license)
+      errors.push(`${at}: license ${t.license} does not match the manifest license ${license}`);
     if (t.description.length > 160) errors.push(`${at}: description is over 160 characters`);
 
     const envFile = join(root, t.path, '.env.example');
@@ -111,9 +140,13 @@ export function checkCatalog(root) {
 
     if (t.deploy.vercel && !t.deploy.vercel.includes(encodeURIComponent(`examples/${t.slug}`)))
       errors.push(`${at}: deploy.vercel does not point at examples/${t.slug}`);
+    if (t.deploy.vercel && existsSync(join(root, t.readme)) && !read(t.readme).includes(`(${t.deploy.vercel})`))
+      errors.push(`${t.readme}: deploy button does not match deploy.vercel in templates.json`);
 
     if (!readme.includes(`](examples/${t.slug})`)) errors.push(`README.md does not link examples/${t.slug}`);
     if (!llms.includes(`${RAW_BASE}${t.readme}`)) errors.push(`llms.txt does not link ${t.readme}`);
+    else if (!llms.includes(`[${t.title}](${RAW_BASE}${t.readme}): ${t.description} Features:`))
+      errors.push(`llms.txt entry for ${t.slug} should read [${t.title}](${RAW_BASE}${t.readme}): ${t.description}`);
     if (!llms.includes(`${RAW_BASE}${t.agents}`)) errors.push(`llms.txt does not link ${t.agents}`);
   }
 

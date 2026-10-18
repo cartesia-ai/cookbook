@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
+from types import TracebackType
+from typing import Any, Self
 
 import httpx
 
@@ -25,6 +26,17 @@ class Cartesia:
             timeout=20,
             transport=transport,
         )
+
+    def close(self) -> None:
+        self.http.close()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
+    ) -> None:
+        self.close()
 
     def request(self, method: str, path: str, json: Any = None, params: dict[str, Any] | None = None) -> Any:
         try:

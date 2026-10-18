@@ -1,4 +1,4 @@
-# Agent notes
+# Agent notes for docs-voice-widget
 
 Docs voice widget: a framework-free web component (`widget/src`, bundled by esbuild into one `widget.js`) plus a Hono server on Node (`server/`). The agent is a Cartesia Managed Agent with two client tools. Search is a JSON index: OpenAI embeddings when `OPENAI_API_KEY` is set at ingest, BM25 keyword scoring (`server/keyword.ts`) otherwise. The index's `model` field decides which one search uses.
 

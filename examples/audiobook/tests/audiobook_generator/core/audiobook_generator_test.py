@@ -1,6 +1,11 @@
 import json
 import os
+import signal
+import subprocess
+import sys
 import tempfile
+import textwrap
+import time
 import unittest
 from unittest.mock import patch
 
@@ -42,6 +47,102 @@ class InProcessPool:
 
     def imap_unordered(self, fn, tasks):
         return (fn(t) for t in tasks)
+
+class SigtermPool(InProcessPool):
+    terminated = False
+    exit_exc = None
+
+    def __exit__(self, exc_type, exc, tb):
+        SigtermPool.exit_exc = exc_type
+        self.terminate()
+        return False
+
+    def terminate(self):
+        SigtermPool.terminated = True
+
+    def imap_unordered(self, fn, tasks):
+        os.kill(os.getpid(), signal.SIGTERM)
+        time.sleep(1)
+        return iter(())
+
+WORKER_SCRIPT = textwrap.dedent('''
+    import multiprocessing, os, sys, time
+    multiprocessing.set_start_method("fork", force=True)
+    from audiobook_generator.core import audiobook_generator as gen
+    from tests.test_utils import get_cartesia_config
+
+    marker_dir = sys.argv[1]
+
+    class SlowProvider:
+        def get_break_string(self):
+            return " "
+        def estimate_cost(self, chars):
+            return 0
+        def prepare_run(self, chapters):
+            pass
+        def get_output_file_extension(self):
+            return "mp3"
+        def text_to_speech(self, text, output_file, audio_tags):
+            open(os.path.join(marker_dir, str(os.getpid())), "w").close()
+            time.sleep(30)
+
+    gen.get_tts_provider = lambda config: SlowProvider()
+    config = get_cartesia_config(input_file=sys.argv[2], output_folder=sys.argv[3],
+                                 worker_count=2, no_prompt=True)
+    config.log_file = os.path.join(sys.argv[3], "log.txt")
+    sys.exit(gen.AudiobookGenerator(config).run())
+''')
+
+def pid_alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+class TestSigterm(unittest.TestCase):
+
+    def test_sigterm_raises_system_exit_and_terminates_pool(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        book = os.path.join(tmp.name, "tiny.epub")
+        make_epub(book)
+        config = get_cartesia_config(input_file=book, output_folder=os.path.join(tmp.name, "out"),
+                                     worker_count=1, no_prompt=True, preview=True)
+        config.log_file = os.path.join(tmp.name, "log.txt")
+        before = signal.getsignal(signal.SIGTERM)
+        with patch.object(gen.multiprocessing, "Pool", SigtermPool):
+            with self.assertRaises(SystemExit) as caught:
+                gen.AudiobookGenerator(config).run()
+        self.assertEqual(caught.exception.code, 143)
+        self.assertIs(SigtermPool.exit_exc, SystemExit)
+        self.assertTrue(SigtermPool.terminated)
+        self.assertEqual(signal.getsignal(signal.SIGTERM), before)
+
+    @unittest.skipIf(sys.platform == "win32", "needs fork and SIGTERM")
+    def test_sigterm_stops_real_pool_workers(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        book = os.path.join(tmp.name, "tiny.epub")
+        make_epub(book)
+        markers = os.path.join(tmp.name, "markers")
+        out = os.path.join(tmp.name, "out")
+        os.makedirs(markers)
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        proc = subprocess.Popen([sys.executable, "-c", WORKER_SCRIPT, markers, book, out], cwd=root,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(proc.kill)
+        deadline = time.time() + 20
+        while len(os.listdir(markers)) < 2 and time.time() < deadline:
+            time.sleep(0.05)
+        worker_pids = [int(name) for name in os.listdir(markers)]
+        self.assertEqual(len(worker_pids), 2)
+        proc.send_signal(signal.SIGTERM)
+        self.assertEqual(proc.wait(timeout=10), 143)
+        deadline = time.time() + 5
+        while any(pid_alive(pid) for pid in worker_pids) and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertFalse(any(pid_alive(pid) for pid in worker_pids))
 
 class TestRun(unittest.TestCase):
 

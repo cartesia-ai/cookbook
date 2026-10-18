@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     return Response.json({ ...notes, title: notes.title.slice(0, 80), summary: notes.summary.slice(0, 1200) });
   } catch (err) {
     if (err instanceof LlmConfigError) {
-      return Response.json({ error: err.message }, { status: 500 });
+      return Response.json({ error: err.message }, { status: 503 });
     }
     if (NoObjectGeneratedError.isInstance(err) || NoOutputGeneratedError.isInstance(err)) {
       return Response.json({ error: "The model did not return valid notes" }, { status: 502 });

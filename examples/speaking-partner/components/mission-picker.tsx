@@ -4,9 +4,9 @@ import { FormPanel, FormSection } from "@/components/blocks/form-section";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { languageName, type LanguageCode } from "../lib/languages";
-import { DIFFICULTIES, MISSIONS, type Mission } from "../lib/missions";
-import { isMode, MODE_COPY, MODES, type Mode } from "../lib/modes";
+import { languageName, type LanguageCode } from "@/lib/languages";
+import { DIFFICULTIES, MISSIONS, type Mission } from "@/lib/missions";
+import { isMode, MODE_COPY, MODES, type Mode } from "@/lib/modes";
 import { Shell } from "./shell";
 
 function ModeTabs({ mode, onMode, className }: { mode: Mode; onMode: (m: Mode) => void; className?: string }) {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OptionsSchema } from "../lib/config";
-import type { ScriptLine } from "../lib/types";
+import { OptionsSchema } from "@/lib/config";
+import type { ScriptLine } from "@/lib/types";
 
 const generate = vi.fn();
 vi.mock("@cartesia/cartesia-js", async (importActual) => ({
@@ -10,7 +10,7 @@ vi.mock("@cartesia/cartesia-js", async (importActual) => ({
   },
 }));
 
-const { LINES_AT_ONCE, renderEpisode } = await import("../lib/tts");
+const { LINES_AT_ONCE, renderEpisode } = await import("@/lib/tts");
 
 const o = OptionsSchema.parse({ outputLanguage: "Spanish" });
 

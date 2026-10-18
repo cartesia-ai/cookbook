@@ -16,7 +16,9 @@ npm install
 npm run dev
 ```
 
-Before `npm run dev`, add `CARTESIA_API_KEY`, `LLM_MODEL` and the matching provider key to `.env.local`. pnpm works too. Node 22.22 or newer.
+Node 22.22 or newer. pnpm works too.
+
+Before `npm run dev`, add `CARTESIA_API_KEY`, `LLM_MODEL` and the matching provider key to `.env.local`.
 
 Open http://localhost:3000, press Start recording and talk for a few seconds, then press Stop and write notes. Or switch to Upload, choose an audio file and press Write notes. If a key is missing, the page says which one.
 
@@ -61,7 +63,7 @@ console.log(res.text, res.duration);
 - Transcribe another language: pick it in the language menu. The list is `LANGUAGES` in `lib/limits.ts`; `ink-whisper` accepts more, so add their ISO 639-1 codes there.
 - Use another LLM: set `LLM_MODEL`. `lib/llm.ts` is the whole switch. For another direct provider, add its AI SDK package and one branch there.
 - Change what the notes contain: edit `lib/schema.ts` and the instructions in `lib/prompt.ts`.
-- Store notes on a server: replace the four async functions in `lib/store.ts` with calls to your database and keep the hooks.
+- Store notes on a server: replace the five async functions in `lib/store.ts` with calls to your database and keep the hooks.
 
 ## Before you deploy
 
@@ -105,10 +107,11 @@ npm test
 
 ## Learn more
 
-- Recipe: [Transcribe and summarize meetings](https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/01-next/20-transcribe-and-summarize-meetings.mdx)
+- Recipe: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/01-next/20-transcribe-and-summarize-meetings.mdx
 - Compare STT endpoints: https://docs.cartesia.ai/use-the-api/stt/compare-endpoints
 - Batch transcription API: https://docs.cartesia.ai/api-reference/stt/transcribe
 - Cartesia docs for agents: https://docs.cartesia.ai/llms.txt
+- Agent skills: `npx skills add cartesia-ai/skills`
 
 ## License
 

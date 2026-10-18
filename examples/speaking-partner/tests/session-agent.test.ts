@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentsApi, VoiceSummary } from "../lib/agents-api";
+import type { AgentsApi, VoiceSummary } from "@/lib/agents-api";
 import {
   AGENT_NAME_PREFIX,
   buildAgentBody,
@@ -18,7 +18,7 @@ import {
   resetClientSessions,
   STALE_AFTER_MS,
   sweepStaleAgents,
-} from "../lib/session-agent";
+} from "@/lib/session-agent";
 
 const v = (id: string, name: string, locale: string, extra: Partial<VoiceSummary> = {}): VoiceSummary => ({
   id,
@@ -156,7 +156,7 @@ describe("deleteSessionAgent", () => {
 
   it("rejects ids that are not agent ids, and path tricks", async () => {
     const { api } = fakeApi();
-    for (const bad of ["", "tool_123", "agent_../tools", "agent_abc/def", "../agents"]) {
+    for (const bad of ["", "tool_123", "agent_../tools", "agent_abc/def", "@/agents"]) {
       await expect(deleteSessionAgent(api, bad)).rejects.toMatchObject({ code: "bad_id" });
     }
   });

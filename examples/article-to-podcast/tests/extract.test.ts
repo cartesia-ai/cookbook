@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { articleFromText, cleanText, parseArticle, UnreadablePageError } from "../lib/extract";
+import { articleFromText, cleanText, parseArticle, UnreadablePageError } from "@/lib/extract";
 
 const html = readFileSync(new URL("./fixtures/article.html", import.meta.url), "utf8");
 

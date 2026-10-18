@@ -1,5 +1,3 @@
-import type { RecapEntry } from "../schema";
-
 export const ENTRY_INSTRUCTIONS = `You read one voice journal entry, transcribed from speech, and return a title, a mood and a one-sentence reflection.
 
 Rules:
@@ -20,7 +18,3 @@ Rules:
 - End with one gentle question they could think about next week.
 - You are not a therapist. Do not diagnose or give medical advice.
 - Write numbers and dates the way they are spoken. Avoid abbreviations that read badly aloud.`;
-
-export function recapPrompt(entries: RecapEntry[]): string {
-  return entries.map((e) => `## ${e.day}: ${e.title} (mood: ${e.mood})\n${e.transcript.trim()}`).join("\n\n");
-}

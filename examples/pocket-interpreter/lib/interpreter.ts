@@ -215,10 +215,17 @@ export async function startInterpreter(pair: readonly [Lang, Lang], events: Inte
       if (stopped) return;
       console.warn("Ink 2 socket", reason);
       try {
-        client = new Cartesia({ token: await fetchToken() });
-        listening = await listen(client, audioCtx, () => speaker.busy(), handlers);
+        const token = await fetchToken();
+        if (stopped) return;
+        client = new Cartesia({ token });
+        const next = await listen(client, audioCtx, () => speaker.busy(), handlers);
+        if (stopped) {
+          next.stop();
+          return;
+        }
+        listening = next;
       } catch {
-        events.onError("The connection to Cartesia dropped. Start again.");
+        if (!stopped) events.onError("The connection to Cartesia dropped. Start again.");
       }
     },
   };

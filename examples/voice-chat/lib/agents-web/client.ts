@@ -288,16 +288,8 @@ export class CartesiaAgentClient extends Emitter<AgentEventMap> {
   }
 
   private createContext(): AudioContext {
-    const factory =
-      this.opts.audioContextFactory ??
-      ((o: { sampleRate?: number }) => {
-        try {
-          return new AudioContext(o);
-        } catch {
-          return new AudioContext();
-        }
-      });
-    return factory({ sampleRate: this.rate });
+    const factory = this.opts.audioContextFactory ?? (() => new AudioContext());
+    return factory({});
   }
 
   private onMicChunk(s: Session, pcm: Int16Array): void {
@@ -522,14 +514,10 @@ export class CartesiaAgentClient extends Emitter<AgentEventMap> {
 
     try {
       s.playback?.dispose();
-    } catch {
-      // ignore
-    }
+    } catch {}
     try {
       s.capture?.stop();
-    } catch {
-      // ignore
-    }
+    } catch {}
     void s.ctx?.close?.().catch?.(() => {});
 
     const ws = s.ws;
@@ -538,9 +526,7 @@ export class CartesiaAgentClient extends Emitter<AgentEventMap> {
       if (!socketClosed) {
         try {
           ws.close(1000, 'session completed');
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
     }
 
@@ -589,9 +575,7 @@ export class CartesiaAgentClient extends Emitter<AgentEventMap> {
       }
       try {
         ws.close(1000, reason);
-      } catch {
-        // the timer finishes the job
-      }
+      } catch {}
     });
     return this.stopping;
   }

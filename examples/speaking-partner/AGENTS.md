@@ -4,8 +4,10 @@ Language speaking practice on a Cartesia Managed Agent. Next.js 16 App Router, t
 
 ## Commands (run from this folder)
 
-- Install and run: `pnpm install`, then `pnpm dev` (http://localhost:3000).
-- Check: `pnpm test && pnpm typecheck && pnpm build`. The build must pass with no env vars.
+- npm (pnpm works too), Node 22.22+.
+- Install and run: `npm install`, then `npm run dev` (http://localhost:3000).
+- Check: `npm test && npm run typecheck && npm run build`. The build must pass with no env vars.
+- Imports use the `@/` alias for anything outside the importing file's folder.
 
 ## Files
 
@@ -20,7 +22,7 @@ Language speaking practice on a Cartesia Managed Agent. Next.js 16 App Router, t
 ## Rules
 
 - One temporary agent per session is deliberate. Browser tokens cannot send `dynamic_variables` (the service answers `dynamic_variables_not_allowed`), so the server writes mission, role, mode and languages into the instructions. Routes take a mission id; never add a way for the browser to send free text into a prompt.
-- `CARTESIA_API_KEY` is read only in `lib/env.ts`, `app/api/` and `tests/`. Never add a `NEXT_PUBLIC_` secret. The browser gets a 60 second token with only the `agent` grant.
+- `CARTESIA_API_KEY` is read only on the server: in `lib/env.ts`, `app/api/`, `tests/`, and as a fallback in `lib/agents-web/server.ts` when no `apiKey` is passed. Never add a `NEXT_PUBLIC_` secret. The browser gets a 60 second token with only the `agent` grant.
 - Only `lib/session-agent.ts` deletes agents, and only after it checks the `speaking-partner-session-` name prefix. Keep that check.
 - The agent stack is managed: Ink 2 hears, Sonic 3.6 speaks. Do not add TTS or STT model fields to the agent config. The five languages (en, es, fr, hi, ja) are the Ink 2 languages; do not widen the pickers. If you add direct TTS, use `sonic-3.6`. `facts.json` at the repo root lists the retired ids.
 - `lib/model.ts` reads `LLM_MODEL` as `provider/model`, the same rule as the other LLM templates: a direct `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for that prefix wins, otherwise the full id goes to the AI Gateway (`AI_GATEWAY_API_KEY`, or on Vercel). With neither, `resolveModel` returns null and the corrections panel stays off. Do not hardcode a default model id.

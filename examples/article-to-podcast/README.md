@@ -2,7 +2,7 @@
 
 Turns a link or pasted text into a two-host podcast episode, with Cartesia Sonic 3.6 text to speech voicing each host in a different voice.
 
-![The finished episode "Sonic Briefing" for an article about libraries lending heat pumps: a player at 0:08 of 2:33 with a Download button, and the script below it with Sam's current line highlighted in green](./docs/screenshot.png)
+![The finished episode "Sonic Briefing: Libraries Lending Heat Pumps" for a short article about libraries lending heat pumps: a player at 0:09 of 1:53 with a Download button, and the script below it with Sam's current line highlighted in green](./docs/screenshot.png)
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Farticle-to-podcast&env=CARTESIA_API_KEY%2CLLM_MODEL%2CAPP_PASSWORD&envDescription=Cartesia%20API%20key%2C%20an%20LLM%20as%20provider%2Fmodel%20%28on%20Vercel%20the%20AI%20Gateway%20needs%20no%20key%29%2C%20and%20a%20password%20for%20the%20app%20%28or%20none%29.&envLink=https%3A%2F%2Fgithub.com%2Fcartesia-ai%2Fcookbook%2Ftree%2Fmain%2Fexamples%2Farticle-to-podcast%23environment-variables&project-name=article-to-podcast&repository-name=article-to-podcast)
 
@@ -20,7 +20,7 @@ npm run dev
 
 pnpm works too (`pnpm install`, `pnpm dev`).
 
-Open http://localhost:3000, paste a link to an article (or switch to Paste text), leave Length on Short and press Make podcast. Without keys the page still loads, and a request tells you which variable to set.
+Open http://localhost:3000, paste a link to an article (or switch to Paste text), leave Length on Short and press Make podcast. Without keys the page still loads and shows a Finish setup notice naming what is missing. `GET /api/health` reports the same thing as booleans, never values.
 
 ## Environment variables
 
@@ -70,14 +70,17 @@ The SDK sends `Cartesia-Version: 2026-08-14` on every request. See https://docs.
 
 - Use other voices: pick two at https://play.cartesia.ai/voices and set `CARTESIA_VOICE_HOST_A` and `CARTESIA_VOICE_HOST_B`. The defaults are English voices, so set voices that match the language you pick.
 - Change the show: the podcast name, tagline, host roles and dialogue structure are defaults in `lib/config.ts`. The prompt is in `lib/prompt.ts`.
-- Use another LLM provider: set `LLM_MODEL` to its AI Gateway id, for example `google/<model id>`, with `AI_GATEWAY_API_KEY`. To call it directly instead, install its AI SDK package and return its model from `getModel` in `lib/model.ts`. If the model rejects `temperature`, remove `temperature: o.creativity` in `lib/script.ts`.
+- Use another LLM provider: set `LLM_MODEL` to its AI Gateway id, for example `google/<model id>`, with `AI_GATEWAY_API_KEY`. To call it directly instead, install its AI SDK package and add a branch for its prefix in `getModel` in `lib/llm.ts`. If the model rejects `temperature`, remove `temperature: o.creativity` in `lib/script.ts`.
 
 ```ts
-import { google } from "@ai-sdk/google";
-export function getModel() {
-  return google("<model id>");
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+
+if (provider === "google" && env.GOOGLE_GENERATIVE_AI_API_KEY) {
+  return createGoogleGenerativeAI({ apiKey: env.GOOGLE_GENERATIVE_AI_API_KEY })(bare);
 }
 ```
+
+`lib/llm.ts` is shared with the other LLM templates in this repo, so `pnpm check:copies` flags the edit there. In your own copy, edit it freely.
 
 ## Before you deploy
 
@@ -116,7 +119,7 @@ The tests need no keys and no network. They mock the Cartesia SDK and use `MockL
 
 ## Learn more
 
-- Recipe: [Article to podcast](https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/01-next/02-article-to-podcast.mdx)
+- Recipe: https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/01-next/02-article-to-podcast.mdx
 - TTS bytes API: https://docs.cartesia.ai/api-reference/tts/bytes
 - Laughter, speed and emotion: https://docs.cartesia.ai/build-with-cartesia/capability-guides/volume-speed-emotion
 - Cartesia docs for agents: https://docs.cartesia.ai/llms.txt

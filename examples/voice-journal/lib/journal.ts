@@ -1,3 +1,4 @@
+import { MAX_RECAP_ENTRIES, MAX_RECAP_INPUT_CHARS, MAX_TRANSCRIPT_CHARS } from "./limits";
 import type { Mood, RecapEntry } from "./schema";
 
 export type Entry = {
@@ -100,11 +101,23 @@ export function entriesInRange(entries: Entry[], from: Date, to: Date): Entry[] 
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-export function toRecapEntries(entries: Entry[], max = 30): RecapEntry[] {
-  return entries
-    .filter((e): e is Entry & { title: string; mood: Mood } => Boolean(e.title && e.mood && e.transcript))
+export function recapHeading(e: Pick<RecapEntry, "day" | "title" | "mood">): string {
+  return `## ${e.day}: ${e.title} (mood: ${e.mood})`;
+}
+
+export function recapPrompt(entries: RecapEntry[]): string {
+  return entries.map((e) => `${recapHeading(e)}\n${e.transcript.trim()}`).join("\n\n");
+}
+
+export function toRecapEntries(entries: Entry[], max = MAX_RECAP_ENTRIES, budget = MAX_RECAP_INPUT_CHARS): RecapEntry[] {
+  const kept = entries
+    .filter((e): e is Entry & { title: string; mood: Mood } => Boolean(e.title && e.mood && e.transcript.trim()))
     .slice(-max)
-    .map((e) => ({ day: longDay(e.createdAt), title: e.title, mood: e.mood, transcript: e.transcript.slice(0, 12_000) }));
+    .map((e) => ({ day: longDay(e.createdAt), title: e.title.slice(0, 120), mood: e.mood, transcript: e.transcript.trim() }));
+  if (!kept.length) return [];
+  const headings = kept.reduce((n, e) => n + recapHeading(e).length + 1, 0) + 2 * (kept.length - 1);
+  const each = Math.min(MAX_TRANSCRIPT_CHARS, Math.max(0, Math.floor((budget - headings) / kept.length)));
+  return kept.map((e) => ({ ...e, transcript: e.transcript.slice(0, each).trim() }));
 }
 
 const SHORT = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });

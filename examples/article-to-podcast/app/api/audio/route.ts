@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { defaultOptions, MAX_TRANSCRIPT_CHARS, OptionsSchema } from "../../../lib/config";
-import { badRequest, errorResponse, streamChunks } from "../../../lib/http";
-import { clientIp, createRateLimiter, tooManyRequests } from "../../../lib/rate-limit";
-import { ScriptSchema } from "../../../lib/script";
-import { renderEpisode } from "../../../lib/tts";
+import { defaultOptions, MAX_TRANSCRIPT_CHARS, OptionsSchema } from "@/lib/config";
+import { badRequest, errorResponse, streamChunks } from "@/lib/http";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
+import { ScriptSchema } from "@/lib/script";
+import { renderEpisode } from "@/lib/tts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;

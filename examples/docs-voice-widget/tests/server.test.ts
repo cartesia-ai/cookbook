@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createApp, type AppDeps } from '../server/app';
-import { renderMarkdown, safeHref } from '../server/demo';
+import { mountDemo, renderMarkdown, safeHref } from '../server/demo';
+import { Hono } from 'hono';
+import { fileURLToPath } from 'node:url';
 import { RateLimiter, lastForwardedFor, originAllowed, parseOrigins } from '../server/guard';
 import { DocIndex } from '../server/store';
 
@@ -125,6 +127,19 @@ describe('demo links', () => {
     expect(renderMarkdown('![logo](/logo.png "Logo")')).toContain(
       '<img src="https://docs.cartesia.ai/logo.png" alt="logo" title="Logo">',
     );
+  });
+});
+
+describe('demo site', () => {
+  it('serves the green favicon and titles pages with a middle dot', async () => {
+    const demo = new Hono();
+    mountDemo(demo, fileURLToPath(new URL('../content', import.meta.url)));
+    const icon = await demo.fetch(new Request(`${SELF}/icon.svg`));
+    expect(icon.headers.get('content-type')).toBe('image/svg+xml');
+    expect(await icon.text()).toContain('fill="#309d4b"');
+    const page = await (await demo.fetch(new Request(`${SELF}/docs/tools`))).text();
+    expect(page).toContain('<link rel="icon" href="/icon.svg" type="image/svg+xml">');
+    expect(page).toContain('<title>Tools · Cartesia docs demo</title>');
   });
 });
 

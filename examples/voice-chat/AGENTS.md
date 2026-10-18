@@ -25,7 +25,7 @@ scripts/prompt.ts           agent instructions and greeting
 
 ## Rules
 
-- `CARTESIA_API_KEY` is read only in `lib/env.ts` (used by `lib/token-handler.ts`) and `scripts/setup-agent.ts`. Never import it from a client component and never add a `NEXT_PUBLIC_` variable for it. Tokens get only `{ agent: true }`.
+- `CARTESIA_API_KEY` is read only on the server: in `lib/env.ts` (used by `lib/token-handler.ts`), in `scripts/setup-agent.ts`, and as a fallback in `lib/agents-web/server.ts` when no `apiKey` is passed. Never import it from a client component and never add a `NEXT_PUBLIC_` variable for it. Tokens get only `{ agent: true }`.
 - The agent stack (Ink 2, an LLM, Sonic 3.6) is managed by Cartesia. Don't add a TTS or STT model field to the agent config. The SDK sends `Cartesia-Version: 2026-08-14`.
 - `@cartesia/cartesia-js` 4.2 has no typed `agents.create`, so setup uses the client's generic `post` with the path in `scripts/paths.ts`. Keep it that way until the SDK adds the method.
 - Token route errors are fixed strings from `lib/token-handler.ts` and `lib/agents-web/server.ts`. Don't return SDK error text.

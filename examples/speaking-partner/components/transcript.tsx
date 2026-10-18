@@ -5,7 +5,7 @@ import type { AgentMessage } from "@/lib/agents-web/react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { LanguageCode } from "../lib/languages";
+import type { LanguageCode } from "@/lib/languages";
 
 function Dots() {
   return (

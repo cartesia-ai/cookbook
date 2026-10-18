@@ -6,11 +6,12 @@ Runnable templates (`examples/<name>`) and recipes (`content/cookbook`) for Cart
 
 - Node 22.22 or newer, pnpm 10. Inside this repo use pnpm (`pnpm dlx`, not npx); READMEs give npm commands for readers. Python templates use uv.
 - `pnpm install` at the root installs every workspace package, including the templates.
-- `pnpm check` runs the Node checks CI runs: `check:facts`, `check:content`, `check:catalog`, `check:copies`, `typecheck`, `test`. CI also runs `pnpm build` (no env vars) and, for front-desk, audiobook and coding-voice-mode, `uv sync --locked` and `uv run pytest` (plus ruff and mypy in front-desk).
+- `pnpm check` runs the Node checks CI runs: `check:facts`, `check:content`, `check:snippets`, `check:catalog`, `check:copies`, `typecheck`, `test`. CI also runs `pnpm build` (no env vars) and, for front-desk, audiobook and coding-voice-mode, `uv sync --locked` and `uv run pytest` (plus ruff and mypy in front-desk).
 - `pnpm check:facts` fails on any Sonic model id or `Cartesia-Version` date that `facts.json` does not allow, in any text file.
-- `pnpm check:content` checks the recipe tree: `NN-name` files, frontmatter, relative links, closed fences, no em dashes.
-- `pnpm check:catalog` checks `templates.json`, `llms.txt` and the root README against `examples/`, each `.env.example`, the recipe titles and `facts.json`.
-- `pnpm check:copies` fails when a template's `components/ui`, `components/blocks`, `lib/agents-web` or `widget/src/agents-web` file differs from the `packages/kit` or `packages/agents-web/src` file of the same name, or when a Next template's `proxy.ts` or `lib/rate-limit.ts` (and voice-journal's `lib/server/rate-limit.ts`) differs from article-to-podcast's.
+- `pnpm check:content` checks the recipe tree: `NN-name` files, frontmatter, relative links, closed fences, no em dashes, and no retired or deprecated model ids (put `<!-- allow-model-id -->` on a line that names one on purpose).
+- `pnpm check:snippets` fails when a recipe code block with `filename="..."` is not a slice, in order, of that file in the recipe's template (from `templates.json` `recipe`, a `template:` frontmatter field, or the template the recipe links most).
+- `pnpm check:catalog` checks `templates.json`, `llms.txt` and the root README against `examples/`, each `.env.example`, the recipe titles, each template's manifest license and `facts.json`. It also fails on a `](../` link in a template README, because those break after degit; link `https://github.com/cartesia-ai/cookbook/blob/main/...` instead.
+- `pnpm check:copies` fails when a template's `components/ui`, `components/blocks`, `lib/agents-web` or `widget/src/agents-web` file differs from the `packages/kit` or `packages/agents-web/src` file of the same name. It also pins these groups byte for byte: `proxy.ts`, `tests/proxy.test.ts` and `lib/rate-limit.ts` in all six Next templates (plus voice-journal's `lib/server/rate-limit.ts`) against article-to-podcast's; `lib/llm.ts` in pocket-interpreter, story-time and article-to-podcast (plus voice-journal's `lib/server/llm.ts`) against meeting-notes'; and every `THIRD_PARTY_NOTICES.md` against the root one.
 
 ## Facts an agent cannot guess
 
@@ -37,7 +38,7 @@ Runnable templates (`examples/<name>`) and recipes (`content/cookbook`) for Cart
 
 ## Adding or renaming a template
 
-1. Create `examples/<name>` with `README.md`, `AGENTS.md`, `CLAUDE.md` (only `@AGENTS.md`), `.env.example`, a package file with description, keywords, repository and license, and `docs/screenshot.png`.
+1. Create `examples/<name>` with `README.md`, `AGENTS.md`, `CLAUDE.md` (only `@AGENTS.md`), `.env.example`, a package file with description, keywords, repository and license, and `docs/screenshot.png` (templates with a UI).
 2. Add an entry to `templates.json` (env keys must match `.env.example`; `features` uses the tags listed in `tools/check-catalog`).
 3. Add a row to the template table in the root `README.md`.
 4. Add a line to `llms.txt`.

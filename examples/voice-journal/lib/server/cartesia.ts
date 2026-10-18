@@ -2,7 +2,7 @@ import Cartesia from "@cartesia/cartesia-js";
 
 export class MissingKeyError extends Error {
   constructor() {
-    super("CARTESIA_API_KEY is not set");
+    super("CARTESIA_API_KEY is not set. Add it to .env.local and restart.");
   }
 }
 

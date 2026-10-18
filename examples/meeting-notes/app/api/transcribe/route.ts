@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     if (err instanceof MissingKeyError) {
-      return Response.json({ error: err.message }, { status: 500 });
+      return Response.json({ error: err.message }, { status: 503 });
     }
     if (err instanceof Cartesia.APIError && typeof err.status === "number") {
       return Response.json({ error: UPSTREAM_ERRORS[err.status] ?? "Transcription failed" }, { status: 502 });

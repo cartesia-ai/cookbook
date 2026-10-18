@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import tomllib
 from pathlib import Path
 
@@ -68,8 +69,15 @@ def _backup_once(path: Path) -> None:
 
 def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = stat.S_IMODE(path.stat().st_mode)
+    except FileNotFoundError:
+        mode = 0o600
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(text)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        os.fchmod(f.fileno(), mode)
+        f.write(text)
     os.replace(tmp, path)
 
 def cursor_path(home: Path, project: Path | None = None) -> Path:

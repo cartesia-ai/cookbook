@@ -37,16 +37,15 @@ body { background: var(--ab-bg); overflow-x: hidden; }
 footer { display: none !important; }
 
 .gradio-container { max-width: none !important; padding: 0 !important; margin: 0 !important; background: var(--ab-bg) !important; }
-.gradio-container main.app { padding: 0 !important; max-width: none !important; }
-.gradio-container .contain { box-sizing: border-box; width: 100%; max-width: 768px; margin: 0 auto !important; padding: 0 24px 80px !important; gap: 0 !important; }
+.gradio-container .main.app, .gradio-container main.app { padding: 0 !important; max-width: none !important; }
+.gradio-container .contain { box-sizing: border-box; width: 100%; max-width: 768px; margin: 0 auto !important; padding: 0 clamp(16px, (100vw - 639px) * 1000, 24px) clamp(64px, (100vw - 639px) * 1000, 80px) !important; gap: 0 !important; }
 .gradio-container .contain > .column { gap: 0 !important; }
-@media (max-width: 639px) { .gradio-container .contain { padding: 0 16px 64px !important; } }
 
 .block.ab-header-wrap { margin: 0 calc(50% - 50vw) !important; width: 100vw; position: sticky; top: 0; z-index: 40; }
 .ab-header { border-bottom: 1px solid color-mix(in oklab, var(--ab-border) 70%, transparent); background: color-mix(in oklab, var(--ab-bg) 85%, transparent); backdrop-filter: blur(8px); }
 .ab-header-inner { max-width: 768px; height: 56px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
 @media (max-width: 639px) { .ab-header-inner { padding: 0 16px; } }
-.ab-brand { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--ab-fg) !important; text-decoration: none !important; border-radius: 6px; outline: none; }
+.ab-brand { padding: 0 !important; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--ab-fg) !important; text-decoration: none !important; border-radius: 6px; outline: none; }
 .ab-brand:focus-visible, .ab-mode:focus-visible { box-shadow: 0 0 0 3px var(--ab-ring); }
 .ab-mode { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: transparent; border: 0; color: var(--ab-fg); cursor: pointer; outline: none; }
 .ab-mode:hover { background: var(--ab-muted); }

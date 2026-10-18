@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "The model did not write a usable scene. Try again." }, { status: 502 });
   } catch (err) {
     if (err instanceof ModerationError) return Response.json({ error: CHECKER_DOWN }, { status: 503 });
-    if (err instanceof LlmConfigError) return Response.json({ error: err.message }, { status: 500 });
+    if (err instanceof LlmConfigError) return Response.json({ error: err.message }, { status: 503 });
     if (NoObjectGeneratedError.isInstance(err) || NoOutputGeneratedError.isInstance(err)) {
       return Response.json({ error: "The model did not write a usable scene. Try again." }, { status: 502 });
     }

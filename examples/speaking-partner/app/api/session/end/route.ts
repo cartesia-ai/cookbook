@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { createAgentsApi } from "../../../../lib/agents-api";
-import { getApiKey } from "../../../../lib/env";
-import { clientIp, createRateLimiter, tooManyRequests } from "../../../../lib/rate-limit";
-import { deleteSessionAgent, forgetSession, SessionAgentError } from "../../../../lib/session-agent";
+import { createAgentsApi } from "@/lib/agents-api";
+import { getApiKey } from "@/lib/env";
+import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
+import { deleteSessionAgent, forgetSession, SessionAgentError } from "@/lib/session-agent";
 
 const headers = { "Cache-Control": "no-store" };
 const allow = createRateLimiter(20, 60_000);
@@ -10,7 +10,7 @@ const Body = z.object({ agentId: z.string().max(80) });
 
 export async function POST(req: Request): Promise<Response> {
   const apiKey = getApiKey();
-  if (!apiKey) return Response.json({ error: "CARTESIA_API_KEY is not set." }, { status: 503, headers });
+  if (!apiKey) return Response.json({ error: "CARTESIA_API_KEY is not set. Add it to .env.local and restart." }, { status: 503, headers });
   if (!allow(clientIp(req))) return tooManyRequests(headers);
   const parsed = Body.safeParse(await req.text().then((t) => JSON.parse(t)).catch(() => null));
   if (!parsed.success) return Response.json({ error: "Bad request." }, { status: 400, headers });

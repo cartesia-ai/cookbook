@@ -1,14 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ outputs: [] as string[], prompts: [] as string[] }));
+const state = vi.hoisted(() => ({ outputs: [] as string[], prompts: [] as string[], unconfigured: false }));
 
 vi.mock("@/lib/llm", async () => {
   const { MockLanguageModelV4 } = await import("ai/test");
   class LlmConfigError extends Error {}
   return {
     LlmConfigError,
-    getModel: () =>
-      new MockLanguageModelV4({
+    getModel: () => {
+      if (state.unconfigured) throw new LlmConfigError("LLM_MODEL is not set.");
+      return new MockLanguageModelV4({
         doGenerate: async (opts: { prompt: unknown }) => {
           state.prompts.push(JSON.stringify(opts.prompt));
           return {
@@ -21,7 +22,8 @@ vi.mock("@/lib/llm", async () => {
             content: [{ type: "text", text: state.outputs.shift() ?? "" }],
           };
         },
-      }),
+      });
+    },
   };
 });
 
@@ -57,6 +59,7 @@ describe("POST /api/scene", () => {
   beforeEach(() => {
     state.outputs = [];
     state.prompts = [];
+    state.unconfigured = false;
     delete process.env.OPENAI_API_KEY;
     vi.unstubAllGlobals();
   });
@@ -111,6 +114,13 @@ describe("POST /api/scene", () => {
     expect(res.status).toBe(503);
     expect((await res.json()).error).toBe(CHECKER_DOWN);
     expect(state.prompts).toHaveLength(0);
+  });
+
+  it("answers 503 when LLM_MODEL is not set", async () => {
+    state.unconfigured = true;
+    const res = await post(first);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "LLM_MODEL is not set." });
   });
 
   it("returns the first scene with two choices", async () => {

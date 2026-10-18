@@ -3,8 +3,9 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import httpx
+import pytest
 
-from front_desk.calendars import CalComCalendar, make_calendar
+from front_desk.calendars import CalComCalendar, CalendarError, make_calendar
 from front_desk.config import settings
 from front_desk.store import Store
 
@@ -57,3 +58,45 @@ def test_calcom_slots_and_booking_requests(monkeypatch):
         "phoneNumber": "+14155550123",
     }
     assert store.list_appointments()[0]["external_id"] == "bk_1"
+
+
+def _cal(monkeypatch, handler):
+    monkeypatch.setenv("CALCOM_API_KEY", "cal_test")
+    monkeypatch.setenv("CALCOM_EVENT_TYPE_ID", "42")
+    s = settings()
+    store = Store(s.database_path)
+    client = httpx.Client(base_url="https://api.cal.com", transport=httpx.MockTransport(handler))
+    return CalComCalendar(s, store, client), store
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(200, text="<html>maintenance</html>"),
+        httpx.Response(200, json=[1, 2]),
+        httpx.Response(200, json={"data": ["not", "a", "dict"]}),
+    ],
+)
+def test_calcom_unreadable_slots_raise_calendar_error(monkeypatch, response):
+    cal, _ = _cal(monkeypatch, lambda req: response)
+    with pytest.raises(CalendarError):
+        cal.open_slots(date(2026, 10, 17))
+
+
+def test_calcom_booking_with_unreadable_body_still_counts(monkeypatch):
+    cal, store = _cal(monkeypatch, lambda req: httpx.Response(201, text="ok"))
+    start = datetime(2026, 10, 17, 13, tzinfo=ZoneInfo("America/Los_Angeles"))
+    result = cal.book(start=start, name="Dana Park", phone="", service="cut", call_id="ac_1")
+    assert result.ok and result.external_id == ""
+    assert len(store.list_appointments()) == 1
+
+
+def test_shared_calcom_client_closes_on_shutdown():
+    from front_desk.calendars import calcom_client, close_calcom_client
+
+    first = calcom_client()
+    assert calcom_client() is first
+    close_calcom_client()
+    assert first.is_closed
+    assert calcom_client() is not first
+    close_calcom_client()

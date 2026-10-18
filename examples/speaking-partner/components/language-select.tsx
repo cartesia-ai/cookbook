@@ -1,6 +1,6 @@
 import { Field } from "@/components/blocks/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LANGUAGES, isLanguageCode, type LanguageCode } from "../lib/languages";
+import { LANGUAGES, isLanguageCode, type LanguageCode } from "@/lib/languages";
 
 const ITEMS = LANGUAGES.map((l) => ({ value: l.code, label: l.name === l.nativeName ? l.name : `${l.name} (${l.nativeName})` }));
 

@@ -24,9 +24,9 @@ vi.mock("@/lib/agents-web/react", () => ({
     return { ...h.state, start: h.start, stop: h.stop, setMuted: h.setMuted, sendToolResult: vi.fn() };
   },
 }));
-vi.mock("../lib/chime", () => ({ playChime: vi.fn() }));
-vi.mock("../lib/client-api", async (orig) => ({
-  ...(await orig<typeof import("../lib/client-api")>()),
+vi.mock("@/lib/chime", () => ({ playChime: vi.fn() }));
+vi.mock("@/lib/client-api", async (orig) => ({
+  ...(await orig<typeof import("@/lib/client-api")>()),
   fetchToken: vi.fn(async () => "tok"),
   requestCorrection: vi.fn(async (p: { text: string }) => ({
     hasIssue: true,
@@ -36,9 +36,9 @@ vi.mock("../lib/client-api", async (orig) => ({
   })),
 }));
 
-import { SessionView } from "../components/session-view";
-import { requestCorrection } from "../lib/client-api";
-import { MISSIONS } from "../lib/missions";
+import { SessionView } from "@/components/session-view";
+import { requestCorrection } from "@/lib/client-api";
+import { MISSIONS } from "@/lib/missions";
 
 const mission = MISSIONS.find((m) => m.title === "Order a coffee")!;
 

@@ -1,7 +1,9 @@
 import logging
 import multiprocessing
 import os
+import signal
 import sys
+import threading
 
 from audiobook_generator.book_parsers.base_book_parser import get_book_parser
 from audiobook_generator.config.general_config import GeneralConfig
@@ -30,6 +32,13 @@ def confirm_conversion():
         raise ConversionAborted(NOT_A_TTY_MESSAGE) from None
     if answer.strip().lower() != "y":
         raise ConversionAborted("Aborted.")
+
+def _exit_on_sigterm(signum, frame):
+    raise SystemExit(128 + signal.SIGTERM)
+
+def _init_worker(log_level, log_file, is_worker):
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    setup_logging(log_level, log_file, is_worker)
 
 def get_total_chars(chapters):
     total_characters = 0
@@ -91,6 +100,9 @@ class AudiobookGenerator:
         return idx, self.process_chapter(idx, title, text, book_parser)
 
     def run(self):
+        previous_sigterm = None
+        if threading.current_thread() is threading.main_thread():
+            previous_sigterm = signal.signal(signal.SIGTERM, _exit_on_sigterm)
         try:
             logger.info("Starting audiobook generation...")
             book_parser = get_book_parser(self.config)
@@ -150,7 +162,7 @@ class AudiobookGenerator:
 
             with multiprocessing.Pool(
                 processes=self.config.worker_count,
-                initializer=setup_logging,
+                initializer=_init_worker,
                 initargs=(self.config.log, self.config.log_file, True)
             ) as pool:
                 results = list(pool.imap_unordered(self.process_chapter_wrapper, tasks))
@@ -179,5 +191,7 @@ class AudiobookGenerator:
             logger.exception(f"Error during audiobook generation: {e}")
             return 1
         finally:
+            if previous_sigterm is not None:
+                signal.signal(signal.SIGTERM, previous_sigterm)
             logger.debug("AudiobookGenerator.run() method finished.")
 

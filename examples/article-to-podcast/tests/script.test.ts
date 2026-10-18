@@ -1,9 +1,9 @@
 import { generateText, Output } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it } from "vitest";
-import { defaultOptions, OptionsSchema } from "../lib/config";
-import { buildSystemPrompt, buildUserPrompt, partInstruction } from "../lib/prompt";
-import { calculateChunkSize, chunkText, generateScript, normalizeLines, planChunks, ScriptSchema } from "../lib/script";
+import { defaultOptions, OptionsSchema } from "@/lib/config";
+import { buildSystemPrompt, buildUserPrompt, partInstruction } from "@/lib/prompt";
+import { calculateChunkSize, chunkText, generateScript, normalizeLines, planChunks, ScriptSchema } from "@/lib/script";
 
 function mockModel(texts: string[]) {
   let call = 0;
