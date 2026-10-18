@@ -35,7 +35,7 @@ npm run ingest -- ./my-docs --base-url /docs/                    # a folder of .
 npm run ingest -- --sitemap https://docs.example.com/sitemap.xml # or a live site
 ```
 
-Sitemap mode fetches `<page>.md` first (Mintlify and GitBook serve one) and falls back to the HTML, keeping the page's own heading ids so citations land on the right anchor. It only fetches pages, and follows redirects, on the sitemap's own host. Running ingest again only re-indexes pages whose content changed.
+Sitemap mode fetches `<page>.md` first (Mintlify and GitBook serve one) and falls back to the HTML, keeping the page's own heading ids so citations land on the right anchor. It only fetches pages, and follows redirects, on the sitemap's own host. Running ingest again only re-indexes pages whose content changed. Only ingest sites you own or are allowed to index.
 
 Optional attributes on the script tag: `data-theme="light|dark"` (default follows the page) and `data-title="Ask the docs"`. Host pages with a Content Security Policy need `connect-src wss://api.cartesia.ai https://your-server.example.com` and `worker-src blob:`.
 
@@ -88,6 +88,8 @@ A public button that starts paid voice calls will be found. The token route chec
 
 The Origin check stops other websites, not scripts, which can send any header, so the rate limit is the real guard. The limiter is in memory and per process, so it only slows casual abuse. Put it in Redis or your edge if you run more than one process.
 
+Cartesia records the audio and transcript of every agent call by default ([observability](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings)). Tell your users, and delete calls you don't need with `DELETE /agents/calls/{call_id}`.
+
 Cost: each call bills Managed Agents minutes on your Cartesia account, see https://docs.cartesia.ai/pricing. With `OPENAI_API_KEY` set, every search also embeds the question once.
 
 Run `npm run build` and serve with `npm start`, which uses the built `dist/widget.js`. `GET /health` returns `{"ok":true}`.
@@ -123,3 +125,5 @@ npm run typecheck
 ## License
 
 Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE).
+
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

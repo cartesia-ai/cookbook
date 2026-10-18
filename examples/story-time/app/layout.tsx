@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Story time",
-  description: "Interactive bedtime stories read by a cast of Cartesia Sonic voices. Say what happens next.",
+  description: "Interactive stories read by a cast of Cartesia Sonic voices. You choose what happens next.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -11,6 +11,9 @@ import { Text } from "@/components/ui/text";
 import { formatDuration, groupByDay, searchEntries, timeLabel, type Entry } from "@/lib/journal";
 import { MOOD_LABELS } from "@/lib/schema";
 
+export const PRIVACY_NOTE =
+  "Entries are saved on this device. Recordings are sent to Cartesia and your LLM provider for transcription and reflections.";
+
 export function EntryList({ entries }: { entries: Entry[] }) {
   const [query, setQuery] = React.useState("");
   const groups = React.useMemo(() => groupByDay(searchEntries(entries, query)), [entries, query]);
@@ -31,7 +34,7 @@ export function EntryList({ entries }: { entries: Entry[] }) {
         <EmptyState
           icon={(c) => <BookOpen size={20} color={c} />}
           title="No entries yet"
-          description="Your first recording shows up here. Entries stay on this device."
+          description={`Your first recording shows up here. ${PRIVACY_NOTE}`}
         />
       ) : (
         <>

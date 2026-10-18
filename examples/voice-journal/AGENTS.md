@@ -15,3 +15,4 @@ Expo SDK 58 app (expo-router, expo-audio) for iOS, Android and web. Cartesia `in
 - Voice cloning is out of scope by decision. Do not add it.
 - LLM ids are never hardcoded. `LLM_MODEL` is `provider/model`; `lib/server/llm.ts` resolves it.
 - Docs: https://docs.cartesia.ai/llms.txt, https://docs.expo.dev/router/web/api-routes/.
+- Keep `PRIVACY_NOTE` (`components/journal/entry-list.tsx`, shown under the record button and in the empty list) and the 988 line on the entry screen. Change the note if you change where recordings go.

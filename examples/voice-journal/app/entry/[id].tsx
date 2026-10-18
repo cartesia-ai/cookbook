@@ -99,6 +99,10 @@ export default function EntryScreen() {
           </FormFooter>
         </FormPanel>
 
+        <Text variant="hint" tone="muted" style={{ marginTop: 16, textAlign: "center" }}>
+          If you&apos;re in crisis in the US, call or text 988.
+        </Text>
+
         <Dialog
           open={confirm}
           onClose={() => setConfirm(false)}

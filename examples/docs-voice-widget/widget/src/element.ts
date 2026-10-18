@@ -23,7 +23,7 @@ interface WidgetConfig {
 }
 
 const STATUS: Record<Phase, string> = {
-  idle: 'Ask anything about these docs',
+  idle: 'Ask an AI voice assistant about these docs. Audio is processed and recorded by Cartesia.',
   connecting: 'Connecting',
   listening: 'Listening',
   thinking: 'Thinking',

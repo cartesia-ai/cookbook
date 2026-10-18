@@ -20,6 +20,7 @@ Run from this directory. Node 22.22 or newer; inside the monorepo use pnpm.
 - Links built from index data (`sourceHref`, the demo's `safeHref`) allow only http(s) and relative URLs.
 - Widget UI follows `packages/kit/DESIGN.md` with hand-written CSS in `widget/src/styles.ts` and tokens in `widget/src/tokens.ts`.
 - Errors shown to visitors are the fixed strings in `errorFor` (`widget/src/element.ts`). Never show upstream text.
+- The idle status in `STATUS` (`widget/src/element.ts`) tells visitors they are talking to an AI and that Cartesia records the audio. Keep both.
 - `widget/src/agents-web/` is a byte-identical copy of files in `packages/agents-web/src`. Fix bugs there first, then copy.
 - `content/` holds the two demo pages. Do not commit `.env.local`, `data/` or `dist/`.
 

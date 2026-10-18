@@ -95,6 +95,9 @@ export function Recorder() {
                 <span className="text-xs text-muted-foreground">
                   Up to {MAX_RECORD_SECONDS / 60} minutes. Stop to get the notes.
                 </span>
+                <span className="text-xs text-muted-foreground">
+                  Get everyone&apos;s consent before recording. Some places require it from all participants.
+                </span>
               </span>
             </div>
           )

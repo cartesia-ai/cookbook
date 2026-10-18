@@ -8,10 +8,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ai.cartesia.cookbook.voicejournal"
+      "bundleIdentifier": "com.example.voicejournal"
     },
     "android": {
-      "package": "ai.cartesia.cookbook.voicejournal"
+      "package": "com.example.voicejournal"
     },
     "web": {
       "bundler": "metro",

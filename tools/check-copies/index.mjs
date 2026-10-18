@@ -3,10 +3,15 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const NEXT = ['article-to-podcast', 'meeting-notes', 'pocket-interpreter', 'speaking-partner', 'story-time', 'voice-chat'];
+const NOTICES = [
+  'packages/kit',
+  ...['article-to-podcast', 'meeting-notes', 'pocket-interpreter', 'speaking-partner', 'voice-chat', 'voice-journal', 'docs-voice-widget', 'front-desk', 'audiobook', 'story-time'].map((s) => `examples/${s}`),
+];
 export const GROUPS = [
   NEXT.map((s) => `examples/${s}/proxy.ts`),
   [...NEXT.map((s) => `examples/${s}/lib/rate-limit.ts`), 'examples/voice-journal/lib/server/rate-limit.ts'],
   ['examples/article-to-podcast/test/proxy.test.ts', ...NEXT.slice(1).map((s) => `examples/${s}/tests/proxy.test.ts`)],
+  ['THIRD_PARTY_NOTICES.md', ...NOTICES.map((d) => `${d}/THIRD_PARTY_NOTICES.md`)],
 ];
 
 function files(dir) {

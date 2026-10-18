@@ -37,7 +37,7 @@ export function SetupBanner() {
         )}
         {!health.moderation && (
           <p>
-            Add <code>OPENAI_API_KEY</code> to check names and scenes with OpenAI&apos;s free moderation endpoint. Without
+            Add <code>OPENAI_API_KEY</code> to check settings and scenes with OpenAI&apos;s free moderation endpoint. Without
             it, only the word list in <code>lib/safety.ts</code> runs.
           </p>
         )}

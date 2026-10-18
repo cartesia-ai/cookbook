@@ -65,6 +65,7 @@ console.log(res.text, res.duration);
 
 ## Before you deploy
 
+- Get everyone's consent before recording. Some places require it from all participants, and the recorder says so under the record button. The audio goes to Cartesia for transcription and the transcript goes to your LLM provider for the notes. Tell participants that.
 - Set `APP_PASSWORD`. `proxy.ts` asks every visitor for it with HTTP Basic auth, and on Vercel (production and preview) the app refuses to serve until it is set (use `none` to make the app public on purpose). On hosts other than Vercel, set `APP_PASSWORD` yourself, because the gate only enforces it on Vercel.
 - Both routes spend money. Each has an in-memory rate limit of 10 requests a minute per IP address. The limiter lives in one server process, so it only slows casual abuse. The password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
 - Batch `ink-whisper` bills per second of audio, silence included, plus one LLM call per meeting. See https://docs.cartesia.ai/pricing.
@@ -112,3 +113,5 @@ npm test
 ## License
 
 Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE).
+
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -135,6 +135,8 @@ The token route allows 10 tokens a minute per address. The limiter is in memory 
 
 Cartesia checks the token only when the socket opens, so a call does not end when its token expires.
 
+Cartesia records the audio and transcript of every agent call by default ([observability](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings)). Tell your users, and delete calls you don't need with `DELETE /agents/calls/{call_id}`.
+
 Managed Agent calls cost $0.06 a minute plus the LLM tokens, billed in dollars separately from credits. See https://docs.cartesia.ai/pricing. `GET /v1/agents/models` returns the token price of each model.
 
 ## FAQ
@@ -175,3 +177,5 @@ The tests cover the setup script against a stub API, the token route, the rate l
 ## License
 
 Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE).
+
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { FormFooter, FormPanel, FormSection } from "@/components/blocks/form-section";
 import { useTheme } from "@/components/theme/theme";
 import { radius } from "@/components/theme/tokens";
+import { PRIVACY_NOTE } from "@/components/journal/entry-list";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { formatDuration } from "@/lib/journal";
@@ -40,7 +41,7 @@ export function RecorderPanel({ busy, onRecorded }: { busy: boolean; onRecorded:
 
   return (
     <FormPanel>
-      <FormSection title="New entry" description="Talk for a minute or two, up to five. Only the text is kept, not the audio.">
+      <FormSection title="New entry" description="Talk for a minute or two, up to four. Only the text is kept, not the audio.">
         <View
           style={{
             height: 120,
@@ -79,7 +80,7 @@ export function RecorderPanel({ busy, onRecorded }: { busy: boolean; onRecorded:
           </Text>
         ) : (
           <Text variant="hint" tone="muted">
-            {rec.isRecording ? "Recording. Tap Stop and save when you are done." : "The microphone turns on when you tap Start recording."}
+            {rec.isRecording ? "Recording. Tap Stop and save when you are done." : PRIVACY_NOTE}
           </Text>
         )}
       </FormSection>

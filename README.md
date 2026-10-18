@@ -18,7 +18,7 @@ Each folder in [`examples/`](examples) installs and runs on its own, with a READ
 | [article-to-podcast](examples/article-to-podcast) | Paste a link and get a two-host episode with a transcript that follows along | Next.js, AI SDK | Cartesia + LLM key |
 | [meeting-notes](examples/meeting-notes) | Record or upload a meeting, get a transcript, summary, decisions and action items | Next.js, AI SDK | Cartesia + LLM key |
 | [voice-journal](examples/voice-journal) | A voice diary for iOS, Android and the web that reads a weekly recap aloud | Expo, React Native | Cartesia + LLM key |
-| [story-time](examples/story-time) | An interactive bedtime story read aloud with a voice per character and word highlighting | Next.js, AI SDK | Cartesia + LLM key |
+| [story-time](examples/story-time) | An interactive story read aloud with a voice per character and word highlighting, where you choose what happens next | Next.js, AI SDK | Cartesia + LLM key |
 
 Get a Cartesia key at [play.cartesia.ai/keys](https://play.cartesia.ai/keys). To start from one template:
 
@@ -114,6 +114,10 @@ The API version header is `Cartesia-Version: 2026-08-14`. [`facts.json`](facts.j
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the repo layout, how templates share code, and the checks to run before a pull request.
 
+## Your users' data
+
+The templates send your users' audio and text to Cartesia and to the LLM provider you configure (OpenAI, Anthropic or Vercel AI Gateway). Managed Agents record the audio and transcript of every agent call by default. Delete a call's recording with `DELETE /agents/calls/{id}`, and see the [observability docs](https://docs.cartesia.ai/line/infrastructure/observability) for recording and retention controls. If you deploy one of these apps for other people, you need your own privacy notice and terms, and consent where the law requires it.
+
 ## Thanks
 
 Several templates started from ideas in these open source projects:
@@ -136,4 +140,10 @@ The UI is [shadcn/ui](https://ui.shadcn.com), the icons are [Lucide](https://luc
 
 ## License
 
+These templates are examples, not production software. They are provided as is under Apache-2.0. You are responsible for privacy, consent, recording and AI-disclosure laws where you deploy.
+
 Apache-2.0, see [LICENSE](LICENSE). Two exceptions keep their upstream MIT license: [`examples/audiobook`](examples/audiobook) is a fork of [p0n1/epub_to_audiobook](https://github.com/p0n1/epub_to_audiobook), and the UI components in `components/ui` and `packages/kit/components/ui` come from [shadcn/ui](https://ui.shadcn.com) (MIT, Copyright (c) 2023 shadcn).
+
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Vercel and Next.js are trademarks of Vercel, Inc. Other product names are trademarks of their owners. Their use here does not imply affiliation or endorsement.

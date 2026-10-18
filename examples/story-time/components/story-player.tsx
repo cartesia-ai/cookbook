@@ -16,7 +16,7 @@ import { listenForChoice } from "@/lib/listen";
 import { matchChoice } from "@/lib/match-choice";
 import { narrateLive, replay, type Narration, type Timeline } from "@/lib/narrate";
 import { getStory, saveStory } from "@/lib/store";
-import { isFinished, NARRATOR, themeLabel, TOTAL_SCENES, type Scene, type SceneRecord, type Story } from "@/lib/story";
+import { isFinished, NARRATOR, themeLabel, TONES, TOTAL_SCENES, type Scene, type SceneRecord, type Story } from "@/lib/story";
 
 type Phase = "loading" | "missing" | "writing" | "reading" | "choosing" | "idle" | "end" | "error";
 
@@ -39,7 +39,7 @@ async function postScene(s: Story): Promise<Scene> {
       body: JSON.stringify({
         hero: s.hero,
         themes: s.themes,
-        age: s.age,
+        tone: s.tone,
         title: s.title,
         history: s.scenes.map(({ lines, choices, chosen }) => ({ lines, choices, chosen })),
       }),
@@ -144,18 +144,15 @@ export function StoryPlayer({ id }: { id: string }) {
       narration.current = n;
       setPlaying({ scene: index, timeline: n.timeline });
       setPhase("reading");
-      let how: "done" | "stopped";
       try {
-        how = await n.ended;
+        await n.ended;
       } finally {
         if (narration.current === n) narration.current = null;
         setPlaying(null);
       }
-      const cur = storyRef.current!;
-      setPhase(phaseFor(cur));
-      if (how === "done" && index === cur.scenes.length - 1 && phaseFor(cur) === "choosing") void startListening();
+      setPhase(phaseFor(storyRef.current!));
     },
-    [commit, startListening, stopListening, stopReading],
+    [commit, stopListening, stopReading],
   );
 
   const advance = useCallback(async () => {
@@ -241,14 +238,15 @@ export function StoryPlayer({ id }: { id: string }) {
   if (!story) return <Skeleton className="h-64 w-full rounded-xl" />;
 
   const themes = themeLabel(story.themes);
+  const tone = TONES.find((t) => t.value === story.tone)?.label ?? "A";
   const last = story.scenes.at(-1);
   const needsReading = phase === "idle" && last && !last.audio;
 
   return (
     <>
       <PageHeader
-        title={story.title || `${story.hero}'s story`}
-        description={`A ${themes.toLowerCase()} story for ${story.hero}, ages ${story.age.replace("-", " to ")}.`}
+        title={story.title || (story.hero ? `${story.hero}'s story` : "New story")}
+        description={`${tone} story about ${themes.toLowerCase()}. You choose what happens next.`}
         actions={
           phase === "reading" ? (
             <Button variant="outline" className={softRed} onClick={stopReading}>
@@ -284,7 +282,7 @@ export function StoryPlayer({ id }: { id: string }) {
           <section className="flex flex-col gap-4 p-5 sm:p-6" aria-live="polite">
             <div className="flex items-start justify-between gap-4">
               <div className="flex flex-col gap-1">
-                <h2 className="text-sm font-medium leading-5">What should {story.hero} do?</h2>
+                <h2 className="text-sm font-medium leading-5">What happens next?</h2>
                 <ListenStatus listening={listening} heard={heard} unclear={unclear} blocked={micBlocked} />
               </div>
               {!listening ? (
@@ -327,7 +325,7 @@ export function StoryPlayer({ id }: { id: string }) {
         ) : null}
         {phase === "end" ? (
           <FormFooter className="sm:justify-between">
-            <p className="text-sm font-medium">The end. Sleep well, {story.hero}.</p>
+            <p className="text-sm font-medium">The end.</p>
             <Button asChild className="w-full sm:w-auto sm:min-w-40">
               <Link href="/">Make another story</Link>
             </Button>
@@ -382,7 +380,7 @@ function SceneSection({
       {scene.chosen !== undefined ? (
         <p className="flex items-center gap-2 text-[13px] leading-5 text-muted-foreground">
           <Check className="size-4 text-primary" aria-hidden />
-          {story.hero} chose: {scene.choices[scene.chosen]}
+          You chose: {scene.choices[scene.chosen]}
         </p>
       ) : null}
     </section>
@@ -411,7 +409,13 @@ function ListenStatus({ listening, heard, unclear, blocked }: { listening: boole
       </p>
     );
   }
-  if (!listening) return <p className="text-[13px] leading-5 text-muted-foreground">Tap a choice, or answer out loud.</p>;
+  if (!listening) {
+    return (
+      <p className="text-[13px] leading-5 text-muted-foreground">
+        Tap a choice. To say it instead, press Answer out loud. Your voice then streams to Cartesia for transcription.
+      </p>
+    );
+  }
   return (
     <p className="flex flex-wrap items-center gap-2 text-[13px] leading-5 text-muted-foreground">
       <span className="relative flex size-2.5" aria-hidden>

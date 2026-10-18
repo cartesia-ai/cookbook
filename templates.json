@@ -251,15 +251,9 @@
     {
       "slug": "story-time",
       "title": "Story time",
-      "description": "An interactive bedtime story generator that reads aloud with a Sonic 3.6 voice per character, highlights each word, and takes spoken choices with Ink 2.",
+      "description": "An interactive story app where Sonic 3.6 voices every character with word highlighting and you choose what happens next, by tap or by voice with Ink 2.",
       "category": "speech-generation",
-      "searchPhrases": [
-        "AI bedtime story generator that reads aloud",
-        "different voice for each character text to speech",
-        "word highlighting read-along with TTS timestamps",
-        "interactive story kids can talk to",
-        "Sonic WebSocket contexts with emotion"
-      ],
+      "searchPhrases": ["interactive AI story that reads aloud", "different voice for each character text to speech", "word highlighting read-along with TTS timestamps", "choose your own adventure with voice input", "Sonic WebSocket contexts with emotion"],
       "stack": ["Next.js 16", "React 19", "AI SDK", "IndexedDB", "shadcn/ui"],
       "languages": ["TypeScript"],
       "spokenLanguages": ["en"],
@@ -285,14 +279,14 @@
       },
       "deploy": {
         "vercel": null,
-        "note": "Add your own login and a moderation API before sharing it publicly."
+        "note": "Set APP_PASSWORD before you deploy, and add OPENAI_API_KEY so scenes are moderated."
       },
-      "license": "BSD-2-Clause"
+      "license": "Apache-2.0"
     },
     {
       "slug": "meeting-notes",
       "title": "Meeting notes",
-      "description": "Record or upload a meeting, transcribe it with ink-whisper, and get a summary, decisions and action items. Meetings stay in the browser.",
+      "description": "Transcribe meetings with ink-whisper and get a summary and action items. Notes are stored in the browser. Audio goes to Cartesia and the transcript to your LLM.",
       "category": "transcription",
       "searchPhrases": [
         "AI meeting notes app",

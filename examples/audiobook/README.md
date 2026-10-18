@@ -107,6 +107,7 @@ The tool uses `sonic-3.6` over `/tts/sse`, with `Cartesia-Version: 2026-08-14` s
 
 ## Before you deploy
 
+- Rights: only convert books you own or have the rights to. Label published output as AI-generated audio.
 - Auth: the web app has no login. Keep the default host `127.0.0.1`. Anyone who can reach the app spends your credits.
 - Limits: `--worker_count` sets how many requests run at once. Stay within your plan's concurrency limit.
 - Cost: Sonic bills about one credit per character, and the pauses between paragraphs are added locally for free. Run with `--preview` first to get the character count. What a credit costs depends on your plan, see https://docs.cartesia.ai/pricing.
@@ -147,4 +148,8 @@ The tests use a fake client, unset `CARTESIA_API_KEY` before they run and never 
 
 ## License
 
-MIT, unlike the rest of the cookbook. This folder is a fork of [p0n1/epub_to_audiobook](https://github.com/p0n1/epub_to_audiobook), which supplies the EPUB parsing, chapter handling, preview mode, search-and-replace and the Gradio app, and `LICENSE` keeps its copyright notice. `samples/alice_ch1_2.txt` holds two excerpts of *Alice's Adventures in Wonderland* from Project Gutenberg, public domain in the United States.
+MIT, unlike the rest of the cookbook. This folder is a fork of [p0n1/epub_to_audiobook](https://github.com/p0n1/epub_to_audiobook), which supplies the EPUB parsing, chapter handling, preview mode, search-and-replace and the Gradio app, and `LICENSE` keeps its copyright notice. `samples/alice_ch1_2.txt` holds two excerpts of *Alice's Adventures in Wonderland* (Lewis Carroll, 1865), public domain in the United States.
+
+The tool depends on EbookLib (AGPL-3.0) and mutagen (GPL-2.0-or-later). They are not bundled here, but anyone who redistributes or hosts the app should check those licenses.
+
+Third-party notices: THIRD_PARTY_NOTICES.md.

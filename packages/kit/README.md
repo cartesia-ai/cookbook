@@ -31,3 +31,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 Templates stay self-contained: copy, do not depend on this package.
 
+
+## License
+
+Apache-2.0, like the rest of the cookbook. The components in `components/ui` are based on shadcn/ui (MIT). Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -114,6 +114,8 @@ Set `APP_PASSWORD`. `proxy.ts` then asks for that password (HTTP Basic auth, any
 
 `/api/token` and `/api/translate` also have an in-memory rate limit of 10 requests a minute per client IP. It is per process and only slows casual abuse; the password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
 
+Both people's speech goes to Cartesia, and the text of each turn goes to your LLM provider for translation. Tell the other person before you start.
+
 A session costs Ink 2 time while the microphone is open, one LLM call per turn, and Sonic characters for each translation. See https://docs.cartesia.ai/pricing and your LLM provider's pricing page.
 
 ## FAQ
@@ -151,3 +153,5 @@ npm test
 ## License
 
 Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE).
+
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

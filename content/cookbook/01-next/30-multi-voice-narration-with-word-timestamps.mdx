@@ -6,7 +6,7 @@ tags: ['next', 'tts', 'timestamps', 'stt']
 
 # Narrate a story with a different voice per character and highlight each word
 
-This recipe reads a scene aloud in the browser with Cartesia Sonic 3.6 (`sonic-3.6`). The narrator and each character get their own voice and their own emotion, the word being spoken lights up on screen, and when the scene ends the listener says what happens next. Cartesia Ink 2 (`ink-2`) turns that answer into text, and a small matcher picks one of the two choices.
+This recipe reads a scene aloud in the browser with Cartesia Sonic 3.6 (`sonic-3.6`). The narrator and each character get their own voice and their own emotion, the word being spoken lights up on screen, and the listener can say what happens next. Cartesia Ink 2 (`ink-2`) turns that answer into text, and a small matcher picks one of the two choices.
 
 Where the scene text comes from is up to you. A fixed script works, and so do lines an LLM writes as JSON. This page covers the voice and timing parts.
 
@@ -226,7 +226,7 @@ The same timeline drives replay. Save the joined PCM and each line's offset and 
 
 ## Hear the spoken choice with Ink 2
 
-When the scene ends, the page streams the microphone to Ink 2 over the turns WebSocket. Ink 2 detects when the speaker stops, so there is no button to hold.
+When the listener presses Answer out loud, the page streams the microphone to Ink 2 over the turns WebSocket. Ink 2 detects when the speaker stops, so there is no button to hold.
 
 ```ts filename="lib/listen.ts"
 export async function listenForChoice(client: Cartesia, ctx: AudioContext, handlers: ListenHandlers) {
@@ -260,7 +260,7 @@ export async function listenForChoice(client: Cartesia, ctx: AudioContext, handl
 }
 ```
 
-`startMic` in the same file runs an `AudioWorklet` that posts raw Float32 samples and cuts them into 100 ms chunks at the context's own sample rate, which is the `sample_rate` sent to Ink 2. Nothing is recorded or kept.
+`startMic` in the same file runs an `AudioWorklet` that posts raw Float32 samples and cuts them into 100 ms chunks at the context's own sample rate, which is the `sample_rate` sent to Ink 2. The audio streams to Cartesia for transcription; the app keeps none of it.
 
 The player tries to match on `turn.eager_end`, before the end-of-turn silence has passed, so a clear answer moves the story on sooner. Only an unclear `turn.end` tells the listener to try again.
 

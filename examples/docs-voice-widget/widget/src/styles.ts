@@ -41,7 +41,7 @@ svg { display: block; flex-shrink: 0; }
 
 .body { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; overscroll-behavior: contain; }
 .stage { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 4px; }
-.status { font-size: 13px; color: var(--muted-foreground); min-height: 20px; }
+.status { font-size: 13px; color: var(--muted-foreground); min-height: 20px; text-align: center; max-width: 280px; }
 
 .orb { position: relative; width: 88px; height: 88px; border-radius: 9999px; background: var(--orb-idle, var(--muted)); border: 1px solid var(--border); transition: background-color .25s, transform .25s, border-color .25s; }
 :host([data-theme="dark"]) { --orb-idle: var(--secondary); }

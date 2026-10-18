@@ -6,17 +6,22 @@ export const THEMES = [
   { value: "space", label: "Space" },
   { value: "forest", label: "Enchanted forest" },
   { value: "ocean", label: "Under the sea" },
-  { value: "dragons", label: "Friendly dragons" },
+  { value: "dragons", label: "Dragons" },
   { value: "dinosaurs", label: "Dinosaurs" },
   { value: "robots", label: "Robots" },
   { value: "castle", label: "Castles" },
-  { value: "farm", label: "Farm animals" },
+  { value: "city", label: "Big city" },
 ] as const;
 
 export type ThemeValue = (typeof THEMES)[number]["value"];
 
-export const AGES = ["3-5", "6-8"] as const;
-export type Age = (typeof AGES)[number];
+export const TONES = [
+  { value: "cozy", label: "Cozy", prompt: "warm and gentle, with small stakes" },
+  { value: "funny", label: "Funny", prompt: "playful and silly, with jokes and comic timing" },
+  { value: "adventure", label: "Adventure", prompt: "brisk and exciting, with a clear goal and mild peril" },
+  { value: "mystery", label: "Mystery", prompt: "curious and a little eerie, with clues that pay off" },
+] as const;
+export type Tone = (typeof TONES)[number]["value"];
 
 export const VOICES = {
   marian: { id: "26403c37-80c1-4a1a-8692-540551ca2ae5", name: "Marian", hint: "Calm storyteller" },
@@ -89,7 +94,7 @@ export type Story = {
   createdAt: number;
   hero: string;
   themes: ThemeValue[];
-  age: Age;
+  tone: Tone;
   narrator: VoiceKey;
   title: string;
   cast: Record<string, VoiceKey>;

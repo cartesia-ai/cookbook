@@ -8,8 +8,8 @@ export default function Home() {
     <>
       <SetupBanner />
       <PageHeader
-        title="Make a bedtime story"
-        description="Pick a hero and a theme. Sonic 3.6 reads it with a voice for each character, and your child says what happens next."
+        title="Make a story"
+        description="Pick a theme and a tone. Sonic 3.6 reads it with a voice for each character, and you choose what happens next."
       />
       <StoryForm />
       <StoryLibrary />

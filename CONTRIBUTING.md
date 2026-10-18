@@ -136,4 +136,4 @@ Write plainly. No em dashes, no marketing words. Say what the code does and what
 
 ## License
 
-By contributing you agree your work is licensed under Apache-2.0, the same as the rest of the repo.
+By contributing you agree your work is licensed under Apache-2.0, the same as the rest of the repo, except contributions to examples/audiobook, which are MIT.

@@ -73,3 +73,14 @@ test('a template missing a shared copy fails', () => {
     'examples/story-time/proxy.ts: missing, it should be a copy of examples/article-to-podcast/proxy.ts.',
   ]);
 });
+
+test('third-party notices copies must match the root file', () => {
+  const root = tree({ ...base, 'examples/front-desk/THIRD_PARTY_NOTICES.md': 'edited' });
+  assert.deepEqual(checkCopies(root), [
+    'examples/front-desk/THIRD_PARTY_NOTICES.md: differs from THIRD_PARTY_NOTICES.md. Copy the source file over it.',
+  ]);
+  const { 'packages/kit/THIRD_PARTY_NOTICES.md': _, ...rest } = base;
+  assert.deepEqual(checkCopies(tree(rest)), [
+    'packages/kit/THIRD_PARTY_NOTICES.md: missing, it should be a copy of THIRD_PARTY_NOTICES.md.',
+  ]);
+});

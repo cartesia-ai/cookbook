@@ -35,6 +35,7 @@ proxy.ts                      APP_PASSWORD Basic auth gate
 - UI is shadcn/ui with the Cartesia Verdant theme in `app/globals.css`, copied byte for byte from `packages/kit`. Change behavior in a new file, not in a copy. No other component library.
 - `next.config.ts` sets `agentRules: false` so `next dev` leaves this file alone.
 - Don't commit `.env.local`. Don't print keys.
+- Keep the consent line under the record button in `components/recorder.tsx`.
 
 ## Verify a change
 

@@ -21,7 +21,7 @@ function meta(s: Story): string {
   const themes = themeLabel(s.themes);
   const progress = isFinished(s) ? `${TOTAL_SCENES} scenes` : `Scene ${Math.max(1, s.scenes.length)} of ${TOTAL_SCENES}`;
   const date = new Date(s.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  return `${s.hero} · ${themes} · ${progress} · ${date}`;
+  return [s.hero, themes, progress, date].filter(Boolean).join(" · ");
 }
 
 export function StoryLibrary() {

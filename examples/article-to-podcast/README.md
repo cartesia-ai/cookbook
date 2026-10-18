@@ -81,6 +81,7 @@ export function getModel() {
 
 ## Before you deploy
 
+- Only convert articles you own or have permission to adapt. Label published audio as AI-generated.
 - Set `APP_PASSWORD`. `proxy.ts` asks every visitor for it with HTTP Basic auth, and on Vercel (production and preview) the app refuses to serve until it is set (use `none` to make the app public on purpose). On hosts other than Vercel, set `APP_PASSWORD` yourself, because the gate only enforces it on Vercel.
 - Both routes spend money (LLM tokens and Cartesia credits). Each has an in-memory rate limit per IP address (10 scripts and 5 recordings a minute). The limiter lives in one server process, so it only slows casual abuse. The password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
 - Sonic bills per character of script, see https://docs.cartesia.ai/pricing. The audio route rejects scripts over 30,000 characters, which caps the cost of one episode, plus the LLM tokens.
@@ -123,3 +124,5 @@ The tests need no keys and no network. They mock the Cartesia SDK and use `MockL
 ## License
 
 Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE).
+
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

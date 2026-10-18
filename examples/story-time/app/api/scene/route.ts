@@ -4,7 +4,7 @@ import { scenePrompt, storyInstructions } from "@/lib/prompt";
 import { isFlagged, moderate, ModerationError } from "@/lib/moderation";
 import { clientIp, createRateLimiter, tooManyRequests } from "@/lib/rate-limit";
 import { cleanHeroName, cleanThemes, looksUnsafe } from "@/lib/safety";
-import { AGES, SceneSchema, TOTAL_SCENES, type Age, type Scene, type SceneRecord } from "@/lib/story";
+import { SceneSchema, TONES, TOTAL_SCENES, type Scene, type SceneRecord, type Tone } from "@/lib/story";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -45,27 +45,28 @@ function checkScene(scene: Scene, last: boolean): "format" | "unsafe" | null {
 export async function POST(req: Request) {
   if (!allow(clientIp(req))) return tooManyRequests();
   const body = await req.json().catch(() => null);
-  const hero = cleanHeroName(body?.hero);
+  const rawHero = body?.hero ?? "";
+  const hero = rawHero === "" ? "" : cleanHeroName(rawHero);
   const themes = cleanThemes(body?.themes);
-  const age = AGES.includes(body?.age) ? (body.age as Age) : null;
+  const tone = TONES.some((t) => t.value === body?.tone) ? (body.tone as Tone) : null;
   const history = cleanHistory(body?.history);
   const title = typeof body?.title === "string" ? body.title.slice(0, 80) : "";
-  if (!hero) return Response.json({ error: "Use a first name with letters only, up to 24 characters" }, { status: 400 });
+  if (hero === null) return Response.json({ error: "Use a name with letters only, up to 24 characters" }, { status: 400 });
   if (looksUnsafe(hero)) return Response.json({ error: NAME_NOT_OK }, { status: 400 });
-  if (!themes || !age || !history) return Response.json({ error: "The story settings are not valid" }, { status: 400 });
+  if (!themes || !tone || !history) return Response.json({ error: "The story settings are not valid" }, { status: 400 });
 
   const last = history.length === TOTAL_SCENES - 1;
   let safeTitle = looksUnsafe(title) ? "" : title;
   try {
-    const flags = await moderate([`Hero name: ${hero}\nThemes: ${themes.join(", ")}`, safeTitle || "Untitled"]);
+    const flags = await moderate([`Hero name: ${hero || "none"}\nThemes: ${themes.join(", ")}`, safeTitle || "Untitled"]);
     if (flags?.[0]) return Response.json({ error: NAME_NOT_OK }, { status: 400 });
     if (flags?.[1]) safeTitle = "";
     let unsafe = false;
     for (let attempt = 0; attempt < 2; attempt++) {
       const result = await generateText({
         model: getModel(),
-        instructions: storyInstructions(age),
-        prompt: scenePrompt({ hero, themes, age, title: safeTitle, history }),
+        instructions: storyInstructions(tone),
+        prompt: scenePrompt({ hero, themes, tone, title: safeTitle, history }),
         output: Output.object({ schema: SceneSchema }),
         maxOutputTokens: 1200,
         maxRetries: 1,

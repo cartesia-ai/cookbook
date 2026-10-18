@@ -4,7 +4,7 @@ An Expo app for iOS, Android and the web that turns spoken diary entries into te
 
 ![Phone screenshot of the Weekly recap screen: a This week panel with one entry and a Hopeful mood badge, the voice picker set to Tessa, the Write my recap button, and the latest recap playing at 0:04 of 0:32](./docs/screenshot.png)
 
-Tap to record an entry, `ink-whisper` transcribes it, and an LLM adds a title, a mood and a one-line reflection. Once a week the app writes a short recap and reads it with a Sonic voice you pick. Entries stay on the device. A few Expo Router API routes hold the keys, so there is no database and no login.
+Tap to record an entry, `ink-whisper` transcribes it, and an LLM adds a title, a mood and a one-line reflection. Once a week the app writes a short recap and reads it with a Sonic voice you pick. Entries are saved on this device. Recordings are sent to Cartesia and your LLM provider for transcription and reflections. A few Expo Router API routes hold the keys, so there is no database and no login.
 
 ## Run it
 
@@ -95,7 +95,11 @@ Recordings over 4 MB are rejected, because hosts such as Vercel refuse request b
 
 Each entry costs one `ink-whisper` transcription and one LLM call. Each recap costs one LLM call and Sonic characters for the text. See https://docs.cartesia.ai/pricing and your LLM provider's pricing page.
 
-Entries are sent to Cartesia and your LLM provider for processing; tell your users that.
+Entries are sent to Cartesia and your LLM provider for processing; tell your users that. The app says so under the record button.
+
+Washington's [My Health My Data Act](https://app.leg.wa.gov/RCW/default.aspx?cite=19.373.010) can treat inferred mood labels as consumer health data. If you have users there, get their consent and publish a health data privacy policy.
+
+Before you ship to the App Store, check [guideline 5.1.2(i)](https://developer.apple.com/app-store/review/guidelines/). It requires you to say that recordings go to third-party AI services, ask the user's permission first, and link a privacy policy.
 
 ## FAQ
 
@@ -134,3 +138,5 @@ npm test
 ## License
 
 Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE).
+
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

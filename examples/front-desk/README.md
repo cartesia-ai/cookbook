@@ -2,7 +2,7 @@
 
 An AI phone receptionist for a small business that books appointments, takes messages and logs every call, built on a Cartesia Managed Agent with a Python FastAPI dashboard.
 
-![Call detail page in light mode: a browser call marked Booked, a recording player, latency medians (text to speech 251 ms, LLM first text 529 ms) and the transcript with check_availability and book_appointment tool calls inline](./docs/screenshot.png)
+![Call detail page in light mode: a simulated phone call from +14155550123 marked Booked, latency medians (speech to text 178 ms, text to speech 88 ms) and a transcript that opens with "I'm an AI assistant, and this call may be recorded", with check_availability and book_appointment tool calls inline](./docs/screenshot.png)
 
 The agent runs Ink 2 speech to text, an LLM and Sonic 3.6 text to speech as one managed stack. It books into Cal.com or a built-in calendar, hands callers to a person, and the dashboard shows each call's transcript, recording and per-turn latency. You can try it in the browser with only a Cartesia API key, no phone number needed.
 
@@ -111,8 +111,10 @@ Set `DASHBOARD_PASSWORD`. Every page, the recordings, `POST /api/token`, `POST /
 This is not legal advice. Check the rules where you and your callers are.
 
 - Tell callers they are talking to an AI. The default greeting does.
-- Cartesia records agent calls by default; see [call recordings](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings). Some US states, such as California and Florida, require every party's consent to record. The default greeting says the call may be recorded.
-- Outbound calls, especially automated or AI-voiced ones, fall under the TCPA in the US, which requires prior consent for many of them. This template only answers calls.
+- Cartesia records the audio and transcript of every agent call by default ([observability](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings)). Tell your users, and delete calls you don't need with `DELETE /agents/calls/{call_id}`.
+- Some US states, such as California, Florida, Illinois and Washington, require every party's consent to record. The default greeting says the call may be recorded.
+- Calls, transcripts and caller numbers stay in `data/front-desk.db` and in Cartesia until you delete them. Pick a retention period.
+- In February 2024 the FCC ruled that AI-generated voices count as artificial voices under the TCPA ([FCC 24-17](https://docs.fcc.gov/public/attachments/FCC-24-17A1.pdf)), so outbound AI calls need the called person's prior express consent. This template only answers calls.
 
 ### Put it on a phone number
 
@@ -159,3 +161,5 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy front_desk sc
 ## License
 
 Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE).
+
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

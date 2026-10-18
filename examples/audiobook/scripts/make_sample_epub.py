@@ -16,12 +16,12 @@ def read_chapters(path):
 
 def build(chapters):
     book = epub.EpubBook()
-    book.set_identifier("alice-sample-gutenberg-11")
+    book.set_identifier("alice-sample-carroll-1865")
     book.set_title("Alice's Adventures in Wonderland (excerpts)")
     book.set_language("en")
     book.add_author("Lewis Carroll")
     book.add_metadata("DC", "description", "Two excerpts for the Cartesia audiobook example. "
-                      "Text from Project Gutenberg ebook #11; public domain in the United States.")
+                      "Public domain text, Lewis Carroll, 1865.")
     items = []
     for i, (title, paragraphs) in enumerate(chapters, start=1):
         item = epub.EpubHtml(title=title, file_name=f"chapter{i}.xhtml", lang="en")

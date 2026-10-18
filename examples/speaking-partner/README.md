@@ -89,6 +89,8 @@ Each route has an in-memory limit per address: 10 sessions, 10 tokens, 10 correc
 
 Closing the tab sends a `keepalive` request that deletes the agent. Each new session also deletes `speaking-partner-session-` agents older than 30 minutes, so a crashed tab or server leaves one behind only until the next session starts.
 
+Cartesia records the audio and transcript of every agent call by default ([observability](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings)). Tell your users, and delete calls you don't need with `DELETE /agents/calls/{call_id}`.
+
 Agent minutes and the agent's LLM are billed to your Cartesia account. Each line you say also makes one small call to the corrections model. See https://docs.cartesia.ai/pricing.
 
 ## FAQ
@@ -127,3 +129,5 @@ Browser audio and the quality of the conversation are not covered by tests. Ink 
 ## License
 
 Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE).
+
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

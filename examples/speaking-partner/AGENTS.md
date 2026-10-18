@@ -10,7 +10,7 @@ Language speaking practice on a Cartesia Managed Agent. Next.js 16 App Router, t
 ## Files
 
 - `lib/session-agent.ts`: the agent body, voice pick, shared `complete_mission` tool, paged listing, the `MAX_LIVE_SESSIONS` cap, delete and sweep.
-- `lib/prompts.ts`: Teacher and Immersive instructions. `data/missions.json`: the role plays.
+- `lib/prompts.ts`: Teacher and Immersive instructions. `data/missions.json`: the role plays. Immersive mode must still say yes when asked if it is an AI. `content/cookbook/15-agents/03-speaking-partner.mdx` quotes `IMMERSIVE`, and `tests/recipe-snippets.test.ts` fails if they drift.
 - `app/api/session`, `app/api/session/end`, `app/api/token`, `app/api/correct`: the only server routes.
 - `components/session-view.tsx`: the call, through `useCartesiaAgent`.
 - `lib/corrections.ts` and `lib/model.ts`: the corrections call and the model switch.
