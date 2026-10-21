@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 from front_desk.config import settings
 from front_desk.tools import TOOL_SPECS
 
@@ -9,6 +11,16 @@ spec = importlib.util.spec_from_file_location(
 )
 setup_agent = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(setup_agent)
+
+
+def test_help_prints_usage_without_a_key(monkeypatch, capsys):
+    monkeypatch.setenv("CARTESIA_API_KEY", "")
+    with pytest.raises(SystemExit) as exit_info:
+        setup_agent.main(["--help"])
+    assert exit_info.value.code == 0
+    out = capsys.readouterr().out
+    assert "--dry-run" in out
+    assert "CARTESIA_API_KEY is empty" not in out
 
 
 def test_client_tools_without_a_public_url():

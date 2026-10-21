@@ -148,6 +148,20 @@ class TestCartesiaProvider(unittest.TestCase):
         provider.text_to_speech("Hello there.", self.out, self.tags)
         self.assertEqual(len(fake.tts.calls), 2)
 
+    def test_closes_each_stream_after_done(self):
+        provider, fake = make_provider()
+        provider.text_to_speech(f"First paragraph here. {BRK} Second paragraph here.", self.out, self.tags)
+        self.assertEqual(len(fake.tts.streams), 2)
+        self.assertTrue(all(s.closed for s in fake.tts.streams))
+
+    def test_closes_the_stream_on_an_error_event(self):
+        from types import SimpleNamespace
+        ev = SimpleNamespace(type="error", status_code=400, title="Bad request", message="nope")
+        provider, fake = make_provider(tts=FakeTTS(error_event=ev))
+        with self.assertRaises(mod.CartesiaStreamError):
+            provider.text_to_speech("Hello there.", self.out, self.tags)
+        self.assertTrue(fake.tts.streams[0].closed)
+
     def test_gives_up_after_the_retry_limit(self):
         from cartesia import APIConnectionError
         import httpx

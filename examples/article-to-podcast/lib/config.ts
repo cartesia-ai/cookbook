@@ -59,7 +59,7 @@ export const OptionsSchema = z.object({
     .array(z.string().trim().min(1).max(40))
     .max(8)
     .default(["questions", "examples", "analogies"]),
-  creativity: z.number().min(0).max(1).default(0.7),
+  creativity: z.number().min(0).max(1).optional(),
   userInstructions: z.string().max(1000).default(""),
   length: z.enum(["short", "medium", "long"]).default("medium"),
   maxNumChunks: z.number().int().min(1).max(8).optional(),

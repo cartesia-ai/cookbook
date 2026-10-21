@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import re
@@ -179,17 +180,18 @@ class CartesiaTTSProvider:
 
         pcm = bytearray()
         words: List[Tuple[str, float, float]] = []
-        for ev in self.client.tts.generate_sse(**kwargs):
-            if ev.type == "chunk":
-                if ev.audio:
-                    pcm += ev.audio
-            elif ev.type == "timestamps":
-                wt = ev.word_timestamps
-                words.extend(zip(wt.words, wt.start, wt.end, strict=False))
-            elif ev.type == "error":
-                raise CartesiaStreamError(ev.status_code, f"{ev.title}: {ev.message}")
-            elif ev.type == "done":
-                break
+        with contextlib.closing(self.client.tts.generate_sse(**kwargs)) as stream:
+            for ev in stream:
+                if ev.type == "chunk":
+                    if ev.audio:
+                        pcm += ev.audio
+                elif ev.type == "timestamps":
+                    wt = ev.word_timestamps
+                    words.extend(zip(wt.words, wt.start, wt.end, strict=False))
+                elif ev.type == "error":
+                    raise CartesiaStreamError(ev.status_code, f"{ev.title}: {ev.message}")
+                elif ev.type == "done":
+                    break
         return bytes(pcm), words
 
     def _stream_chunk_with_retry(self, chunk: cast.Segment):

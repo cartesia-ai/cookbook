@@ -230,7 +230,6 @@ export async function POST(req: Request) {
       instructions: NOTES_INSTRUCTIONS,
       prompt: transcript,
       output: Output.object({ schema: MeetingNotesSchema }),
-      temperature: 0.2,
       maxOutputTokens: 1500,
       maxRetries: 2,
     });
@@ -248,7 +247,7 @@ export async function POST(req: Request) {
 }
 ```
 
-The schema makes every key required, and `owner` is nullable instead of optional. OpenAI's strict structured outputs reject optional keys, and this shape works with the other providers too. The `describe` text on `decisions` matters. Without it, models list open questions as decisions. `getModel()` in `lib/llm.ts` reads `LLM_MODEL` and accepts an AI Gateway key or an OpenAI or Anthropic key directly. `MAX_TRANSCRIPT_CHARS` in `lib/limits.ts` is 120,000.
+The schema makes every key required, and `owner` is nullable instead of optional. OpenAI's strict structured outputs reject optional keys, and this shape works with the other providers too. The `describe` text on `decisions` matters. Without it, models list open questions as decisions. `getModel()` in `lib/llm.ts` reads `LLM_MODEL` and accepts an AI Gateway key or an OpenAI or Anthropic key directly. `MAX_TRANSCRIPT_CHARS` in `lib/limits.ts` is 120,000. The route passes no `temperature`, because reasoning models ignore temperature.
 
 ## Client: record and post
 

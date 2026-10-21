@@ -54,7 +54,7 @@ export async function correctLine(model: LanguageModel, req: CorrectRequest, sig
     prompt: context,
     output: Output.object({ schema: CorrectionSchema }),
     maxOutputTokens: 2000,
-    providerOptions: { openai: { reasoningEffort: "minimal" } },
+    providerOptions: { openai: { reasoningEffort: "low" } },
     abortSignal: signal,
   });
   return clampCorrection(output, req.text);

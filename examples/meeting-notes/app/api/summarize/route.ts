@@ -30,7 +30,6 @@ export async function POST(req: Request) {
       instructions: NOTES_INSTRUCTIONS,
       prompt: transcript,
       output: Output.object({ schema: MeetingNotesSchema }),
-      temperature: 0.2,
       maxOutputTokens: 1500,
       maxRetries: 2,
     });

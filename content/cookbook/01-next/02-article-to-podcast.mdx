@@ -64,7 +64,7 @@ async function generatePart(model: LanguageModel, o: Options, material: string, 
 }
 ```
 
-The system prompt asks for plain spoken prose and treats the article as untrusted material. After generation, a normalizer merges runs from one speaker, splits lines over 400 characters, strips markdown characters and keeps at most two `[laughter]` tags. Long articles are cut into parts, and each part sees the last six lines of the one before it. The chunk sizing follows [Podcastfy](https://github.com/souzatharsis/podcastfy).
+`o.creativity` is unset unless the request sets it, because reasoning models ignore temperature. The system prompt asks for plain spoken prose and treats the article as untrusted material. After generation, a normalizer merges runs from one speaker, splits lines over 400 characters, strips markdown characters and keeps at most two `[laughter]` tags. Long articles are cut into parts, and each part sees the last six lines of the one before it. The chunk sizing follows [Podcastfy](https://github.com/souzatharsis/podcastfy).
 
 ## Voice each line
 

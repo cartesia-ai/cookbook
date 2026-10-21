@@ -12,7 +12,7 @@ describe("OptionsSchema", () => {
     expect(o.podcastTagline).toBe("Any article, two voices");
     expect(o.outputLanguage).toBe("English");
     expect(o.engagementTechniques).toEqual(["questions", "examples", "analogies"]);
-    expect(o.creativity).toBe(0.7);
+    expect(o.creativity).toBeUndefined();
     expect(o.userInstructions).toBe("");
     expect(o.minChunkSize).toBe(600);
     expect(chunkCap(o)).toBe(4);

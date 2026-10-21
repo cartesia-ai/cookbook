@@ -11,20 +11,20 @@ importers:
   examples/article-to-podcast:
     dependencies:
       '@ai-sdk/anthropic':
-        specifier: 4.0.79
+        specifier: ^4.0.79
         version: 4.0.79(zod@4.6.7)
       '@ai-sdk/openai':
-        specifier: 4.0.93
-        version: 4.0.93(zod@4.6.7)
+        specifier: ^4.0.93
+        version: 4.0.95(zod@4.6.7)
       '@cartesia/cartesia-js':
-        specifier: 4.2.0
+        specifier: ^4.2.0
         version: 4.2.0(ws@8.22.0)
       '@mozilla/readability':
-        specifier: 0.6.0
+        specifier: ^0.6.0
         version: 0.6.0
       ai:
-        specifier: 7.0.140
-        version: 7.0.140(zod@4.6.7)
+        specifier: ^7.0.140
+        version: 7.0.142(zod@4.6.7)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -32,7 +32,7 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
       jsdom:
-        specifier: 30.1.2
+        specifier: ^30.1.2
         version: 30.1.2
       lucide-react:
         specifier: ^1.57.0
@@ -56,7 +56,7 @@ importers:
         specifier: ^3.7.0
         version: 3.7.0
       zod:
-        specifier: 4.6.7
+        specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
       '@tailwindcss/postcss':
@@ -87,7 +87,7 @@ importers:
         specifier: ~5.9.0
         version: 5.9.3
       vitest:
-        specifier: 5.0.4
+        specifier: ^5.0.4
         version: 5.0.4(@types/node@22.20.5)(jsdom@30.1.2)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15))
 
   examples/docs-voice-widget:
@@ -9506,9 +9506,7 @@ snapshots:
       metro-runtime: 0.87.1
     transitivePeerDependencies:
       - '@babel/core'
-      - bufferutil
       - supports-color
-      - utf-8-validate
 
   '@react-native/normalize-colors@0.74.89': {}
 

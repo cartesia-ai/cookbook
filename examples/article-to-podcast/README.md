@@ -72,7 +72,8 @@ The SDK sends `Cartesia-Version: 2026-08-14` on every request. See https://docs.
 
 - Use other voices: pick two at https://play.cartesia.ai/voices and set `CARTESIA_VOICE_HOST_A` and `CARTESIA_VOICE_HOST_B`. The defaults are English voices, so set voices that match the language you pick.
 - Change the show: the podcast name, tagline, host roles and dialogue structure are defaults in `lib/config.ts`. The prompt is in `lib/prompt.ts`.
-- Use another LLM provider: set `LLM_MODEL` to its AI Gateway id, for example `google/<model id>`, with `AI_GATEWAY_API_KEY`. To call it directly instead, install its AI SDK package and add a branch for its prefix in `getModel` in `lib/llm.ts`. Some providers ignore or reject `temperature` for reasoning models. If yours rejects it, remove `temperature: o.creativity` in `lib/script.ts`.
+- Use another LLM provider: set `LLM_MODEL` to its AI Gateway id, for example `google/<model id>`, with `AI_GATEWAY_API_KEY`. To call it directly instead, install its AI SDK package and add a branch for its prefix in `getModel` in `lib/llm.ts`. Some providers reject `temperature` for reasoning models. If yours rejects it, remove `temperature: o.creativity` in `lib/script.ts`.
+- Set the temperature: the `creativity` option (0 to 1) in the request body becomes `temperature`. It is unset by default because reasoning models ignore temperature, and `openai/gpt-5.4-mini` is one. The UI does not send it, so set it from your own client or change the default in `lib/config.ts` when you use a model that reads it.
 
 ```ts
 import { createGoogleGenerativeAI } from "@ai-sdk/google";

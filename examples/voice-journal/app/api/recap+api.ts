@@ -35,7 +35,6 @@ export async function POST(req: Request) {
       instructions: RECAP_INSTRUCTIONS,
       prompt,
       output: Output.object({ schema: RecapSchema }),
-      temperature: 0.6,
       maxOutputTokens: 900,
       maxRetries: 2,
     });

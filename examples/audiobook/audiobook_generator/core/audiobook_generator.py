@@ -178,6 +178,9 @@ class AudiobookGenerator:
                     logger.warning(f"  - Chapter {idx}: {title}")
                 logger.error(f"Conversion completed with {len(failed_chapters)} failed chapters. Check your output directory: {self.config.output_folder} and log file: {self.config.log_file} for more details.")
                 return 1
+            if self.config.preview:
+                logger.info("Preview done, no audio written.")
+                return 0
             logger.info(f"All chapters converted successfully. Check your output directory: {self.config.output_folder}")
             return 0
 

@@ -22,6 +22,41 @@ jobs:
       - name: Build every package with no env vars set
         run: pnpm build
 
+  standalone:
+    name: standalone (${{ matrix.template }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template:
+          - article-to-podcast
+          - docs-voice-widget
+          - meeting-notes
+          - pocket-interpreter
+          - speaking-partner
+          - story-time
+          - voice-chat
+          - voice-journal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          check-latest: true
+      - name: Copy the template out of the workspace
+        run: |
+          mkdir -p "$RUNNER_TEMP/app"
+          git archive HEAD "examples/${{ matrix.template }}" | tar -x -C "$RUNNER_TEMP/app" --strip-components=2
+      - name: npm install
+        working-directory: ${{ runner.temp }}/app
+        run: npm install --no-audit --no-fund
+      - name: npm run typecheck
+        working-directory: ${{ runner.temp }}/app
+        run: npm run typecheck --if-present
+      - name: npm test
+        working-directory: ${{ runner.temp }}/app
+        run: npm test
+
   python:
     runs-on: ubuntu-latest
     strategy:

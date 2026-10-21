@@ -29,7 +29,6 @@ export async function POST(req: Request) {
       instructions: ENTRY_INSTRUCTIONS,
       prompt: transcript,
       output: Output.object({ schema: EntryAnalysisSchema }),
-      temperature: 0.4,
       maxOutputTokens: 400,
       maxRetries: 2,
     });

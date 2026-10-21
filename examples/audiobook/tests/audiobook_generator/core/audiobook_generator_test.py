@@ -277,9 +277,13 @@ class TestRun(unittest.TestCase):
         config.log_file = os.path.join(tmp.name, "log.txt")
         with patch.dict(os.environ, {}, clear=False), patch.object(gen.multiprocessing, "Pool", InProcessPool):
             os.environ.pop("CARTESIA_API_KEY", None)
-            gen.AudiobookGenerator(config).run()
+            with self.assertLogs(gen.logger, level="INFO") as logs:
+                gen.AudiobookGenerator(config).run()
         self.assertTrue(os.path.isfile(os.path.join(out, "cast.json")))
         self.assertEqual([f for f in os.listdir(out) if f.endswith(".mp3")], [])
+        text = "\n".join(logs.output)
+        self.assertIn("Preview done, no audio written.", text)
+        self.assertNotIn("converted successfully", text)
 
 if __name__ == "__main__":
     unittest.main()

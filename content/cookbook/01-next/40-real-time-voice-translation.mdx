@@ -192,7 +192,7 @@ const result = streamText({
 return result.toTextStreamResponse({ headers: { "Cache-Control": "no-store" } });
 ```
 
-`resolved` comes from `getModel()` in `lib/llm.ts`, which turns `LLM_MODEL` into a provider model or a Vercel AI Gateway id. The route passes no `temperature`, because some providers ignore or reject it for reasoning models.
+`resolved` comes from `getModel()` in `lib/llm.ts`, which turns `LLM_MODEL` into a provider model or a Vercel AI Gateway id. The route passes no `temperature`, because reasoning models ignore temperature and some providers reject it.
 
 In the browser, `run()` reads the stream until the first line names the language, then picks the other language as the target. `createReplyParser` in `lib/translation.ts` strips the code. If a model skips the header, the app falls back to a script check (kana or kanji means Japanese, Devanagari means Hindi), and then to the opposite of the previous speaker.
 

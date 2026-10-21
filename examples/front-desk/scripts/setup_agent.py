@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import secrets
@@ -196,7 +197,18 @@ def delete_all(api: Cartesia, s: Settings, webhook_id: str) -> int:
     return 0
 
 
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Create or update the front desk agent, its tools and its call webhook on Cartesia."
+    )
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--dry-run", action="store_true", help="print the requests without a key")
+    group.add_argument("--delete", action="store_true", help="delete the agent, its tools and its webhook")
+    return parser.parse_args(argv)
+
+
 def main(argv: list[str]) -> int:
+    args = parse_args(argv)
     load_env()
     import os
 
@@ -206,7 +218,7 @@ def main(argv: list[str]) -> int:
         return 1
     tool_secret = s.tool_secret or "<generated on first run>"
 
-    if "--dry-run" in argv:
+    if args.dry_run:
         print(f"Tool mode: {s.tool_mode}")
         for spec in TOOL_SPECS:
             print("POST /v1/agents/tools", json.dumps(tool_body(spec, s, "***"), indent=2))
@@ -219,7 +231,7 @@ def main(argv: list[str]) -> int:
     api = Cartesia(s.cartesia_api_key)
     webhook_id = os.environ.get("CARTESIA_WEBHOOK_ID", "")
 
-    if "--delete" in argv:
+    if args.delete:
         return delete_all(api, s, webhook_id)
 
     try:

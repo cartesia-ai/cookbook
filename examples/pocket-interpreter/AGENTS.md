@@ -33,7 +33,7 @@ lib/rate-limit.ts      in-memory per-IP limiter
 - `turn.eager_end` starts a speculative translation that `turn.end` reuses when the text matches. Latency is measured from `turn.end` in `lib/interpreter.ts`.
 - `proxy.ts` gates every page and API route behind HTTP Basic auth when `APP_PASSWORD` is set, and returns 503 on Vercel (production or preview) when it is unset. `APP_PASSWORD=none` makes the app public. `/api/token` and `/api/translate` are rate limited per IP with `lib/rate-limit.ts`.
 - `startInterpreter` owns the `AudioContext` and must close it on every failure path; Safari caps live contexts. `tests/interpreter.test.ts` covers this.
-- LLM ids are never hardcoded. `LLM_MODEL` is `provider/model`, resolved in `lib/llm.ts`. Don't pass `temperature`: some providers ignore or reject it for reasoning models.
+- LLM ids are never hardcoded. `LLM_MODEL` is `provider/model`, resolved in `lib/llm.ts`. Don't pass `temperature`. Reasoning models ignore temperature, and some providers reject it.
 - UI rules: `packages/kit/DESIGN.md`. One primary button per screen, End is the soft red outline, no other hues.
 - Do not commit `.env.local`. Do not print keys.
 
