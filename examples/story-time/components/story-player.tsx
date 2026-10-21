@@ -103,6 +103,7 @@ export function StoryPlayer({ id }: { id: string }) {
       const client = await cartesiaClient();
       if (!current()) return;
       setListening(true);
+      let ended = false;
       const started = await listenForChoice(client, audioContext(), {
         onPartial: (t) => {
           setHeard(t);
@@ -120,12 +121,19 @@ export function StoryPlayer({ id }: { id: string }) {
           }
           return false;
         },
+        onClosed: () => {
+          ended = true;
+          if (!current()) return;
+          listener.current = null;
+          setListening(false);
+          setUnclear(true);
+        },
       });
       if (!current()) {
         started.stop();
         return;
       }
-      listener.current = started;
+      if (!ended) listener.current = started;
     } catch {
       if (!current()) return;
       listener.current = null;
@@ -424,6 +432,13 @@ function ListenStatus({ listening, heard, unclear, blocked }: { listening: boole
     return (
       <p className="flex items-center gap-2 text-[13px] leading-5 text-muted-foreground">
         <MicOff className="size-4" aria-hidden /> The microphone is off. Tap a choice.
+      </p>
+    );
+  }
+  if (!listening && unclear) {
+    return (
+      <p className="text-[13px] leading-5 text-muted-foreground">
+        I did not catch that. Press Answer out loud to try again, or tap a choice.
       </p>
     );
   }

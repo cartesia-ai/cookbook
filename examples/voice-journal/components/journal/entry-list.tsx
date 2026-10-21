@@ -12,7 +12,7 @@ import { formatDuration, groupByDay, searchEntries, timeLabel, type Entry } from
 import { MOOD_LABELS } from "@/lib/schema";
 
 export const PRIVACY_NOTE =
-  "Entries are saved on this device. Recordings are sent to Cartesia and your LLM provider for transcription and reflections.";
+  "Entries are saved on this device. Recordings go to Cartesia for transcription, and the transcripts go to your LLM provider for titles, moods and reflections.";
 
 export function EntryList({ entries }: { entries: Entry[] }) {
   const [query, setQuery] = React.useState("");

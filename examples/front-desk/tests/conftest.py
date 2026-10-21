@@ -29,7 +29,9 @@ def clean_env(monkeypatch, tmp_path):
         monkeypatch.setenv(k, "")
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "test.db"))
     monkeypatch.setenv("BUSINESS_TIMEZONE", "America/Los_Angeles")
-    from front_desk import main
+    from front_desk import auth, main
 
+    # TestClient sends Host: testserver. Accept it on top of whatever the real host check allows.
+    monkeypatch.setattr(main, "allowed_hosts", lambda s, host: [*auth.allowed_hosts(s, host), "testserver"])
     main._token_hits.clear()
     yield

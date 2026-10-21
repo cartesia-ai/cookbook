@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fake = vi.hoisted(() => ({ instances: [] as Array<{ started: boolean; stopped: boolean; release: () => void }> }));
+type Listener = (arg: never) => unknown;
+const fake = vi.hoisted(() => ({
+  instances: [] as Array<{ started: boolean; stopped: boolean; release: () => void; emit: (name: string, arg: unknown) => unknown }>,
+}));
 
 vi.mock('../widget/src/agents-web/client', () => ({
   CartesiaAgentClient: class {
@@ -13,7 +16,13 @@ vi.mock('../widget/src/agents-web/client', () => ({
     constructor() {
       fake.instances.push(this);
     }
-    on() {}
+    listeners = new Map<string, Listener[]>();
+    on(name: string, fn: Listener) {
+      this.listeners.set(name, [...(this.listeners.get(name) ?? []), fn]);
+    }
+    emit(name: string, arg: unknown) {
+      return Promise.all((this.listeners.get(name) ?? []).map((fn) => fn(arg as never)));
+    }
     setMuted() {}
     start() {
       this.started = true;
@@ -109,6 +118,53 @@ describe('DocsAgentElement', () => {
     expect(fake.instances[0]!.stopped).toBe(true);
     expect(q(el, '.notice').textContent).not.toContain('Could not connect');
     expect(q(el, '.foot').querySelector('[data-act="start"]')).not.toBeNull();
+  });
+
+  it('ignores events from an ended session once a new one starts', async () => {
+    let releaseSearch: () => void = () => {};
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.endsWith('/api/config')) return Promise.resolve(new Response(JSON.stringify(config)));
+        return new Promise<Response>((resolve) => {
+          releaseSearch = () =>
+            resolve(new Response(JSON.stringify({ result: 'r', sources: { s1: { url: 'https://x/a', title: 'A', anchor: '' } } })));
+        });
+      }),
+    );
+    const el = make();
+    const priv = el as unknown as { messages: unknown[]; uncited: string | null; phase: string };
+    click(el, 'start');
+    await flush();
+    const old = fake.instances[0]!;
+    old.release();
+    await flush();
+    const respond = vi.fn();
+    const pending = old.emit('client_tool_call', { toolName: 'search_docs', parameters: { query: 'q' }, respond });
+    await flush();
+    click(el, 'end');
+    await flush();
+    click(el, 'start');
+    await flush();
+    fake.instances[1]!.release();
+    await flush();
+    expect(priv.phase).toBe('listening');
+
+    releaseSearch();
+    await pending;
+    expect(priv.uncited).toBeNull();
+    expect(respond).not.toHaveBeenCalled();
+
+    await old.emit('transcript', { turn: 1, role: 'assistant', text: 'stale words', final: true });
+    await old.emit('speaking', { who: 'agent' });
+    await old.emit('turn_ended', { role: 'user' });
+    await old.emit('client_tool_call', { toolName: 'search_docs', parameters: { query: 'q' }, respond });
+    expect(priv.messages).toHaveLength(0);
+    expect(priv.phase).toBe('listening');
+    expect(respond).not.toHaveBeenCalled();
+
+    await fake.instances[1]!.emit('transcript', { turn: 1, role: 'user', text: 'fresh words', final: true });
+    expect(priv.messages).toHaveLength(1);
   });
 
   it('says seconds for short session caps', () => {

@@ -7,6 +7,7 @@ import ipaddress
 import os
 import sys
 from collections.abc import Mapping, Sequence
+from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request
 
@@ -42,6 +43,20 @@ def is_loopback(host: str) -> bool:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
+
+
+LOOPBACK_HOSTS = ["127.0.0.1", "localhost", "[::1]"]
+
+
+def allowed_hosts(s: Settings, host: str = "127.0.0.1") -> list[str]:
+    """Host headers the app answers. Loopback names only, so a DNS rebinding page cannot reach it."""
+    if s.dashboard_password and not is_loopback(host):
+        return ["*"]
+    hosts = list(LOOPBACK_HOSTS)
+    public = urlsplit(s.public_base_url).hostname if s.public_base_url else None
+    if public:
+        hosts.append(f"[{public}]" if ":" in public else public)
+    return hosts
 
 
 def check_deploy_config(s: Settings, host: str = "127.0.0.1") -> None:

@@ -96,7 +96,9 @@ export function useRecorder() {
     const secs = (recorder.currentTime ?? 0) || seconds;
     try {
       await recorder.stop();
-      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      try {
+        await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      } catch {}
       const uri = recorder.uri;
       return uri ? { uri, seconds: secs } : null;
     } catch {
@@ -163,13 +165,16 @@ The route checks the upload, wraps it in a `File` with a name and type, and call
 import { getCartesia } from "@/lib/server/cartesia";
 import { cartesiaError, json, rateLimited } from "@/lib/server/errors";
 import { MAX_AUDIO_BYTES, STT_MODEL } from "@/lib/limits";
+import { declaredTooLarge } from "@/lib/server/body";
 import { createRateLimiter } from "@/lib/server/rate-limit";
 
 const allow = createRateLimiter(10, 60_000);
+const TOO_LARGE = "The recording is too large for the hosted limit (4 MB). Keep entries under four minutes.";
 
 export async function POST(req: Request) {
   const limited = rateLimited(req, allow);
   if (limited) return limited;
+  if (declaredTooLarge(req, MAX_AUDIO_BYTES + 64 * 1024)) return json({ error: TOO_LARGE }, 413);
   let form: { get(name: string): unknown };
   try {
     form = (await req.formData()) as unknown as typeof form;
@@ -179,7 +184,7 @@ export async function POST(req: Request) {
   const file = form.get("file");
   if (!(file instanceof Blob)) return json({ error: "Missing audio file" }, 400);
   if (file.size === 0) return json({ error: "The recording is empty" }, 400);
-  if (file.size > MAX_AUDIO_BYTES) return json({ error: "The recording is too large for the hosted limit (4 MB). Keep entries under four minutes." }, 413);
+  if (file.size > MAX_AUDIO_BYTES) return json({ error: TOO_LARGE }, 413);
 
   const name = file instanceof File && file.name ? file.name : "entry.m4a";
   try {
@@ -303,8 +308,8 @@ React.useEffect(() => {
 ## Limits
 
 - The transcribe route rejects files over 4 MB, and the recorder stops at four minutes (`lib/limits.ts`). The speak route reads at most 2,000 characters in one request.
-- Every API route has a per-IP rate limit, kept in memory per process, which only slows casual abuse. The routes have no login, so anyone who finds the URL can spend your Cartesia credits. Put them behind your own auth before you deploy.
-- The template README says the web and native paths were checked in headless Chrome. The native paths compile but were not run on a device.
+- Every route that calls Cartesia or the LLM has a per-IP rate limit, kept in memory per process, which only slows casual abuse. The routes have no login, so anyone who finds the URL can spend your Cartesia credits. Put them behind your own auth before you deploy.
+- The web build was checked in headless Chrome. The iOS and Android paths compile but were not run on a device.
 - This is batch transcription of a finished recording. For words on screen while you talk, you need Ink 2 over the streaming WebSocket with raw PCM chunks. `expo-audio` 58 has `useAudioStream` for that on iOS and Android, but not on the web.
 
 ## Next steps

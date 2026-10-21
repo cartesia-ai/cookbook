@@ -12,7 +12,7 @@ The `examples/audiobook` app converts an EPUB into one mp3 per chapter. Quoted s
 
 You need Python 3.10 to 3.12, uv and ffmpeg. The sample book is two public-domain excerpts, about 15,000 characters.
 
-```bash filename="terminal"
+```bash filename="terminal" standalone
 cd examples/audiobook
 cp .env.example .env            # put your key in .env
 set -a; . ./.env; set +a
@@ -64,7 +64,7 @@ The `cartesia` 4.2.0 client does not read `CARTESIA_API_KEY` by itself, so the a
 
 In `dialogue` mode the text is split on quotation marks. A few patterns attribute each quote to a speaker ("said Alice", "the Mouse cried"), and each speaker gets a voice from a pool of Cartesia library voices. The result is saved as `cast.json` in the output folder before any chapter is converted, so chapters processed in parallel agree:
 
-```json filename="cast.json"
+```json filename="cast.json" standalone
 {
   "narrator": "Archie",
   "speakers": { "Alice": "Maya", "Mouse": "Leo" }
@@ -79,7 +79,7 @@ For English dialogue, a cue next to a quote sets the emotion for that request th
 
 ## Long chapters
 
-No request length limit is documented. The app sends at most 1,500 (`--cartesia_max_chars`) so that a failed request costs little to retry. Text is split on sentence boundaries and never across paragraphs, and paragraphs are joined with 600 ms of silence added to the PCM. A stream that dies midway is retried for that chunk only, and its partial audio and timestamps are thrown away.
+No request length limit is documented. The app sends at most 1,500 characters per request (`--cartesia_max_chars`) so that a failed request costs little to retry. Text is split on sentence boundaries and never across paragraphs, and paragraphs are joined with 600 ms of silence added to the PCM. A stream that dies midway is retried for that chunk only, and its partial audio and timestamps are thrown away.
 
 ## Read-along
 
@@ -87,7 +87,7 @@ Each chapter has `<chapter>.timings.json` with a `words` list of `{"w", "s", "e"
 
 ## Cost
 
-Sonic bills about one credit per character, and what a credit costs depends on your plan. The sample uses roughly 15,000 credits. See [cartesia.ai/pricing](https://cartesia.ai/pricing).
+Sonic bills about one credit per character, and what a credit costs depends on your plan. The sample uses roughly 15,000 credits. See [docs.cartesia.ai/pricing](https://docs.cartesia.ai/pricing).
 
 ## Next steps
 

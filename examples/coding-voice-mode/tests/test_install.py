@@ -97,3 +97,31 @@ def test_atomic_write_creates_new_files_private(tmp_path):
     p = tmp_path / "new" / "config.toml"
     inst.merge_codex(p, inst.server_entry(D))
     assert stat.S_IMODE(p.stat().st_mode) == 0o600
+
+def test_codex_merge_and_remove_keep_comments(tmp_path):
+    p = tmp_path / "config.toml"
+    original = '# my codex setup\nmodel = "x"  # pinned\n\n# other server\n[mcp_servers.other]\ncommand = "y"\n'
+    p.write_text(original)
+    assert inst.merge_codex(p, inst.server_entry(D))
+    text = p.read_text()
+    assert "# my codex setup" in text and "# pinned" in text and "# other server" in text
+    assert inst.merge_codex(p, inst.server_entry(D)) is False
+    assert inst.remove_codex(p)
+    assert p.read_text().rstrip() == original.rstrip()
+
+def test_codex_new_file_has_no_empty_parent_table(tmp_path):
+    p = tmp_path / "config.toml"
+    inst.merge_codex(p, inst.server_entry(D))
+    assert "[mcp_servers]\n" not in p.read_text()
+    assert "[mcp_servers.cartesia-voice]" in p.read_text()
+
+def test_atomic_write_follows_symlinked_config(tmp_path):
+    real = tmp_path / "dotfiles" / "mcp.json"
+    real.parent.mkdir()
+    real.write_text(json.dumps({"mcpServers": {"other": {"command": "x"}}}))
+    link = tmp_path / ".cursor" / "mcp.json"
+    link.parent.mkdir()
+    link.symlink_to(real)
+    assert inst.merge_cursor(link, inst.server_entry(D))
+    assert link.is_symlink()
+    assert "cartesia-voice" in json.loads(real.read_text())["mcpServers"]

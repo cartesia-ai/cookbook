@@ -56,6 +56,13 @@ describe("/api/analyze", () => {
     expect(generateText).not.toHaveBeenCalled();
   });
 
+  it("strips wrapping quotes and trailing periods from the title", async () => {
+    generateText.mockResolvedValue({ output: { title: " “Quiet morning.” ", mood: "calm", reflection: "r" } });
+    expect((await (await analyzeRoute(post({ transcript: "x" }))).json()).title).toBe("Quiet morning");
+    generateText.mockResolvedValue({ output: { title: "'\"...\"'", mood: "calm", reflection: "r" } });
+    expect((await (await analyzeRoute(post({ transcript: "x" }))).json()).title).toBe("Untitled entry");
+  });
+
   it("hides provider error details", async () => {
     generateText.mockRejectedValue(new Error("secret upstream body"));
     const res = await analyzeRoute(post({ transcript: "x" }));
@@ -78,8 +85,12 @@ describe("/api/recap", () => {
   });
 
   it("rejects an empty week and unknown moods", async () => {
-    expect((await recapRoute(post({ entries: [] }))).status).toBe(400);
-    expect((await recapRoute(post({ entries: [{ day: "d", title: "t", mood: "elated", transcript: "x" }] }))).status).toBe(400);
+    const empty = await recapRoute(post({ entries: [] }));
+    expect(empty.status).toBe(400);
+    expect((await empty.json()).error).toBe("Send between 1 and 30 entries");
+    const bad = await recapRoute(post({ entries: [{ day: "d", title: "t", mood: "elated", transcript: "x" }] }));
+    expect(bad.status).toBe(400);
+    expect((await bad.json()).error).toBe("The entries are not valid.");
   });
 });
 
@@ -104,6 +115,35 @@ describe("limits", () => {
     const res = await transcribeRoute(new Request("http://x/api/transcribe", { method: "POST", body: form }));
     expect(res.status).toBe(413);
     expect(transcribe).not.toHaveBeenCalled();
+  });
+
+  it("refuses a declared oversize upload before reading the form", async () => {
+    const form = new FormData();
+    form.append("file", new Blob([new Uint8Array(10)], { type: "audio/webm" }), "entry.webm");
+    const req = new Request("http://x/api/transcribe", { method: "POST", body: form });
+    req.headers.set("content-length", String(4 * 1024 * 1024 + 64 * 1024 + 1));
+    const formData = vi.spyOn(req, "formData");
+    expect((await transcribeRoute(req)).status).toBe(413);
+    expect(formData).not.toHaveBeenCalled();
+  });
+
+  it("caps analyze and recap JSON bodies at 64 KB, with or without Content-Length", async () => {
+    const declared = new Request("http://x/api/analyze", { method: "POST", body: JSON.stringify({ transcript: "hi" }) });
+    declared.headers.set("content-length", String(70 * 1024));
+    expect((await analyzeRoute(declared)).status).toBe(413);
+    const bytes = new TextEncoder().encode(JSON.stringify({ entries: [{ day: "d", title: "t", mood: "calm", transcript: "y".repeat(70 * 1024) }] }));
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        for (let i = 0; i < bytes.length; i += 8192) c.enqueue(bytes.slice(i, i + 8192));
+        c.close();
+      },
+    });
+    const chunked = new Request("http://x/api/recap", { method: "POST", body: stream, duplex: "half" } as RequestInit);
+    expect(chunked.headers.get("content-length")).toBeNull();
+    const res = await recapRoute(chunked);
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toBe("This week has too much text to recap in one pass");
+    expect(generateText).not.toHaveBeenCalled();
   });
 
   it("rate limits each client before calling the model", async () => {

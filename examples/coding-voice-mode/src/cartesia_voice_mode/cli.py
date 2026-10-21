@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -46,7 +47,7 @@ def _install_one(name: str, opts: dict) -> tuple[bool, str]:
         cmd = inst.claude_add_cmd(directory, scope=opts["scope"], uv=uv, voice=opts["voice"])
         if dry or not shutil.which("claude"):
             why = "dry run" if dry else "claude not found on PATH, run this yourself"
-            return True, f"claude ({why}):\n  {' '.join(cmd)}"
+            return True, f"claude ({why}):\n  {shlex.join(cmd)}"
         r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode == 0:
             return True, "claude: added"
@@ -90,6 +91,7 @@ def install(client, scope, project, voice, save_key, skill, dry_run) -> None:
     opts = dict(scope=scope, project=project, voice=voice, dry_run=dry_run)
     names = [c for c in CLIENTS if _present(c)] if client == "all" else [client]
     _validate(names, opts)
+    settings = _settings()
     if save_key:
         key = os.environ.get("CARTESIA_API_KEY")
         if not key:
@@ -118,7 +120,7 @@ def install(client, scope, project, voice, save_key, skill, dry_run) -> None:
     )
     if want_skill and "claude" in names and "claude" not in failed and not dry_run:
         click.echo(f"skill: {inst.install_skill(Path.home())}")
-    if not (save_key or os.environ.get("CARTESIA_API_KEY") or _settings().api_key):
+    if not (save_key or settings.api_key):
         click.echo("note: no API key found yet. Set CARTESIA_API_KEY or run install again with --save-key.")
     if failed:
         raise click.ClickException(f"install failed for: {', '.join(failed)}")
@@ -133,7 +135,7 @@ def uninstall(client, scope, project, dry_run) -> None:
     if client == "claude":
         cmd = inst.claude_remove_cmd(scope)
         if dry_run or not shutil.which("claude"):
-            click.echo(" ".join(cmd))
+            click.echo(shlex.join(cmd))
         else:
             subprocess.run(cmd)
         return

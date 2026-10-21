@@ -23,10 +23,9 @@ uv run uvicorn front_desk.main:app --port 8000
 
 Open http://localhost:8000/try, press Start call and say "I'd like to book a haircut tomorrow afternoon." When you hang up, the call shows up under Calls with its transcript, recording and latency, and the booking shows up under Inbox. Use headphones, or the agent hears itself.
 
-To see a phone call in the dashboard without a phone, replay a recorded-shape webhook:
+To see a phone call in the dashboard without a phone, replay a recorded-shape webhook. The script and the server need the same `CARTESIA_WEBHOOK_SECRET`. If that line in `.env` is still empty, fill it in place with the output of `openssl rand -hex 24` (don't append a second line), then stop and restart uvicorn, because the server reads `.env` once at startup. Skip this if setup already wrote a secret.
 
 ```sh
-echo "CARTESIA_WEBHOOK_SECRET=$(openssl rand -hex 24)" >> .env   # skip if setup already wrote one
 uv run scripts/send_test_webhook.py   # posts call_started, call_turn x9, call_completed, post_call_analysis
 ```
 
@@ -39,6 +38,7 @@ Pass `--url https://your-host.example.com/webhooks/cartesia` to send to another 
 | `CARTESIA_API_KEY` | yes | https://play.cartesia.ai/keys. Read only in `front_desk/config.py`, used only in `front_desk/cartesia.py`. |
 | `CARTESIA_AGENT_ID` | written by setup | The agent the browser call and the webhook belong to. |
 | `DASHBOARD_PASSWORD` | when deployed | HTTP Basic password (any username) for the dashboard, recordings, the browser call and its tool routes. The app refuses to start if `PUBLIC_BASE_URL` is set and this is empty. |
+| `UVICORN_HOST` | no | Address uvicorn binds when you don't pass `--host`. The app reads it (or `--host`) to refuse starting on a non-loopback address without `DASHBOARD_PASSWORD`, and to decide which `Host` headers it answers. |
 | `TRUST_PROXY` | no | Set to `1` behind a proxy such as Render, Fly or Railway, so the token rate limit keys on the last `X-Forwarded-For` address, the one your proxy appended, instead of the proxy's. Leave it unset when clients reach the server directly, or they can fake the header. |
 | `BUSINESS_NAME`, `BUSINESS_SERVICES`, `BUSINESS_TIMEZONE`, `BUSINESS_HOURS`, `APPOINTMENT_MINUTES` | no | Your business. Defaults to a hair salon in Los Angeles. Run setup again after changing them. |
 | `TRANSFER_NUMBER` | no | E.164 number for live handoff on phone calls. |
@@ -101,6 +101,8 @@ scripts/setup_agent.py     idempotent agent, tools and webhook setup
 ### Login
 
 Set `DASHBOARD_PASSWORD`. Every page, the recordings, `POST /api/token`, `POST /api/calls/<id>/sync` and `POST /api/client-tools/<name>` then ask for HTTP Basic auth with that password and any username. The browser sends the login with the call page's own requests, so the web call keeps working. `/tools/*` and `/webhooks/cartesia` skip it because Cartesia calls them, and they check their own secrets instead. When `PUBLIC_BASE_URL` is set and `DASHBOARD_PASSWORD` is empty, the app refuses to start. Locally, with neither set, the dashboard is open. Without `PUBLIC_BASE_URL`, the app also refuses to start with no `DASHBOARD_PASSWORD` when uvicorn binds anything other than `127.0.0.1`, `::1` or `localhost` (for example `--host 0.0.0.0`).
+
+Two more checks stop other web pages from using a logged-in or local dashboard. `POST /api/client-tools/<name>` only accepts `Content-Type: application/json`, which a cross-site form cannot send without a CORS preflight, so a page you visit can't book appointments with your cached login. And the app answers only requests whose `Host` is `127.0.0.1`, `localhost`, `[::1]` or the host in `PUBLIC_BASE_URL`, which blocks DNS rebinding against a server on your laptop. When uvicorn binds a non-loopback address and `DASHBOARD_PASSWORD` is set, any `Host` is accepted, since the password guards it.
 
 ### Limits and cost
 

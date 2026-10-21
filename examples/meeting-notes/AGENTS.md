@@ -5,7 +5,7 @@ AI meeting notes: Next.js 16 App Router. Cartesia `ink-whisper` transcribes the 
 ## Commands (run in this folder)
 
 - Install and run: `npm install` (or `pnpm install`), `cp .env.example .env.local`, `npm run dev`
-- Check: `pnpm test && pnpm typecheck && pnpm build`. Tests need no keys and no network. The build must pass with no env set.
+- Check: `npm test && npm run typecheck && npm run build` (pnpm works too). Tests need no keys and no network. The build must pass with no env set.
 
 ## Files
 
@@ -39,6 +39,6 @@ proxy.ts                      APP_PASSWORD Basic auth gate
 
 ## Verify a change
 
-1. `pnpm test && pnpm typecheck && pnpm build`.
-2. `pnpm dev`, upload a short WAV or record ten seconds, and check that the notes page shows a summary and action items.
+1. `npm test && npm run typecheck && npm run build` (pnpm works too).
+2. `npm run dev`, upload a short WAV or record ten seconds, and check that the notes page shows a summary and action items.
 3. Docs: https://docs.cartesia.ai/llms.txt, batch STT https://docs.cartesia.ai/api-reference/stt/transcribe.md.

@@ -4,12 +4,13 @@ import json
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from .calendars import Calendar, CalendarError
+from .calendars import CalComCalendar, Calendar, CalendarError
 from .config import Settings
 from .parsing import parse_date, parse_period, parse_time, spoken_date, spoken_time
 from .store import Store
 
 MAX_TIMES = 8
+SEARCH_DAYS = 14
 
 TOOL_SPECS: list[dict[str, Any]] = [
     {
@@ -92,6 +93,10 @@ def _s(params: dict[str, Any], key: str, limit: int = 200) -> str:
     return str(v).strip()[:limit] if v is not None else ""
 
 
+def _in_period(slots: list[datetime], period: tuple[int, int] | None) -> list[datetime]:
+    return [t for t in slots if period[0] <= t.hour < period[1]] if period else slots
+
+
 def _json(obj: dict[str, Any]) -> str:
     return json.dumps(obj, separators=(",", ":"))
 
@@ -115,18 +120,21 @@ class Tools:
             return _json({"error": str(e), "next": "Offer to take a message instead."})
 
     def _times(self, day: date, period: tuple[int, int] | None) -> list[datetime]:
-        slots = self.calendar.open_slots(day)
-        if period:
-            slots = [t for t in slots if period[0] <= t.hour < period[1]]
-        return slots
+        return _in_period(self.calendar.open_slots(day), period)
 
     def _next_open_days(
         self, start: date, period: tuple[int, int] | None, days: int = 3
     ) -> list[dict[str, Any]]:
         out = []
-        for offset in range(14):
+        # Cal.com answers a two-week range in one request; the local calendar is a cheap per-day query.
+        fetched = (
+            self.calendar.open_slots_range(start, start + timedelta(days=SEARCH_DAYS - 1))
+            if isinstance(self.calendar, CalComCalendar)
+            else None
+        )
+        for offset in range(SEARCH_DAYS):
             d = start + timedelta(days=offset)
-            times = self._times(d, period)
+            times = _in_period(fetched.get(d, []), period) if fetched is not None else self._times(d, period)
             if times:
                 out.append(
                     {

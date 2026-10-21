@@ -17,9 +17,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from . import webhooks
-from .auth import bind_host, check_deploy_config, client_ip, require_dashboard
+from .auth import allowed_hosts, bind_host, check_deploy_config, client_ip, require_dashboard
 from .calendars import close_calcom_client, make_calendar
 from .cartesia import Cartesia, CartesiaError
 from .config import ROOT, Settings, load_env, settings
@@ -40,7 +42,28 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         close_calcom_client()
 
 
+class HostCheck:
+    """TrustedHostMiddleware with the allowed hosts read from settings on each request."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+        self._checks: dict[tuple[str, ...], TrustedHostMiddleware] = {}
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+        hosts = tuple(allowed_hosts(settings(), bind_host()))
+        check = self._checks.get(hosts)
+        if check is None:
+            if len(self._checks) > 16:
+                self._checks.clear()
+            check = self._checks[hosts] = TrustedHostMiddleware(self.app, list(hosts), www_redirect=False)
+        await check(scope, receive, send)
+
+
 app = FastAPI(title="Front desk", docs_url=None, redoc_url=None, lifespan=lifespan)
+app.add_middleware(HostCheck)
 dashboard = APIRouter(dependencies=[Depends(require_dashboard)])
 BAD_JSON = "Request body must be a JSON object."
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
@@ -299,6 +322,10 @@ async def _json_object(request: Request) -> dict[str, Any]:
 async def client_tool(name: str, request: Request) -> PlainTextResponse:
     if name not in TOOL_NAMES:
         raise HTTPException(404, "Unknown tool.")
+    # A cross-site form or fetch can send text/plain without a preflight, and the browser would attach
+    # a cached Basic login. Requiring application/json forces a CORS preflight, which this app never answers.
+    if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+        raise HTTPException(415, "Send JSON.")
     body = await _json_object(request)
     raw = body.get("parameters")
     params = dict(raw) if isinstance(raw, dict) else {}

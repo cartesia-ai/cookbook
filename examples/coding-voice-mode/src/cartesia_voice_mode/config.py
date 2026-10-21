@@ -85,7 +85,7 @@ def _num(env: Mapping[str, str], name: str, cast=float):
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if env is None else env
 
-    tts_model = _first(env, "CARTESIA_TTS_MODEL", "VOICEMODE_CARTESIA_MODEL") or TTS_MODEL
+    tts_model = _first(env, "CARTESIA_TTS_MODEL") or TTS_MODEL
     if tts_model in RETIRED_MODELS:
         raise ConfigError(f"TTS model {tts_model!r} is retired. Use {TTS_MODEL!r}.")
     stt_model = env.get("CARTESIA_STT_MODEL") or STT_MODEL
@@ -107,7 +107,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     api_key = env.get("CARTESIA_API_KEY") or _read_key_file(key_file(env))
     return Settings(
         api_key=api_key or None,
-        voice_id=_first(env, "CARTESIA_VOICE_ID", "VOICEMODE_CARTESIA_VOICE_ID") or DEFAULT_VOICE_ID,
+        voice_id=_first(env, "CARTESIA_VOICE_ID") or DEFAULT_VOICE_ID,
         tts_model=tts_model,
         stt_model=stt_model,
         language=_first(env, "CARTESIA_LANGUAGE"),

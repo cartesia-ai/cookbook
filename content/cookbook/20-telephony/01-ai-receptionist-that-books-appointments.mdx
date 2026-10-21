@@ -16,7 +16,7 @@ This recipe covers the Cartesia parts: defining tools, choosing between client a
 - Python 3.12 or newer and [uv](https://docs.astral.sh/uv/)
 - For phone calls, a public HTTPS address for the server (a deploy, or a tunnel such as `ngrok http 8000`)
 
-The Python SDK has no typed Managed Agents client yet, so the template calls the documented paths with httpx and sends the `Cartesia-Version` header on every request.
+The Python SDK (4.2) has `client.agents` with retrieve, update, list and delete, plus calls, but it can't create agents, tools or webhooks. The template calls the documented paths with httpx instead and sends the `Cartesia-Version` header on every request.
 
 ## Define the booking tools
 
@@ -91,7 +91,7 @@ def tool_body(spec: dict[str, Any], s: Settings, tool_secret: str) -> dict[str, 
     }
 ```
 
-The webhook version adds two things. A secret `X-Tool-Secret` header lets your server reject posts that did not come from Cartesia. Three extra properties are bound to system dynamic variables, so Cartesia fills in the call id, caller number and call direction itself. The model never sees or writes those values. `book_appointment` uses the injected `caller_number` when the caller did not say a number.
+The webhook version adds two things. A secret `X-Tool-Secret` header lets your server reject posts that did not come from Cartesia. Three extra properties are bound to system dynamic variables, so Cartesia fills in the call id, caller number and call direction itself. The model never writes those values. It does see the caller number, because the prompt includes `{{system__caller_id}}` so the agent can read it back. `book_appointment` uses the injected `caller_number` when the caller did not say a number.
 
 ## Create the agent
 
@@ -173,7 +173,7 @@ Call events (`call_started`, `call_turn`, `call_completed`, `post_call_analysis`
 
 ## Before you deploy
 
-Only `/tools/*` and the call webhook check secrets. Put the rest of the app, including the dashboard and the token route, behind your own auth. See [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx).
+Set `DASHBOARD_PASSWORD`. It puts the dashboard, recordings, the token route and the browser's tool route behind HTTP Basic auth, and the app refuses to start without it when `PUBLIC_BASE_URL` is set or uvicorn binds a non-loopback address. `/tools/*` and the call webhook skip that login because Cartesia calls them, and they check their own secrets instead. Behind a proxy such as Render, Fly or Railway, set `TRUST_PROXY=1` so the token rate limit sees the caller's address rather than the proxy's. The browser only ever gets a short-lived access token, as [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx) explains.
 
 Recording callers has legal requirements that depend on where you and they are. Cartesia records agent calls by default. See [call recordings](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings).
 

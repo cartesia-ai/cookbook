@@ -53,3 +53,16 @@ def test_upsert_env(tmp_path):
     setup_agent.upsert_env(p, "CARTESIA_AGENT_ID", "agent_x")
     setup_agent.upsert_env(p, "NEW", "y")
     assert p.read_text() == "A=1\nCARTESIA_AGENT_ID=agent_x\nNEW=y\n"
+
+
+def test_upsert_env_drops_duplicate_keys(tmp_path):
+    # .env.example has CARTESIA_WEBHOOK_SECRET=; an appended second line used to win in python-dotenv.
+    p = tmp_path / ".env"
+    p.write_text(
+        "CARTESIA_WEBHOOK_SECRET=\nA=1\nCARTESIA_WEBHOOK_SECRET=old\nexport CARTESIA_WEBHOOK_SECRET=x\n"
+    )
+    setup_agent.upsert_env(p, "CARTESIA_WEBHOOK_SECRET", "new")
+    assert p.read_text() == "CARTESIA_WEBHOOK_SECRET=new\nA=1\n"
+    from dotenv import dotenv_values
+
+    assert dotenv_values(p)["CARTESIA_WEBHOOK_SECRET"] == "new"

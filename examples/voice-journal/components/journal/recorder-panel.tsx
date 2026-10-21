@@ -54,14 +54,21 @@ export function RecorderPanel({ busy, onRecorded }: { busy: boolean; onRecorded:
     return () => clearInterval(id);
   }, [rec.isRecording, rec.maxSeconds]);
 
+  const focused = React.useRef(true);
   useFocusEffect(
-    React.useCallback(
-      () => () => {
-        if (live.current.recording) void live.current.finish(false);
-      },
-      [],
-    ),
+    React.useCallback(() => {
+      focused.current = true;
+      return () => {
+        focused.current = false;
+        void live.current.finish(false);
+      };
+    }, []),
   );
+
+  const begin = React.useCallback(async () => {
+    const started = await rec.start();
+    if (started && !focused.current) await live.current.finish(true);
+  }, [rec]);
 
   return (
     <FormPanel>
@@ -124,7 +131,7 @@ export function RecorderPanel({ busy, onRecorded }: { busy: boolean; onRecorded:
             </Button>
           </>
         ) : (
-          <Button style={{ minWidth: 160 }} loading={busy} disabled={busy || rec.busy} icon={(c) => <Mic size={16} color={c} />} onPress={() => void rec.start()}>
+          <Button style={{ minWidth: 160 }} loading={busy} disabled={busy || rec.busy} icon={(c) => <Mic size={16} color={c} />} onPress={() => void begin()}>
             {busy ? "Saving entry" : "Start recording"}
           </Button>
         )}

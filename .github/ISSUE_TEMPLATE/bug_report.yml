@@ -34,9 +34,9 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. pnpm dlx create-next-app --example ... my-app
+        1. npx degit cartesia-ai/cookbook/examples/<name> <name>
         2. cp .env.example .env.local
-        3. pnpm dev
+        3. npm install && npm run dev
     validations:
       required: true
   - type: input

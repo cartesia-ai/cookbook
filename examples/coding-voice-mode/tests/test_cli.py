@@ -1,11 +1,14 @@
 import json
 import os
+import shlex
 import queue
 import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from cartesia_voice_mode import cli
@@ -116,11 +119,23 @@ def test_install_all_with_broken_codex_config_changes_nothing(clean_env, monkeyp
     assert not (clean_env / ".cursor" / "mcp.json").exists()
     assert codex.read_text() == "[mcp_servers\n"
 
-def test_install_with_bad_config_shows_a_clean_error(clean_env, monkeypatch):
-    monkeypatch.delenv("CARTESIA_API_KEY")
+@pytest.mark.parametrize("with_key", [False, True])
+def test_install_with_bad_config_shows_a_clean_error_and_writes_nothing(clean_env, monkeypatch, with_key):
+    if not with_key:
+        monkeypatch.delenv("CARTESIA_API_KEY")
     monkeypatch.setenv("CARTESIA_SPEED", "fast")
     (clean_env / ".cursor").mkdir()
-    r = CliRunner().invoke(cli.main, ["install", "cursor"])
+    r = CliRunner().invoke(cli.main, ["install", "cursor", "--save-key"] if with_key else ["install", "cursor"])
     assert r.exit_code == 1
     assert "Error: CARTESIA_SPEED must be a number" in r.output
     assert "Traceback" not in r.output
+    assert list((clean_env / ".cursor").iterdir()) == []
+    assert not (clean_env / ".config" / "cartesia-voice-mode" / "env").exists()
+
+def test_printed_claude_command_is_shell_quoted(monkeypatch):
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    monkeypatch.setattr(cli.inst, "project_dir", lambda: Path("/tmp/with space/coding-voice-mode"))
+    r = CliRunner().invoke(cli.main, ["install", "claude"])
+    line = r.output.splitlines()[-1].strip()
+    assert "'/tmp/with space/coding-voice-mode'" in line
+    assert shlex.split(line)[-3] == "/tmp/with space/coding-voice-mode"

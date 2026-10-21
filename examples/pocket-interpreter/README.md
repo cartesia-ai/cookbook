@@ -36,7 +36,7 @@ Open http://localhost:3000, pick the two languages, press Start talking and say 
 | `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
-Those model ids are examples. Providers retire models, so check the provider's model page first.
+Those model ids are examples. Providers retire models, so check the provider's model page first. On Vercel, a model with no matching direct key goes through the AI Gateway without `AI_GATEWAY_API_KEY`, because the deployment authenticates to it for you.
 
 ## How it works
 
@@ -79,7 +79,7 @@ import { streamText } from "ai";
 
 const result = streamText({
   model,
-  system: translatePrompt(pair),
+  instructions: translatePrompt(pair),
   prompt: text,
   maxOutputTokens: 600,
   abortSignal: req.signal,
@@ -130,7 +130,7 @@ No. There is one microphone, and the app handles one turn at a time. While a tra
 
 ### Why only five languages?
 
-Ink 2 streams English, Spanish, French, Hindi and Japanese. Sonic speaks more, so if you only need the voice side in another language, the speaker in `lib/audio/speaker.ts` already takes any Sonic language code.
+Ink 2 streams English, Spanish, French, Hindi and Japanese. Sonic speaks more, but `speak()` in `lib/audio/speaker.ts` types `language` as `Lang`, the five codes in `lib/languages.ts`. Widen that type to add a language on the voice side only.
 
 ### Does it work on a phone?
 

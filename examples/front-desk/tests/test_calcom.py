@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
@@ -8,6 +9,7 @@ import pytest
 from front_desk.calendars import CalComCalendar, CalendarError, make_calendar
 from front_desk.config import settings
 from front_desk.store import Store
+from front_desk.tools import Tools
 
 
 def test_calcom_slots_and_booking_requests(monkeypatch):
@@ -100,3 +102,61 @@ def test_shared_calcom_client_closes_on_shutdown():
     assert first.is_closed
     assert calcom_client() is not first
     close_calcom_client()
+
+
+def test_calcom_failures_log_path_and_status_but_not_the_key(monkeypatch, caplog):
+    cal, _ = _cal(monkeypatch, lambda req: httpx.Response(503, text="down"))
+    with caplog.at_level(logging.WARNING, logger="front_desk.calendars"), pytest.raises(CalendarError):
+        cal.open_slots(date(2026, 10, 17))
+    assert "/v2/slots" in caplog.text and "503" in caplog.text
+    caplog.clear()
+    start = datetime(2026, 10, 17, 13, tzinfo=ZoneInfo("America/Los_Angeles"))
+    with caplog.at_level(logging.WARNING, logger="front_desk.calendars"):
+        assert not cal.book(start=start, name="Dana", phone="", service="", call_id="ac_1").ok
+    assert "/v2/bookings" in caplog.text and "503" in caplog.text
+
+    def boom(req):
+        raise httpx.ConnectError("no route", request=req)
+
+    cal, _ = _cal(monkeypatch, boom)
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="front_desk.calendars"), pytest.raises(CalendarError):
+        cal.open_slots(date(2026, 10, 17))
+    assert "/v2/slots" in caplog.text and "ConnectError" in caplog.text
+    assert "cal_test" not in caplog.text and "Bearer" not in caplog.text
+
+
+def test_next_open_days_asks_calcom_once(monkeypatch):
+    seen = []
+
+    def handler(req):
+        seen.append(req)
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "2026-10-19": [{"start": "2026-10-19T09:00:00.000-07:00"}],
+                    "2026-10-21": [
+                        {"start": "2026-10-21T10:00:00.000-07:00"},
+                        {"start": "2026-10-21T15:00:00.000-07:00"},
+                    ],
+                    "2026-10-22": [{"start": "2026-10-22T14:00:00.000-07:00"}],
+                    "2026-10-23": [{"start": "2026-10-23T11:00:00.000-07:00"}],
+                }
+            },
+        )
+
+    cal, store = _cal(monkeypatch, handler)
+    now = datetime(2026, 10, 18, 8, tzinfo=ZoneInfo("America/Los_Angeles"))
+    out = json.loads(Tools(cal.s, store, cal, now=now).run("check_availability", {}))
+    assert len(seen) == 1
+    assert seen[0].url.params["start"] == "2026-10-18" and seen[0].url.params["end"] == "2026-10-31"
+    assert [d["date"] for d in out["next_open_days"]] == ["2026-10-19", "2026-10-21", "2026-10-22"]
+    assert out["next_open_days"][1]["open_times"] == ["10 AM", "3 PM"]
+
+    seen.clear()
+    out = json.loads(
+        Tools(cal.s, store, cal, now=now).run("check_availability", {"part_of_day": "afternoon"})
+    )
+    assert len(seen) == 1
+    assert [d["date"] for d in out["next_open_days"]] == ["2026-10-21", "2026-10-22"]

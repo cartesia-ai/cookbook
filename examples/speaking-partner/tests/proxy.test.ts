@@ -1,6 +1,7 @@
+import { tryToParsePath } from "next/dist/lib/try-to-parse-path";
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { proxy } from "../proxy";
+import { config, proxy } from "../proxy";
 
 const req = (password?: string) =>
   new NextRequest("http://localhost/", {
@@ -39,5 +40,16 @@ describe("proxy", () => {
     vi.stubEnv("APP_PASSWORD", "none");
     vi.stubEnv("VERCEL_ENV", env);
     expect(passes(proxy(req()))).toBe(true);
+  });
+
+  const matchers = config.matcher.map((source) => new RegExp(tryToParsePath(source).regexStr!));
+  const runsOn = (path: string) => matchers.some((re) => re.test(path));
+
+  it.each(["/", "/api/token", "/story/abc"])("runs on %s", (path) => {
+    expect(runsOn(path)).toBe(true);
+  });
+
+  it.each(["/_next/static/x.js", "/_next/image", "/favicon.ico"])("skips %s", (path) => {
+    expect(runsOn(path)).toBe(false);
   });
 });

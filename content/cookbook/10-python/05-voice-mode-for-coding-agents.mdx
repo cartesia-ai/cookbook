@@ -32,7 +32,7 @@ For Claude Code this runs one command, which you can also run yourself:
 claude mcp add cartesia-voice --scope user -- uv run --quiet --directory "$PWD" cartesia-voice-mode serve
 ```
 
-`--save-key` copies the key from your shell into `~/.config/cartesia-voice-mode/env` with mode 0600. The key is never written into a client config. Run `uv run cartesia-voice-mode doctor` to check the key, the audio devices and the models, and `install --dry-run` to see what a setup would change.
+`--save-key` copies the key from your shell into `~/.config/cartesia-voice-mode/env` with mode 0600. The key is never written into a client config. Run `uv run cartesia-voice-mode doctor` to check the key, the audio devices and the models, and `uv run cartesia-voice-mode install claude --dry-run` (or `cursor`, `codex`, `all`) to see what a setup would change.
 
 ## How a turn flows
 
@@ -110,7 +110,7 @@ Set these in the environment of the MCP server. They are sent only when set, so 
 
 ## Why not silence timeouts
 
-A silence timer has to be long enough for you to pause mid-thought and short enough to feel responsive, and it cannot be both. Ink 2 decides from the content of the speech, so a pause in the middle of a sentence is less likely to cut you off. The server keeps two plain deadlines only as a safety net: 20 seconds to hear anyone start, and 120 seconds for one turn.
+A silence timer has to be long enough for you to pause mid-thought and short enough to feel responsive, and it cannot be both. Ink 2 decides from the content of the speech, so a pause in the middle of a sentence is less likely to cut you off. The server keeps two plain deadlines only as a safety net: 20 seconds to hear anyone start, and 120 seconds for one turn (`CARTESIA_NO_SPEECH_TIMEOUT_S` and `CARTESIA_MAX_LISTEN_S`). The agent can pass `listen_duration_max` to listen for less, but never for longer than `CARTESIA_MAX_LISTEN_S`.
 
 ## Limits
 
@@ -120,6 +120,6 @@ A silence timer has to be long enough for you to pause mid-thought and short eno
 
 ## Next steps
 
-- Try `uv run cartesia-voice-mode hear --wav some.wav` to see turn events against a recording.
+- Try `uv run cartesia-voice-mode hear --wav some.wav` with a 16 kHz mono WAV. It prints the final transcript, or how listening ended if nothing was heard.
 - [Convert text to speech and save a WAV file](./01-generate-speech-to-file.mdx)
 - Read the example's README for the full list of settings.

@@ -4,7 +4,7 @@ import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, openAIEmbedder, type Embedder } 
 import { loadEnvFiles } from '../server/env-file';
 import { KEYWORD_MODEL } from '../server/keyword';
 import { DocIndex } from '../server/store';
-import { ingest } from './run';
+import { ingest, shouldPrune } from './run';
 import { folderPages, sitemapPages } from './sources';
 
 loadEnvFiles(process.cwd());
@@ -37,9 +37,11 @@ const { pages, failed } = values.sitemap
   : { pages: await folderPages(resolve(positionals[0] ?? 'content'), values['base-url']!), failed: [] };
 if (failed.length) console.log(`${failed.length} pages failed to fetch; their old sections stay in the index.`);
 
+const prune = shouldPrune(values);
+if (!prune) console.log('--match or --limit is set, so pages outside this run stay in the index.');
 const stats = await ingest(pages, index, embed, {
   force: values.force,
-  prune: true,
+  prune,
   keep: failed,
   log: console.log,
 });

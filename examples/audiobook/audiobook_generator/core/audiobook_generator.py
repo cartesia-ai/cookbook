@@ -37,7 +37,7 @@ def _exit_on_sigterm(signum, frame):
     raise SystemExit(128 + signal.SIGTERM)
 
 def _init_worker(log_level, log_file, is_worker):
-    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    signal.signal(signal.SIGTERM, _exit_on_sigterm)
     setup_logging(log_level, log_file, is_worker)
 
 def get_total_chars(chapters):

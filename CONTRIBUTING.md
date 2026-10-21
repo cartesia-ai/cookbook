@@ -17,7 +17,7 @@ pnpm check
 | --- | --- |
 | `check:facts` | Sonic model ids and `Cartesia-Version` dates in every text file against `facts.json` |
 | `check:content` | The recipe tree: `NN-name` files, frontmatter, relative links, closed fences, no em dashes, no retired model ids |
-| `check:snippets` | Recipe code blocks with `filename="..."` are slices of that file in the recipe's template |
+| `check:snippets` | Recipe code blocks with `filename="..."` are slices of that file in the recipe's template. A missing file is an error unless the fence also says `standalone` |
 | `check:catalog` | `templates.json`, `llms.txt` and the root README against `examples/`, each `.env.example`, each manifest license, the recipes and `facts.json`; no `](../` links in template READMEs |
 | `check:copies` | Kit and agents-web copies match the package files; the pinned groups (`proxy.ts`, `tests/proxy.test.ts`, `rate-limit.ts`, `llm.ts`, `THIRD_PARTY_NOTICES.md`) match their source |
 | `typecheck` | `pnpm -r typecheck` |
@@ -62,7 +62,7 @@ The package is the source of truth. Fix a bug there first, then copy the file ov
 | File (batch) speech to text | `ink-whisper` | `ink-2` does not work on the batch endpoint |
 | API version header | `Cartesia-Version: 2026-08-14` | The SDKs set it |
 
-Do not use older ids. `sonic`, `sonic-english` and `sonic-multilingual` were sunset on 2026-06-01 and return a `model_sunsetted` error. `sonic-2`, `sonic-turbo` and `sonic-3-2025-10-27` stop working on 2026-10-20. The aliases `sonic-latest` and `sonic-3-latest` are deprecated. <!-- allow-model-id -->
+Do not use older ids. `sonic`, `sonic-english` and `sonic-multilingual` were sunset on 2026-06-01 and return a `model_sunsetted` error. `sonic-2`, `sonic-turbo` and `sonic-3-2025-10-27` stopped working on 2026-10-20. The aliases `sonic-latest` and `sonic-3-latest` are deprecated. <!-- allow-model-id -->
 
 Check the current lists at [Sonic 3.6](https://docs.cartesia.ai/build-with-cartesia/tts-models/latest), [Ink 2](https://docs.cartesia.ai/build-with-cartesia/stt/latest) and [deprecated models](https://docs.cartesia.ai/build-with-cartesia/tts-models/api-changes). When a doc page and `facts.json` disagree, update `facts.json` first, then fix what `pnpm check:facts` reports.
 
@@ -94,7 +94,7 @@ tags: ['next', 'tts', 'streaming']
 # Stream speech in Next.js
 ```
 
-Use plain markdown. Code blocks may carry a `filename="..."` meta string, and GitHub ignores it. We have no docs site yet, so don't use site components such as `<Note>` or `<IndexCards>`.
+Use plain markdown. Code blocks may carry a `filename="..."` meta string, and GitHub ignores it. Don't use site components such as `<Note>` or `<IndexCards>`.
 
 A good recipe has Prerequisites, working code, a short explanation of how it works, and Next steps. Test every snippet. Say so when you could not run it against the live API.
 

@@ -86,15 +86,21 @@ def agent_body(s: Settings, tool_ids: list[str]) -> dict[str, Any]:
 
 
 def upsert_env(path: Path, key: str, value: str) -> None:
+    """Set key in .env. Later duplicates are dropped, since python-dotenv would let the last one win."""
     lines = path.read_text().splitlines() if path.exists() else []
-    pattern = re.compile(rf"^\s*{re.escape(key)}\s*=")
-    for i, line in enumerate(lines):
+    pattern = re.compile(rf"^\s*(?:export\s+)?{re.escape(key)}\s*=")
+    out: list[str] = []
+    found = False
+    for line in lines:
         if pattern.match(line):
-            lines[i] = f"{key}={value}"
-            break
-    else:
-        lines.append(f"{key}={value}")
-    path.write_text("\n".join(lines) + "\n")
+            if not found:
+                out.append(f"{key}={value}")
+                found = True
+            continue
+        out.append(line)
+    if not found:
+        out.append(f"{key}={value}")
+    path.write_text("\n".join(out) + "\n")
     path.chmod(0o600)
 
 

@@ -28,7 +28,7 @@ Open [localhost:3000](http://localhost:3000), pick a theme and a tone, optionall
 | --- | --- | --- |
 | `CARTESIA_API_KEY` | yes | [play.cartesia.ai/keys](https://play.cartesia.ai/keys) |
 | `LLM_MODEL` | yes | `provider/model`, for example `openai/gpt-5.4-mini` |
-| `OPENAI_API_KEY` | if `LLM_MODEL` starts with `openai/` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| `OPENAI_API_KEY` | if `LLM_MODEL` starts with `openai/`; recommended for any model | [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Also turns on scene moderation, whatever model writes the story. |
 | `ANTHROPIC_API_KEY` | if `LLM_MODEL` starts with `anthropic/` | [console.anthropic.com](https://console.anthropic.com) |
 | `AI_GATEWAY_API_KEY` | for any other provider | [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) |
 | `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
@@ -86,7 +86,7 @@ Uses `sonic-3.6` for narration, `ink-2` for the spoken choice, and `Cartesia-Ver
 
 - Use different voices: edit `VOICES`, `NARRATORS` and `CHARACTER_POOL` in `lib/story.ts`. Pick ids from the [voice library](https://play.cartesia.ai/voices).
 - Make longer stories: change `TOTAL_SCENES` in `lib/story.ts`. Each scene costs one LLM call and its narration in Sonic.
-- Tell stories in Spanish, French, Hindi or Japanese: Ink 2 and Sonic both speak them. Set `language` in `lib/narrate.ts` and `lib/listen.ts`, add the language to the prompt, and drop `generation_config.emotion`, which is English only.
+- Tell stories in Spanish, French, Hindi or Japanese: Ink 2 and Sonic both speak them. Set `language` in `lib/narrate.ts`, add the language to the prompt, translate the ordinals and stopwords in `lib/match-choice.ts` and the word list in `lib/safety.ts`, and drop `generation_config.emotion`, which is English only. Ink 2 takes no language setting, so `lib/listen.ts` stays as it is.
 - Swap the LLM: set `LLM_MODEL`. `lib/llm.ts` is the whole switch.
 
 ## Before you deploy

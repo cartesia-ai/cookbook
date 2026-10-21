@@ -39,6 +39,10 @@ export function pageChunks(page: RawPage): { title: string; checksum: string; ch
   return { title: parsed.title, checksum: parsed.checksum, chunks };
 }
 
+export function shouldPrune(opts: { match?: string; limit?: string }): boolean {
+  return !opts.match && !opts.limit;
+}
+
 export async function ingest(
   pages: RawPage[],
   index: DocIndex,

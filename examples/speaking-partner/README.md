@@ -85,7 +85,7 @@ The Managed Agent runs Ink 2 (`ink-2`) for your speech and Sonic 3.6 (`sonic-3.6
 
 Set `APP_PASSWORD`. On Vercel (production and preview) the app answers 503 until you set it to a password or to `none`. On hosts other than Vercel, set `APP_PASSWORD` yourself, because the gate only enforces it on Vercel. `/api/session` creates agents on your account, and a token carries the `agent` grant for your whole account, not one agent.
 
-Each route has an in-memory limit per address: 10 sessions, 10 tokens, 10 corrections and 20 session ends a minute. The limiter is per process, resets on restart and is not shared across instances, so it only slows casual abuse. The password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`. On top of that, `/api/session` refuses new sessions while 10 session agents are live or the same address already has 2 open, and each session ends after 3 minutes.
+Each route has an in-memory limit per address: 10 sessions, 10 tokens, 10 corrections and 20 session ends a minute. The limiter is per process, resets on restart and is not shared across instances, so it only slows casual abuse. The password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`. On top of that, `/api/session` refuses new sessions while 10 session agents are live or the same address already has 2 open. The page ends each session after 3 minutes.
 
 Closing the tab sends a `keepalive` request that deletes the agent. Each new session also deletes `speaking-partner-session-` agents older than 30 minutes, so a crashed tab or server leaves one behind only until the next session starts.
 
@@ -94,6 +94,8 @@ Cartesia records the audio and transcript of every agent call by default ([obser
 Agent minutes and the agent's LLM are billed to your Cartesia account. Each line you say also makes one small call to the corrections model. See https://docs.cartesia.ai/pricing.
 
 ## FAQ
+
+### How does the browser talk to Cartesia without my API key?
 
 The browser never sees `CARTESIA_API_KEY`; it gets a 60 second token from `app/api/token/route.ts`. [Browser auth with access tokens](https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx) explains the token route.
 
@@ -127,5 +129,7 @@ Browser audio and the quality of the conversation are not covered by tests. Ink 
 ## License
 
 Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE).
+
+The missions and the two teaching modes come from [ZackAkil/immersive-language-learning-with-live-api](https://github.com/ZackAkil/immersive-language-learning-with-live-api) (Apache-2.0).
 
 Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -5,7 +5,7 @@ Every cookbook template follows these so they look like one product. Copy the bl
 ## Frame
 
 - `AppHeader`: 56px bar, app name only (14px semibold, no logo or mark). Right side: `AppNavLink`s (only if the app has more than one page), then the mode toggle as a ghost `icon-sm` button. Nothing else in the bar.
-- `AppMain`: one centered column. `narrow` (640px) for single-task forms, `default` (768px), `wide` (1024px) only for two-pane tools. Gutter 16px on phones, 24px from `sm`.
+- `AppMain`: one centered column. `narrow` (672px) for single-task forms, `default` (768px), `wide` (1024px) only for two-pane tools. Gutter 16px on phones, 24px from `sm`.
 - `PageHeader` once per page: title 28px semibold (24px on phones), one sentence of description, optional actions on the right.
 
 ## Forms

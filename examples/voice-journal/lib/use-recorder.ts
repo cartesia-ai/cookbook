@@ -55,7 +55,9 @@ export function useRecorder() {
     const secs = (recorder.currentTime ?? 0) || seconds;
     try {
       await recorder.stop();
-      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      try {
+        await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      } catch {}
       const uri = recorder.uri;
       return uri ? { uri, seconds: secs } : null;
     } catch {

@@ -16,7 +16,7 @@ def clean_env(monkeypatch, tmp_path):
     import os
 
     for name in list(os.environ):
-        if name.startswith(("CARTESIA_", "VOICEMODE_", "FASTMCP_")):
+        if name.startswith(("CARTESIA_", "FASTMCP_")):
             monkeypatch.delenv(name)
     home = tmp_path / "home"
     home.mkdir()

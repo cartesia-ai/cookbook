@@ -17,7 +17,7 @@ This recipe covers the Cartesia parts: a temporary agent per session, a client t
 - Optional, for the corrections panel: an Anthropic or OpenAI API key
 - The basics of the agent connection from [Connect to a Managed Agent from the browser](./01-talk-to-a-managed-agent.mdx)
 
-Both of your languages must be one of English, Spanish, French, Hindi or Japanese. Those are the languages Ink-2 transcribes, and you speak both of them: the one you learn, and your own when the partner explains something in Teacher mode. The partner's voice is a Sonic 3.6 voice that speaks the target language natively, picked from the voice list.
+Both of your languages must be one of English, Spanish, French, Hindi or Japanese. Those are the languages Ink 2 transcribes, and you speak both of them: the one you learn, and your own when the partner explains something in Teacher mode. The partner's voice is a Sonic 3.6 voice that speaks the target language natively, picked from the voice list.
 
 Agent LLM usage is billed to your Cartesia account, and each spoken line costs one small call to the corrections model you configure.
 
@@ -60,7 +60,7 @@ export async function createSessionAgent(api: AgentsApi, input: CreateInput, env
 
 `initial_message: null` lets the learner speak first. The agent name starts with `speaking-partner-session-`. The delete route checks that prefix before it deletes anything, so the route cannot be used against your other agents. Tabs that close without a goodbye are covered by a sweep that removes session agents older than 30 minutes.
 
-The alternatives are worse. One agent for every language, mission and mode is 90 agents to keep in sync. A WebSocket proxy that holds your API key can send dynamic variables, but it is a second server to run. The per-session agent costs one extra request before the call starts.
+The alternatives are worse. One agent for every language, mission and mode is 360 agents to keep in sync (9 missions, 2 modes and 20 language pairs). A WebSocket proxy that holds your API key can send dynamic variables, but it is a second server to run. The per-session agent costs one extra request before the call starts.
 
 ## Gate the routes before you deploy
 
@@ -144,7 +144,7 @@ export const CorrectionSchema = z.object({
 
 `correctLine` passes that schema to the AI SDK's `generateText` with `Output.object`, along with the scene and the learner's last few lines.
 
-The model sees text from speech recognition, not text you typed, so the prompt tells it to ignore punctuation, capital letters and anything that looks like a recognition error, and to answer `hasIssue: false` when unsure. A reply that "fixes" nothing is dropped. If the call fails, the card says so and offers a retry. It never shows a made-up pass. Your lines go to the model provider you configured, and the route logs nothing.
+The model sees text from speech recognition, not text you typed, so the prompt tells it to ignore punctuation, capital letters and anything that looks like a recognition error, and to answer `hasIssue: false` when unsure. A reply that "fixes" nothing is dropped. If the call fails, the card says so and offers a retry. It never shows a made-up pass. Your lines go to the model provider you configured, and on failure the route logs only the model id and the error, never your line.
 
 ## Pick a voice for the language
 

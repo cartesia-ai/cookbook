@@ -42,7 +42,8 @@ export function findBlocks(text) {
       const m = line.match(/^(`{3,}|~{3,})(\S*)(.*)$/);
       if (!m) return;
       const filename = m[3].match(/filename="([^"]+)"/)?.[1];
-      open = { fence: m[1], lang: m[2], filename, line: i + 1, body: [] };
+      const standalone = /(?:^|\s)standalone(?:\s|$)/.test(m[3]);
+      open = { fence: m[1], lang: m[2], filename, standalone, line: i + 1, body: [] };
     } else if (line.trim().startsWith(open.fence) && line.trim().replace(/[`~]/g, '') === '') {
       blocks.push(open);
       open = null;
@@ -87,9 +88,14 @@ export function checkSnippets({ contentDir, examplesDir, catalogPath }) {
       continue;
     }
     for (const block of findBlocks(text)) {
-      if (!block.filename) continue;
+      if (!block.filename || block.standalone) continue;
       const source = join(templateDir, block.filename);
-      if (!existsSync(source) || !statSync(source).isFile()) continue;
+      if (!existsSync(source) || !statSync(source).isFile()) {
+        errors.push(
+          `${file}:${block.line}: ${block.filename} is not a file in ${slug}. Fix the filename, or add \`standalone\` to the fence if the block is not from the template`,
+        );
+        continue;
+      }
       const miss = firstMissing(block.body, readFileSync(source, 'utf8'));
       if (miss) {
         errors.push(

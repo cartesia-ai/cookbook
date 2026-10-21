@@ -13,7 +13,7 @@ Expo SDK 58 app (expo-router, expo-audio) for iOS, Android and web. Cartesia `in
 ```
 app/api/*+api.ts      API routes, the only code that reads keys (through lib/server/*)
 lib/server/errors.ts  fixed error strings, 503 for missing config, rateLimited()
-lib/server/llm.ts     resolves LLM_MODEL (provider/model)
+lib/server/llm.ts     resolves LLM_MODEL (provider/model); check:copies pins it byte-for-byte to meeting-notes lib/llm.ts
 lib/store.ts          the only file that touches AsyncStorage; screens use useJournal()
 lib/audio-file.ts     native file handling (expo-file-system); lib/audio-file.web.ts is the web version
 components/theme/tokens.ts  colors, mirrors packages/kit/theme.css

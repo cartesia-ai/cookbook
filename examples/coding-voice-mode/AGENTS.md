@@ -24,7 +24,7 @@ A local stdio MCP server (`cartesia-voice`) that gives coding agents a `converse
 - Never write an API key into a client config, a test, a log line or an error message. `describe()` in `server.py` returns status and message only.
 - Never run `install` against the real home directory while testing. Use `--dry-run` or a temporary `HOME`.
 - The mic opens only after playback drains, and one conversation runs at a time (`asyncio.Lock`). There is no barge-in; do not claim one.
-- Codex stops tool calls after 60 seconds unless `tool_timeout_sec` is set, and `converse` can listen for up to 120. `install.py` writes `tool_timeout_sec = 180` and `startup_timeout_sec = 30` for Codex, and `"type": "stdio"` for Cursor.
+- Codex stops tool calls after 60 seconds unless `tool_timeout_sec` is set. `install.py` writes `tool_timeout_sec = 180` and `startup_timeout_sec = 30` for Codex, and `"type": "stdio"` for Cursor. The 180 seconds cover the whole `converse` call, playback first and then up to `CARTESIA_MAX_LISTEN_S` (120) of listening, so a long message plus a full listen can run past it. `listen_duration_max` from the agent is clamped to `CARTESIA_MAX_LISTEN_S` in `stt.py`. Raise `tool_timeout_sec` if you raise either limit.
 - Client config formats change. Check the official MCP docs for Claude Code, Cursor and Codex before editing `install.py`, and test against a temporary `HOME` (`claude mcp get`, `codex mcp get`).
 
 ## Docs

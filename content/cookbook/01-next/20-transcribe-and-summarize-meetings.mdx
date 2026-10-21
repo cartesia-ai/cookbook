@@ -13,9 +13,10 @@ The two steps are separate routes on purpose. The page can show "Transcribing" a
 ## Prerequisites
 
 - A Next.js App Router app
-- `npm install @cartesia/cartesia-js ai zod`
+- `npm install @cartesia/cartesia-js ai zod @ai-sdk/openai @ai-sdk/anthropic`
+- `lib/llm.ts` and `lib/limits.ts` from the [meeting-notes template](https://github.com/cartesia-ai/cookbook/tree/main/examples/meeting-notes). `getModel()` in `lib/llm.ts` imports both provider packages, and `lib/limits.ts` holds the size and length caps used below
 - `CARTESIA_API_KEY` in `.env.local`
-- `LLM_MODEL` in `.env.local`, as `provider/model`. The AI SDK sends a plain string like this through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway), which needs `AI_GATEWAY_API_KEY` (or OIDC on Vercel). To call a provider directly, install its package, for example `@ai-sdk/openai`, and pass `createOpenAI()(modelId)` as `model` instead.
+- `LLM_MODEL` in `.env.local`, as `provider/model`. `getModel()` calls OpenAI or Anthropic directly when `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` matches the prefix. Any other id goes through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway), which needs `AI_GATEWAY_API_KEY` (or OIDC on Vercel).
 
 ## Server: transcribe
 
@@ -251,7 +252,7 @@ The schema makes every key required, and `owner` is nullable instead of optional
 
 ## Client: record and post
 
-```tsx filename="app/record/page.tsx"
+```tsx filename="app/record/page.tsx" standalone
 'use client';
 
 import { useRef, useState } from 'react';
@@ -319,7 +320,7 @@ The speech-to-text endpoint returns no speaker labels. An action item's owner is
 
 ## Limits
 
-- Vercel serverless functions reject request bodies over 4.5 MB, which is about 20 minutes of Opus at 24 kbps. That cap comes from the host, not from the Cartesia API. For longer meetings, run the route somewhere without that limit.
+- Vercel serverless functions reject request bodies over 4.5 MB. That cap comes from the host, not from the Cartesia API. The template stays under it: uploads stop at 4 MB, and the recorder stops at 3.6 MB or 20 minutes, whichever comes first (`lib/limits.ts`). For longer meetings, run the route somewhere without that limit.
 - The summarize route sends the whole transcript in one call. A very long transcript needs chunking, which this recipe does not do.
 - Both routes spend your credits for anyone who can reach them. The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and route when it is set, and on Vercel the app returns 503 until you set it, or set it to `none` to make the app public. The rate limit only slows casual abuse; the password is the real guard.
 

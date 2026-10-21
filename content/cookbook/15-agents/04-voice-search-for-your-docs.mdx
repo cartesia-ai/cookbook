@@ -76,10 +76,13 @@ The service sends a `client_tool_call` event with `tool_call_id`, `tool_name`, `
 
 ```ts filename="widget/src/element.ts"
     client.on('client_tool_call', async (call) => {
+      if (this.client !== client) return;
       const out = await this.tools.run(call.toolName, call.parameters);
-      if (out) call.respond(out.result, out.isError ? { isError: true, errorType: 'tool_failed' } : undefined);
+      if (out && this.client === client) call.respond(out.result, out.isError ? { isError: true, errorType: 'tool_failed' } : undefined);
     });
 ```
+
+The `this.client !== client` checks drop calls from a session the visitor already ended, so a late search result never lands in the next session.
 
 The dispatcher lives in `widget/src/tools.ts`. Tool names and parameters there must match `scripts/agent-config.ts`, since nothing checks them against each other. `search_docs` returns the server's `result` string as is and keeps the `sources` map for itself. `show_source` returns `null` because the agent does not wait for it.
 

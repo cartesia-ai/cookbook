@@ -53,6 +53,7 @@ const registered = new WeakSet<AudioContext>();
 export interface ListenHandlers {
   onPartial(transcript: string): void;
   onAnswer(transcript: string, final: boolean): boolean;
+  onClosed?(): void;
 }
 
 export async function listenForChoice(client: Cartesia, ctx: AudioContext, handlers: ListenHandlers) {
@@ -83,16 +84,23 @@ export async function listenForChoice(client: Cartesia, ctx: AudioContext, handl
   }
 
   void (async () => {
-    for await (const event of ws.stream()) {
-      if (closed) break;
-      if (event.type !== "message") continue;
-      const m = event.message;
-      if (m.type === "turn.update") handlers.onPartial(m.transcript);
-      else if (m.type === "turn.eager_end" || m.type === "turn.end") {
-        if (handlers.onAnswer(m.transcript, m.type === "turn.end")) stop();
+    try {
+      for await (const event of ws.stream()) {
+        if (closed) break;
+        if (event.type !== "message") continue;
+        const m = event.message;
+        if (m.type === "turn.update") handlers.onPartial(m.transcript);
+        else if (m.type === "turn.eager_end" || m.type === "turn.end") {
+          if (handlers.onAnswer(m.transcript, m.type === "turn.end")) stop();
+        }
       }
+    } catch (err) {
+      console.error(err);
     }
-  })().catch((err) => console.error(err));
+    if (closed) return;
+    stop();
+    handlers.onClosed?.();
+  })();
 
   return { stop };
 }

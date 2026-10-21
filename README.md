@@ -2,6 +2,8 @@
 
 Templates and recipes for building with Cartesia speech and voice agents: text to speech, speech to text, and Managed Agents you can talk to in the browser or on the phone.
 
+![The voice-chat template mid-call: the agent's answer streams in under a green Speaking badge, above Mute and End call buttons](examples/voice-chat/docs/screenshot.png)
+
 ## Templates
 
 Each folder in [`examples/`](examples) installs and runs on its own, with a README, an `.env.example` and an `AGENTS.md` for coding agents.
@@ -25,8 +27,9 @@ Get a Cartesia key at [play.cartesia.ai/keys](https://play.cartesia.ai/keys). To
 ```sh
 npx degit cartesia-ai/cookbook/examples/voice-chat voice-chat
 cd voice-chat
-cp .env.example .env.local
+cp .env.example .env.local   # add CARTESIA_API_KEY
 npm install
+npm run setup:agent          # creates the agent and writes CARTESIA_AGENT_ID to .env.local
 npm run dev
 ```
 
@@ -98,7 +101,7 @@ The API version header is `Cartesia-Version: 2026-08-14`. [`facts.json`](facts.j
 
 ## Keep the API key on the server
 
-`CARTESIA_API_KEY` never reaches a browser or a mobile bundle in any template. Browser templates call a server route that mints a short-lived access token, and the page opens its WebSocket with that token. See [Browser auth with access tokens](content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx) and [Authenticate your applications](https://docs.cartesia.ai/get-started/authenticate-your-client-applications).
+`CARTESIA_API_KEY` never reaches a browser or a mobile bundle in any template. Templates that stream from the browser get a 60 second access token from a server route and open their WebSocket with it. The others call Cartesia only from server routes. See [Browser auth with access tokens](content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx) and [Authenticate your applications](https://docs.cartesia.ai/get-started/authenticate-your-client-applications).
 
 ## For coding agents
 
@@ -117,6 +120,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the repo layout, how templates share 
 ## Your users' data
 
 The templates send your users' audio and text to Cartesia and to the LLM provider you configure (OpenAI, Anthropic or Vercel AI Gateway). Managed Agents record the audio and transcript of every agent call by default. Delete a call's recording with `DELETE /agents/calls/{id}`, and see the [observability docs](https://docs.cartesia.ai/line/infrastructure/observability) for recording and retention controls. If you deploy one of these apps for other people, you need your own privacy notice and terms, and consent where the law requires it.
+
+Two templates also send text to OpenAI when `OPENAI_API_KEY` is set. story-time sends the story settings and each scene to OpenAI's moderation endpoint, and docs-voice-widget sends your docs at ingest and every search query to OpenAI embeddings.
 
 ## Thanks
 

@@ -1,6 +1,6 @@
 ---
 title: Build a browser voice chat with a Managed Agent
-description: Talk to a Cartesia Managed Agent in the browser with barge-in and live captions in Next.js, plus a variant with your own LLM, Ink 2 and Sonic 3.6.
+description: Talk to a Cartesia Managed Agent in the browser with barge-in and streaming agent captions in Next.js, plus a variant with your own LLM, Ink 2 and Sonic 3.6.
 tags: ['agents', 'next', 'voice', 'streaming', 'managed-agents']
 ---
 
@@ -254,7 +254,7 @@ The trade is plain. The managed agent is one token route, and the service owns t
 ## Troubleshooting
 
 - **The call closes right away with 1008.** The service rejected the first event or the token. Check that the token is fresh and the agent id belongs to the account that minted it.
-- **The call ends after two minutes of silence.** The service closes a session that gets no client event for 120 seconds. The client sends silence while muted, so this usually means the tab was suspended.
+- **The call ends after two minutes of silence.** That is the agent's own setting, not a transport timeout. `scripts/setup-agent.ts` sets `turn.inactivity_check_in_secs: 10`, so the agent checks in after 10 seconds of no speech, and `inactivity_end_call_secs: 120`, so it ends the call after 120. Raise them and run `npm run setup:agent -- --force`.
 - **The microphone is blocked.** The page needs HTTPS or `localhost`.
 
 ## Limits

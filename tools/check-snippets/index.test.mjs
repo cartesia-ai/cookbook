@@ -69,8 +69,18 @@ test('a partial line fails', () => {
   assert.equal(checkSnippets(repo({ recipe: recipe('const y =') })).length, 1);
 });
 
-test('a filename that is not in the template is skipped', () => {
+test('a filename that is not in the template fails', () => {
   const text = '---\ntitle: T\n---\n\n```ts filename="lib/sketch.ts"\nanything at all\n```\n';
+  assert.match(checkSnippets(repo({ recipe: text })).join('\n'), /01-r\.mdx:5: lib\/sketch\.ts is not a file in demo/);
+});
+
+test('a standalone block is skipped even when the file is missing', () => {
+  const text = '---\ntitle: T\n---\n\n```ts filename="lib/sketch.ts" standalone\nanything at all\n```\n';
+  assert.deepEqual(checkSnippets(repo({ recipe: text })), []);
+});
+
+test('a standalone block is skipped even when the file exists', () => {
+  const text = '---\ntitle: T\n---\n\n```ts standalone filename="lib/run.ts"\nanything at all\n```\n';
   assert.deepEqual(checkSnippets(repo({ recipe: text })), []);
 });
 

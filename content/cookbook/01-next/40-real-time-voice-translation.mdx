@@ -192,7 +192,7 @@ const result = streamText({
 return result.toTextStreamResponse({ headers: { "Cache-Control": "no-store" } });
 ```
 
-`resolved` comes from `getModel()` in `lib/llm.ts`, which turns `LLM_MODEL` into a provider model or a Vercel AI Gateway id. The route passes no `temperature`, because reasoning models reject it.
+`resolved` comes from `getModel()` in `lib/llm.ts`, which turns `LLM_MODEL` into a provider model or a Vercel AI Gateway id. The route passes no `temperature`, because some providers ignore or reject it for reasoning models.
 
 In the browser, `run()` reads the stream until the first line names the language, then picks the other language as the target. `createReplyParser` in `lib/translation.ts` strips the code. If a model skips the header, the app falls back to a script check (kana or kanji means Japanese, Devanagari means Hindi), and then to the opposite of the previous speaker.
 
@@ -325,13 +325,14 @@ Both numbers start at `endedAt`, the `performance.now()` taken when `turn.end` a
     };
 ```
 
-Because the clock starts at `turn.end` and not at `turn.eager_end`, the time saved by the early request shows up as a smaller number. The page prints both under each translated turn. The template README reports first audio 0.6 to 1.5 s after the speaker stopped, with `openai/gpt-5.4-mini`, tested in desktop Chrome with a recorded voice as the microphone and not on a real phone.
+Because the clock starts at `turn.end` and not at `turn.eager_end`, the time saved by the early request shows up as a smaller number. The page prints both under each translated turn.
 
 ## Limits
 
 - One microphone, one turn at a time. The microphone is muted for Ink 2 while a translation plays, so the other person waits for it to finish.
 - In a loud room, background voices can start a stray turn.
-- `/api/token` and `/api/translate` have no auth. Anyone who can reach them spends your Cartesia and LLM credits, so put the app behind your own login before you share the URL.
+- Both routes spend money. The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and route when it is set, and on Vercel the app returns 503 until you set it, or set it to `none` to make the app public.
+- Each route also has an in-memory rate limit per client IP (10 tokens and 60 translations a minute). It lives in one server process and only slows casual abuse; the password is the real guard. `clientIp` in `lib/rate-limit.ts` reads `x-forwarded-for` only on Vercel or with `TRUST_PROXY=1`, so elsewhere every caller shares one bucket.
 
 ## Next steps
 

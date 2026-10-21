@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -80,7 +81,12 @@ def now_iso() -> str:
 class Store:
     def __init__(self, path: Path):
         self.path = path
-        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.parent.exists():
+            path.parent.mkdir(parents=True, mode=0o700)
+            path.parent.chmod(0o700)
+        # Calls, transcripts and caller numbers live here: owner-only before SQLite writes anything.
+        os.close(os.open(path, os.O_CREAT | os.O_WRONLY, 0o600))
+        path.chmod(0o600)
         with self._conn() as c:
             c.executescript(SCHEMA)
 

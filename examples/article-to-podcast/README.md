@@ -20,24 +20,26 @@ npm run dev
 
 pnpm works too (`pnpm install`, `pnpm dev`).
 
-Open http://localhost:3000, paste a link to an article (or switch to Paste text), leave Length on Short and press Make podcast. Without keys the page still loads and shows a Finish setup notice naming what is missing. `GET /api/health` reports the same thing as booleans, never values.
+Open http://localhost:3000, paste a link to an article (or switch to Paste text), set Length to Short and press Make podcast. Without keys the page still loads and shows a Finish setup notice naming what is missing. `GET /api/health` reports the same thing as booleans, never values.
 
 ## Environment variables
 
 | Name | Required | What it does |
 | --- | --- | --- |
 | `CARTESIA_API_KEY` | yes | Records the audio. Get one at https://play.cartesia.ai/keys |
-| `LLM_MODEL` | yes | The model that writes the script, as `provider/model`, for example `openai/gpt-5.4-mini` or `anthropic/claude-sonnet-5-5` |
+| `LLM_MODEL` | yes | The model that writes the script, as `provider/model`, for example `openai/gpt-5.4-mini` or `anthropic/claude-haiku-4-5` |
 | `OPENAI_API_KEY` | if `LLM_MODEL` starts with `openai/` | https://platform.openai.com/api-keys |
 | `ANTHROPIC_API_KEY` | if `LLM_MODEL` starts with `anthropic/` | https://console.anthropic.com |
 | `AI_GATEWAY_API_KEY` | for any other provider | Routes the model through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). Not needed on a Vercel deployment |
 | `CARTESIA_VOICE_HOST_A`, `CARTESIA_VOICE_HOST_B` | no | Voice ids for the two hosts. Defaults are Skylar and Daniel |
-| `APP_PASSWORD` | see note | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
+| `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
 A direct key for the `LLM_MODEL` prefix wins. Any other prefix, or a prefix with no direct key, goes through the AI Gateway. The model ids are examples. Providers retire models, so check the provider's model page before you pick one. On Vercel, a model with no matching direct key goes through the AI Gateway without `AI_GATEWAY_API_KEY`, because the deployment authenticates to it for you.
 
 ## How it works
+
+Your server fetches the URL, sends the article text to your LLM to write the script, and sends each script line to Cartesia. The browser never calls either provider.
 
 Open these first:
 
@@ -70,7 +72,7 @@ The SDK sends `Cartesia-Version: 2026-08-14` on every request. See https://docs.
 
 - Use other voices: pick two at https://play.cartesia.ai/voices and set `CARTESIA_VOICE_HOST_A` and `CARTESIA_VOICE_HOST_B`. The defaults are English voices, so set voices that match the language you pick.
 - Change the show: the podcast name, tagline, host roles and dialogue structure are defaults in `lib/config.ts`. The prompt is in `lib/prompt.ts`.
-- Use another LLM provider: set `LLM_MODEL` to its AI Gateway id, for example `google/<model id>`, with `AI_GATEWAY_API_KEY`. To call it directly instead, install its AI SDK package and add a branch for its prefix in `getModel` in `lib/llm.ts`. If the model rejects `temperature`, remove `temperature: o.creativity` in `lib/script.ts`.
+- Use another LLM provider: set `LLM_MODEL` to its AI Gateway id, for example `google/<model id>`, with `AI_GATEWAY_API_KEY`. To call it directly instead, install its AI SDK package and add a branch for its prefix in `getModel` in `lib/llm.ts`. Some providers ignore or reject `temperature` for reasoning models. If yours rejects it, remove `temperature: o.creativity` in `lib/script.ts`.
 
 ```ts
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -123,6 +125,7 @@ The tests need no keys and no network. They mock the Cartesia SDK and use `MockL
 - TTS bytes API: https://docs.cartesia.ai/api-reference/tts/bytes
 - Laughter, speed and emotion: https://docs.cartesia.ai/build-with-cartesia/capability-guides/volume-speed-emotion
 - Cartesia docs for agents: https://docs.cartesia.ai/llms.txt
+- Agent skills: `npx skills add cartesia-ai/skills`
 
 ## License
 

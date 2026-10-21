@@ -4,7 +4,7 @@ An Expo app for iOS, Android and the web that turns spoken diary entries into te
 
 ![Phone screenshot of the Weekly recap screen: a This week panel with one entry and a Hopeful mood badge, the voice picker set to Tessa, the Write my recap button, and the latest recap playing at 0:04 of 0:32](./docs/screenshot.png)
 
-Tap to record an entry, `ink-whisper` transcribes it, and an LLM adds a title, a mood and a one-line reflection. Once a week the app writes a short recap and reads it with a Sonic voice you pick. Entries are saved on this device. Recordings are sent to Cartesia and your LLM provider for transcription and reflections. A few Expo Router API routes hold the keys, so there is no database and no login.
+Tap to record an entry, `ink-whisper` transcribes it, and an LLM adds a title, a mood and a one-line reflection. On the Recap page the app writes a short recap of the last seven days and reads it with a Sonic voice you pick. Entries are saved on this device. Recordings go to Cartesia for transcription, and the transcripts go to your LLM provider for titles, moods and reflections. A few Expo Router API routes hold the keys, so there is no database and no login.
 
 ## Run it
 
@@ -33,7 +33,7 @@ Press `w` to open the web app at http://localhost:8081, or scan the QR code with
 | `AI_GATEWAY_API_KEY` | for any other provider | https://vercel.com/docs/ai-gateway |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
-None of these have an `EXPO_PUBLIC_` prefix, so Expo never puts them in the app bundle. Only the API routes in `app/api` read them. Model ids are examples; providers retire models, so check the provider's model page first.
+None of these have an `EXPO_PUBLIC_` prefix, so Expo never puts them in the app bundle. Only the API routes in `app/api` read them. Model ids are examples; providers retire models, so check the provider's model page first. On Vercel, a model with no matching direct key goes through the AI Gateway without `AI_GATEWAY_API_KEY`.
 
 ## How it works
 
@@ -81,9 +81,9 @@ Audio is not kept. The transcribe route reads the file, sends it to Cartesia and
 
 ## Change it
 
-- Use a different default voice: set `DEFAULT_VOICE_ID` in `lib/limits.ts` to any voice id from https://play.cartesia.ai/voices. The picker lists public English voices from `GET /voices`.
+- Use a different default voice: set `DEFAULT_VOICE_ID` and `DEFAULT_VOICE_NAME` in `lib/limits.ts` to a voice from https://play.cartesia.ai/voices, and change its `tagline` in `app/recap.tsx`. The picker lists public English voices from `GET /voices`.
 - Transcribe another language: change `language: "en"` in `app/api/transcribe+api.ts`, and the TTS `language` in `app/api/speak+api.ts` with a voice that speaks it.
-- Change the moods or the tone of the reflection: edit `MOODS` in `lib/schema.ts`, the instructions in `lib/server/prompts.ts`, and `recapPrompt` in `lib/journal.ts` for the weekly recap.
+- Change the moods or the tone: edit `MOODS` in `lib/schema.ts`, `ENTRY_INSTRUCTIONS` in `lib/server/prompts.ts` for the reflection, and `RECAP_INSTRUCTIONS` in the same file for the recap. `recapPrompt` in `lib/journal.ts` only formats the entry headings.
 - Swap the LLM: set `LLM_MODEL`. `lib/server/llm.ts` is the whole switch.
 - Store entries elsewhere: replace the functions in `lib/store.ts` and keep `useJournal()`.
 
@@ -97,7 +97,7 @@ Recordings over 4 MB are rejected, because hosts such as Vercel refuse request b
 
 Each entry costs one `ink-whisper` transcription and one LLM call. Each recap costs one LLM call and Sonic characters for the text. See https://docs.cartesia.ai/pricing and your LLM provider's pricing page.
 
-Entries are sent to Cartesia and your LLM provider for processing; tell your users that. The app says so under the record button.
+Recordings go to Cartesia for transcription, and the transcripts go to your LLM provider. Tell your users that. The app says so under the record button.
 
 Washington's [My Health My Data Act](https://app.leg.wa.gov/RCW/default.aspx?cite=19.373.010) can treat inferred mood labels as consumer health data. If you have users there, get their consent and publish a health data privacy policy.
 
@@ -109,7 +109,7 @@ The app never sees `CARTESIA_API_KEY`. If you want the phone to call Cartesia di
 
 ### Does it work on a real iPhone or Android phone?
 
-Yes, in Expo Go during development: the app calls the API routes on the Expo dev server, which Expo Router resolves for you. For a store build, deploy the server (for example `eas deploy` to EAS Hosting) and set the `origin` option of the `expo-router` plugin in `app.json` to that URL. The web and native paths were checked in headless Chrome; the native paths compile but were not run on a device for this template.
+Yes, in Expo Go during development: the app calls the API routes on the Expo dev server, which Expo Router resolves for you. For a store build, deploy the server (for example `eas deploy` to EAS Hosting) and set the `origin` option of the `expo-router` plugin in `app.json` to that URL. The web build was checked in headless Chrome. The iOS and Android paths compile but were not run on a device.
 
 ### Why ink-whisper and not Ink 2 streaming?
 

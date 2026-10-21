@@ -93,6 +93,32 @@ WORKER_SCRIPT = textwrap.dedent('''
     sys.exit(gen.AudiobookGenerator(config).run())
 ''')
 
+EXPORT_SCRIPT = textwrap.dedent('''
+    import multiprocessing, sys
+    multiprocessing.set_start_method("fork", force=True)
+    from pydub import AudioSegment
+    from audiobook_generator.core import audiobook_generator as gen
+    from audiobook_generator.tts_providers import cartesia_tts_provider as mod
+    from tests.test_utils import get_cartesia_config
+
+    AudioSegment.converter = sys.argv[3]
+
+    class LongProvider(mod.CartesiaTTSProvider):
+        def synthesize(self, text):
+            return b"\\x00" * mod.BYTES_PER_SECOND * 30, []
+
+    gen.get_tts_provider = lambda config: LongProvider(config)
+    config = get_cartesia_config(input_file=sys.argv[1], output_folder=sys.argv[2],
+                                 worker_count=1, no_prompt=True, cast_mode="narrator")
+    config.log_file = sys.argv[2] + ".log"
+    sys.exit(gen.AudiobookGenerator(config).run())
+''')
+
+FAKE_FFMPEG = '''#!/bin/sh
+echo $$ > "$MARKER"
+exec sleep 30
+'''
+
 def pid_alive(pid):
     try:
         os.kill(pid, 0)
@@ -143,6 +169,41 @@ class TestSigterm(unittest.TestCase):
         while any(pid_alive(pid) for pid in worker_pids) and time.time() < deadline:
             time.sleep(0.05)
         self.assertFalse(any(pid_alive(pid) for pid in worker_pids))
+
+    @unittest.skipIf(sys.platform == "win32", "needs fork and SIGTERM")
+    def test_sigterm_mid_export_leaves_no_partial_or_temp_files(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        book = os.path.join(tmp.name, "tiny.epub")
+        make_epub(book)
+        out = os.path.join(tmp.name, "out")
+        sys_tmp = os.path.join(tmp.name, "tmp")
+        os.makedirs(sys_tmp)
+        marker = os.path.join(tmp.name, "ffmpeg.pid")
+        ffmpeg = os.path.join(tmp.name, "ffmpeg")
+        with open(ffmpeg, "w") as f:
+            f.write(FAKE_FFMPEG)
+        os.chmod(ffmpeg, 0o755)
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        env = dict(os.environ, TMPDIR=sys_tmp, MARKER=marker)
+        proc = subprocess.Popen([sys.executable, "-c", EXPORT_SCRIPT, book, out, ffmpeg], cwd=root, env=env,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(proc.kill)
+        deadline = time.time() + 20
+        while not os.path.exists(marker) and time.time() < deadline:
+            time.sleep(0.05)
+        time.sleep(0.2)
+        with open(marker) as f:
+            ffmpeg_pid = int(f.read())
+        self.assertTrue([n for n in os.listdir(out) if n.endswith(".part")])
+        proc.send_signal(signal.SIGTERM)
+        self.assertEqual(proc.wait(timeout=10), 143)
+        deadline = time.time() + 5
+        while pid_alive(ffmpeg_pid) and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertFalse(pid_alive(ffmpeg_pid))
+        self.assertEqual([n for n in os.listdir(out) if n.endswith((".part", ".mp3"))], [])
+        self.assertEqual(os.listdir(sys_tmp), [])
 
 class TestRun(unittest.TestCase):
 

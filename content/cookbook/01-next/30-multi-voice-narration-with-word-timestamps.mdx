@@ -276,21 +276,28 @@ export async function listenForChoice(client: Cartesia, ctx: AudioContext, handl
   }
 
   void (async () => {
-    for await (const event of ws.stream()) {
-      if (closed) break;
-      if (event.type !== "message") continue;
-      const m = event.message;
-      if (m.type === "turn.update") handlers.onPartial(m.transcript);
-      else if (m.type === "turn.eager_end" || m.type === "turn.end") {
-        if (handlers.onAnswer(m.transcript, m.type === "turn.end")) stop();
+    try {
+      for await (const event of ws.stream()) {
+        if (closed) break;
+        if (event.type !== "message") continue;
+        const m = event.message;
+        if (m.type === "turn.update") handlers.onPartial(m.transcript);
+        else if (m.type === "turn.eager_end" || m.type === "turn.end") {
+          if (handlers.onAnswer(m.transcript, m.type === "turn.end")) stop();
+        }
       }
+    } catch (err) {
+      console.error(err);
     }
-  })().catch((err) => console.error(err));
+    if (closed) return;
+    stop();
+    handlers.onClosed?.();
+  })();
 
   return { stop };
 ```
 
-`startMic` in the same file runs an `AudioWorklet` that posts raw Float32 samples and cuts them into 100 ms chunks at the context's own sample rate, which is the `sample_rate` sent to Ink 2. The socket sets no language: Ink 2 detects English, Spanish, French, Hindi and Japanese on its own. The audio streams to Cartesia for transcription; the app keeps none of it. If the microphone fails to start, the function closes the socket before it throws, and a `stop()` that comes in while the microphone is starting still releases it.
+`startMic` in the same file runs an `AudioWorklet` that posts raw Float32 samples and cuts them into 100 ms chunks at the context's own sample rate, which is the `sample_rate` sent to Ink 2. The socket sets no language: Ink 2 detects English, Spanish, French, Hindi and Japanese on its own. The audio streams to Cartesia for transcription; the app keeps none of it. If the microphone fails to start, the function closes the socket before it throws, and a `stop()` that comes in while the microphone is starting still releases it. If the server closes the socket on its own, the loop ends, the function turns the microphone off, and `onClosed` lets the player stop showing "Listening" and ask the listener to try again.
 
 The player tries to match on `turn.eager_end`, before the end-of-turn silence has passed, so a clear answer moves the story on sooner. Only an unclear `turn.end` tells the listener to try again.
 
@@ -314,7 +321,7 @@ The player tries to match on `turn.eager_end`, before the end-of-turn silence ha
 ## Limits
 
 - The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and API route when it is set, and on Vercel the app returns 503 until you set it, or set it to `none` to make the app public. The in-memory rate limits on `/api/token` and `/api/scene` (10 a minute per client IP) are per process and only slow casual abuse. The password is the real guard.
-- Emotion control is English only. For another language, change `language` in the Sonic context and drop `generation_config.emotion`. The Ink 2 socket needs no change.
+- Emotion control is English only. For another language, change `language` in the Sonic context, add the language to the prompt, translate the ordinals and stopwords in `lib/match-choice.ts` and the word list in `lib/safety.ts`, and drop `generation_config.emotion`. The Ink 2 socket takes no language, so it needs no change.
 - The Sonic loop was run from Node with a token client. The microphone path and the read-along UI were not tested against the live API.
 
 ## Next steps

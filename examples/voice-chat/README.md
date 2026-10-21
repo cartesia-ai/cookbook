@@ -37,6 +37,7 @@ Open http://localhost:3000, press Start call, wait for the greeting and ask a qu
 | `CARTESIA_VOICE_ID` | no | Agent voice, read by `npm run setup:agent`. Pick one at https://play.cartesia.ai/voices |
 | `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
+| `CARTESIA_BASE_URL` | no | API base URL for `npm run setup:agent`. Leave unset to use `https://api.cartesia.ai`. Not in `.env.example` |
 
 After changing `AGENT_MODEL_ID` or `CARTESIA_VOICE_ID`, run `npm run setup:agent -- --force`.
 
@@ -144,6 +145,10 @@ Mint a short-lived token on your server and give the browser only that. `lib/tok
 ### Why do my words show up only after I stop talking?
 
 The Managed Agents WebSocket sends your text in `turn_ended`, not while you speak, so the transcript shows animated dots until your turn ends. The agent's words stream in as it says them. For live captions of the user, use the bring-your-own-LLM variant in the recipe, where Ink 2 sends partial transcripts.
+
+### Why did the call end on its own?
+
+The agent ends the call after 120 seconds with no speech. `scripts/setup-agent.ts` sets `turn.inactivity_end_call_secs: 120`, and `inactivity_check_in_secs: 10` makes the agent check in after 10 seconds of silence first. Change them and run `npm run setup:agent -- --force`.
 
 ### Why does the agent keep interrupting itself?
 

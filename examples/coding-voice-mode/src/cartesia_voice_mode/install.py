@@ -4,10 +4,10 @@ import json
 import os
 import shutil
 import stat
-import tomllib
 from pathlib import Path
 
-import tomli_w
+import tomlkit
+from tomlkit.exceptions import TOMLKitError
 
 NAME = "cartesia-voice"
 
@@ -28,18 +28,18 @@ def _read_json(path: Path) -> dict:
         raise ConfigFileError(f"{path} must be a JSON object with an \"mcpServers\" object. The file was not changed.")
     return data
 
-def _read_toml(path: Path) -> dict:
+def _read_toml(path: Path) -> tomlkit.TOMLDocument:
     if not path.exists():
-        return {}
+        return tomlkit.document()
     try:
-        return tomllib.loads(path.read_text())
-    except tomllib.TOMLDecodeError as exc:
+        return tomlkit.parse(path.read_text())
+    except TOMLKitError as exc:
         raise ConfigFileError(f"{path} is not valid TOML ({exc}). Fix it, then run this again. The file was not changed.") from None
 
 def read_cursor(path: Path) -> dict:
     return _read_json(path)
 
-def read_codex(path: Path) -> dict:
+def read_codex(path: Path) -> tomlkit.TOMLDocument:
     return _read_toml(path)
 
 def project_dir() -> Path:
@@ -68,6 +68,7 @@ def _backup_once(path: Path) -> None:
         shutil.copy2(path, bak)
 
 def _atomic_write(path: Path, text: str) -> None:
+    path = Path(os.path.realpath(path))
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         mode = stat.S_IMODE(path.stat().st_mode)
@@ -112,12 +113,17 @@ def merge_codex(path: Path, entry: dict) -> bool:
     data = _read_toml(path)
     codex_entry = {k: v for k, v in entry.items() if v}
     codex_entry |= {"startup_timeout_sec": 30, "tool_timeout_sec": 180}
-    servers = data.setdefault("mcp_servers", {})
-    if servers.get(NAME) == codex_entry:
+    if "mcp_servers" not in data:
+        data["mcp_servers"] = tomlkit.table(is_super_table=True)
+    servers = data["mcp_servers"]
+    if not isinstance(servers, dict):
+        raise ConfigFileError(f"{path} has an mcp_servers key that is not a table. The file was not changed.")
+    current = servers.get(NAME)
+    if current is not None and getattr(current, "unwrap", lambda: current)() == codex_entry:
         return False
     _backup_once(path)
     servers[NAME] = codex_entry
-    _atomic_write(path, tomli_w.dumps(data))
+    _atomic_write(path, tomlkit.dumps(data))
     return True
 
 def remove_codex(path: Path) -> bool:
@@ -128,7 +134,7 @@ def remove_codex(path: Path) -> bool:
         return False
     _backup_once(path)
     del data["mcp_servers"][NAME]
-    _atomic_write(path, tomli_w.dumps(data))
+    _atomic_write(path, tomlkit.dumps(data))
     return True
 
 def save_key(path: Path, key: str) -> None:

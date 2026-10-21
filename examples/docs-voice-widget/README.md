@@ -35,7 +35,7 @@ npm run ingest -- ./my-docs --base-url /docs/                    # a folder of .
 npm run ingest -- --sitemap https://docs.example.com/sitemap.xml # or a live site
 ```
 
-Sitemap mode fetches `<page>.md` first (Mintlify and GitBook serve one) and falls back to the HTML, keeping the page's own heading ids so citations land on the right anchor. It only fetches pages, and follows redirects, on the sitemap's own host. Running ingest again only re-indexes pages whose content changed. Pages that fail to fetch keep their old sections in the index; ingest does not prune them. Only ingest sites you own or are allowed to index.
+Sitemap mode fetches `<page>.md` first (Mintlify and GitBook serve one) and falls back to the HTML, keeping the page's own heading ids so citations land on the right anchor. It only fetches pages, and follows redirects, on the sitemap's own host. Running ingest again only re-indexes pages whose content changed. A page that answers 5xx or 429, or fails on the network, keeps its old sections in the index. A page that answers 404, 410 or another 4xx is removed, like a page that left the sitemap. Runs with `--match` or `--limit` only cover part of the site, so they remove nothing. Only ingest sites you own or are allowed to index.
 
 Optional attributes on the script tag: `data-theme="light|dark"` (default follows the page) and `data-title="Ask the docs"`. Host pages with a Content Security Policy need `connect-src wss://api.cartesia.ai https://your-server.example.com` and `worker-src blob:`.
 
@@ -45,12 +45,14 @@ Optional attributes on the script tag: `data-theme="light|dark"` (default follow
 | --- | --- | --- |
 | `CARTESIA_API_KEY` | yes | Mints access tokens and creates the agent. Get one at https://play.cartesia.ai/keys |
 | `OPENAI_API_KEY` | no | Embeddings for ingest and search (`text-embedding-3-small`, 512 dimensions). Without it, search uses keywords |
-| `CARTESIA_AGENT_ID`, `CARTESIA_TOOL_IDS` | yes | Written by `npm run setup:agent` |
+| `CARTESIA_AGENT_ID` | yes | Written by `npm run setup:agent` |
+| `CARTESIA_TOOL_IDS` | no | Written by `npm run setup:agent` for reference, so you know which tools to delete. Nothing reads it |
 | `ALLOWED_ORIGINS` | for your site | Comma-separated origins that may start sessions. The server's own origin is always allowed |
 | `PUBLIC_URL`, `TRUST_PROXY` | behind a proxy | Public origin, and `1` to rate limit by the last `X-Forwarded-For` address, the one your proxy appended |
 | `MAX_SESSION_SECS` | no | The widget ends a session after this many seconds. Default 300 |
 | `PORT`, `WIDGET_TITLE`, `DEMO_SITE` | no | Port (default 4512), panel title (default "Ask the docs"), `0` turns off the demo site |
-| `AGENT_MODEL_ID`, `CARTESIA_VOICE_ID`, `AGENT_LANGUAGE` | no | Read by `npm run setup:agent` |
+| `AGENT_NAME`, `AGENT_MODEL_ID`, `CARTESIA_VOICE_ID`, `AGENT_LANGUAGE` | no | Read by `npm run setup:agent`. `AGENT_NAME` defaults to "Docs voice widget" |
+| `INDEX_PATH` | no | Where ingest writes the index and the server reads it. Default `data/index.json` |
 
 ## How it works
 
@@ -73,8 +75,8 @@ Other files: `server/store.ts` (the JSON index), `server/keyword.ts` (BM25), `in
 
 ## Change it
 
-- Prompt and tools: edit `scripts/agent-config.ts`, then `npm run setup:agent -- --force` to create a new agent. Delete the old one at https://play.cartesia.ai.
-- Model: the agent uses `ink-2` for speech recognition, `sonic-3.6` for speech and `gpt-4.1` as the LLM. Set `AGENT_MODEL_ID` to another id from https://docs.cartesia.ai/agents/models and run `npm run setup:agent -- --force`.
+- Prompt and tools: edit `scripts/agent-config.ts`, then `npm run setup:agent -- --force` to create a new agent. `--force` also creates two new tools and overwrites `CARTESIA_TOOL_IDS`, so copy the old ids first. Then delete the old agent and both old tools at https://play.cartesia.ai.
+- Model: the agent uses `ink-2` for speech recognition, `sonic-3.6` for speech and `gpt-4.1` as the LLM. Set `AGENT_MODEL_ID` to another id from https://docs.cartesia.ai/agents/models and run `npm run setup:agent -- --force`, then delete the old agent and tools the same way.
 - Voice: set `CARTESIA_VOICE_ID` to a voice from https://play.cartesia.ai/voices before `npm run setup:agent`.
 - Language: set `AGENT_LANGUAGE` to `es`, `fr`, `hi` or `ja`. The prompt already replies in the visitor's language.
 - Vector store: `server/store.ts` is the only file that reads or writes the index. Replace it with pgvector or SQLite when a few thousand sections is not enough.

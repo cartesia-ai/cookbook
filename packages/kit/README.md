@@ -10,7 +10,7 @@ Blocks in `components/blocks`: app-shell, choice-chips, empty-state, field, file
 
 `theme.css` holds the whole palette as CSS variables on `:root` and `.dark`. Light is Canvas `#f9f9f8` with Verdant `#309d4b` as `--primary`. Dark is Carbon `#111010` with green-400 `#5db368` as `--primary`. Fonts are Inter only, wired to `--font-sans` with `next/font/google`.
 
-White on Verdant is about 3.3:1, so primary buttons rely on the default `font-medium`. Keep primary text at 14px medium or larger.
+White on Verdant is about 3.4:1, so primary buttons rely on the default `font-medium`. Keep primary text at 14px medium or larger.
 
 ## Use in a template
 
@@ -32,7 +32,6 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 ```
 
 Templates stay self-contained: copy, do not depend on this package.
-
 
 ## License
 

@@ -17,7 +17,7 @@ jobs:
           check-latest: true
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: pnpm check (facts, content, catalog, copies, typecheck, test)
+      - name: pnpm check (facts, content, snippets, catalog, copies, typecheck, test)
         run: pnpm check
       - name: Build every package with no env vars set
         run: pnpm build

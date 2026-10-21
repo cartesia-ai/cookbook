@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ingest } from '../ingest/run';
+import { ingest, shouldPrune } from '../ingest/run';
 import { sitemapPages } from '../ingest/sources';
 import { DocIndex } from '../server/store';
 
@@ -74,6 +74,27 @@ describe('sitemapPages', () => {
     expect(pages.map((p) => p.url)).toEqual(['https://docs.example.com/a']);
     expect(failed).toEqual(['https://docs.example.com/down']);
   });
+
+  it('keeps 5xx and 429 pages as failed but lets 404 and 410 pages drop out', async () => {
+    const { f } = fakeFetch({
+      [SITEMAP]: new Response(xml(...['500', '429', '404', '410'].map((s) => `https://docs.example.com/p${s}`))),
+      'https://docs.example.com/p500': () => new Response('', { status: 500 }),
+      'https://docs.example.com/p429': () => new Response('', { status: 429 }),
+      'https://docs.example.com/p404': () => new Response('', { status: 404 }),
+      'https://docs.example.com/p410': () => new Response('', { status: 410 }),
+    });
+    const { pages, failed } = await sitemapPages(SITEMAP, { fetchImpl: f });
+    expect(pages).toEqual([]);
+    expect(failed).toEqual(['https://docs.example.com/p500', 'https://docs.example.com/p429']);
+  });
+
+  it('counts network errors as failed', async () => {
+    const f = (async (input: string | URL | Request) => {
+      if (String(input) === SITEMAP) return new Response(xml('https://docs.example.com/a'));
+      throw new TypeError('fetch failed');
+    }) as typeof fetch;
+    expect((await sitemapPages(SITEMAP, { fetchImpl: f })).failed).toEqual(['https://docs.example.com/a']);
+  });
 });
 
 describe('ingest prune', () => {
@@ -86,5 +107,12 @@ describe('ingest prune', () => {
     const stats = await ingest([page('/a', 'alpha')], index, embed, { prune: true, keep: ['/flaky'] });
     expect([...index.pages.keys()].sort()).toEqual(['/a', '/flaky']);
     expect(stats.removed).toBe(1);
+  });
+
+  it('prunes only on a full run', () => {
+    expect(shouldPrune({})).toBe(true);
+    expect(shouldPrune({ match: '/guides/' })).toBe(false);
+    expect(shouldPrune({ limit: '5' })).toBe(false);
+    expect(shouldPrune({ match: '/guides/', limit: '5' })).toBe(false);
   });
 });

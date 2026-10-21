@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from front_desk import main
-from front_desk.auth import bind_host, check_deploy_config
+from front_desk.auth import allowed_hosts, bind_host, check_deploy_config
 from front_desk.cartesia import Cartesia
 from front_desk.config import settings
 
@@ -155,3 +155,54 @@ def test_token_buckets_are_evicted():
         assert main._allow_token(f"ip{i}", 0.0)
     assert main._allow_token("late", 120.0)
     assert set(main._token_hits) == {"late"}
+
+
+def test_client_tools_refuse_non_json_bodies(locked):
+    # A cross-site <form> or no-cors fetch can only send text/plain, form or multipart bodies.
+    body = b'{"call_id": "ac_x", "parameters": {"name": "Eve", "message": "spam"}}'
+    for ctype in ("text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x", ""):
+        r = locked.post(
+            "/api/client-tools/take_message",
+            content=body,
+            headers={"Content-Type": ctype, **basic("open-sesame")},
+        )
+        assert r.status_code == 415, ctype
+        assert r.json() == {"detail": "Send JSON."}
+    assert main.store().list_messages() == []
+    r = locked.post(
+        "/api/client-tools/take_message",
+        content=body,
+        headers={"Content-Type": "application/json; charset=utf-8", **basic("open-sesame")},
+    )
+    assert r.status_code == 200 and len(main.store().list_messages()) == 1
+
+
+def test_unknown_host_headers_are_refused():
+    for base in ("http://localhost:8000", "http://127.0.0.1:8000", "http://[::1]:8000"):
+        assert TestClient(main.app, base_url=base).get("/").status_code == 200, base
+    r = TestClient(main.app, base_url="http://rebind.attacker.example:8000").get("/")
+    assert r.status_code == 400 and r.text == "Invalid host header"
+    assert TestClient(main.app, base_url="http://localhost.attacker.example").get("/").status_code == 400
+
+
+def test_public_base_url_host_is_allowed(monkeypatch):
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://front-desk.example.com")
+    monkeypatch.setenv("DASHBOARD_PASSWORD", "open-sesame")
+    ok = TestClient(main.app, base_url="https://front-desk.example.com")
+    assert ok.get("/", headers=basic("open-sesame")).status_code == 200
+    assert TestClient(main.app, base_url="https://other.example.com").get("/").status_code == 400
+
+
+def test_allowed_hosts():
+    s = settings()
+    assert allowed_hosts(s) == ["127.0.0.1", "localhost", "[::1]"]
+    assert allowed_hosts(s, ALL) == ["127.0.0.1", "localhost", "[::1]"]
+
+
+def test_allowed_hosts_open_up_only_on_a_network_bind_with_a_password(monkeypatch):
+    monkeypatch.setenv("DASHBOARD_PASSWORD", "open-sesame")
+    s = settings()
+    assert allowed_hosts(s, ALL) == ["*"]
+    assert allowed_hosts(s, "127.0.0.1") == ["127.0.0.1", "localhost", "[::1]"]
+    monkeypatch.setattr(sys, "argv", ["uvicorn", "front_desk.main:app", "--host", ALL])
+    assert TestClient(main.app, base_url="http://anything.example").get("/").status_code == 401

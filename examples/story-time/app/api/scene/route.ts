@@ -54,6 +54,8 @@ export async function POST(req: Request) {
   if (hero === null) return Response.json({ error: "Use a name with letters only, up to 24 characters" }, { status: 400 });
   if (looksUnsafe(hero)) return Response.json({ error: NAME_NOT_OK }, { status: 400 });
   if (!themes || !tone || !history) return Response.json({ error: "The story settings are not valid" }, { status: 400 });
+  const historyText = history.flatMap((h) => [...h.lines.map((l) => `${l.speaker}: ${l.text}`), ...h.choices]).join("\n");
+  if (looksUnsafe(historyText)) return Response.json({ error: SCENE_NOT_OK }, { status: 400 });
 
   const last = history.length === TOTAL_SCENES - 1;
   let safeTitle = looksUnsafe(title) ? "" : title;

@@ -81,7 +81,7 @@ startup_timeout_sec = 30
 tool_timeout_sec = 180
 ```
 
-`./setup.sh codex` writes this whole block, timeouts included. It rewrites the file through a TOML parser, so comments are lost; the `.bak` next to it has the original. A project-level `.codex/config.toml` also works in trusted projects.
+`./setup.sh codex` writes this whole block, timeouts included. It edits the file in place and keeps your comments and formatting, and the first run saves the original as `config.toml.bak` next to it. A project-level `.codex/config.toml` also works in trusted projects.
 
 ## Environment variables
 
@@ -92,14 +92,16 @@ The server reads these from the environment the client gives it, and the key als
 | `CARTESIA_API_KEY` | yes | https://play.cartesia.ai/keys |
 | `CARTESIA_VOICE_ID` | no | A voice id from https://play.cartesia.ai/voices, `doctor`, or the `list_voices` tool. Defaults to Daniel (en-US) |
 | `CARTESIA_TTS_MODEL` | no | Default `sonic-3.6`. Retired ids are refused at startup |
+| `CARTESIA_STT_MODEL` | no | Default `ink-2`, the only model the turns endpoint accepts. Any other value is refused at startup |
 | `CARTESIA_LANGUAGE` | no | Language passed to Sonic. Ink 2 detects en, es, fr, hi and ja by itself |
 | `CARTESIA_SPEED` | no | 0.6 to 1.5, sent as `generation_config.speed` |
 | `CARTESIA_TURN_END_TIMEOUT_MS` | no | 640 to 11200. How long a pause can be before Ink 2 ends your turn |
 | `CARTESIA_TURN_START_THRESHOLD`, `CARTESIA_TURN_EAGER_END_THRESHOLD`, `CARTESIA_TURN_END_THRESHOLD` | no | Ink 2 turn detection thresholds, sent only when set |
 | `CARTESIA_KEYTERMS` | no | Comma-separated names to bias transcription toward, such as your repo or library names |
-| `CARTESIA_NO_SPEECH_TIMEOUT_S`, `CARTESIA_MAX_LISTEN_S` | no | Safety deadlines, 20 and 120 seconds. Turn detection ends a normal turn |
+| `CARTESIA_NO_SPEECH_TIMEOUT_S`, `CARTESIA_MAX_LISTEN_S` | no | Safety deadlines, 20 and 120 seconds. Turn detection ends a normal turn. A `listen_duration_max` from the agent can shorten the listen but never go past `CARTESIA_MAX_LISTEN_S` |
 | `CARTESIA_MAX_MESSAGE_CHARS` | no | 2000. Longer messages are refused so the agent summarizes instead of reading code aloud |
 | `CARTESIA_INPUT_DEVICE`, `CARTESIA_OUTPUT_DEVICE` | no | sounddevice index or name |
+| `CARTESIA_SAMPLE_RATE_IN`, `CARTESIA_SAMPLE_RATE_OUT` | no | 16000 and 24000. Microphone rate sent to Ink 2, and the PCM rate requested from Sonic and played. `hear --wav` needs a WAV at the input rate |
 | `CARTESIA_BASE_URL`, `CARTESIA_WS_BASE_URL` | no | For a proxy or a test server |
 
 To set one for a client, add `-e NAME=value` after the server name in `claude mcp add`, an `"env"` object in Cursor, or `--env NAME=value` in `codex mcp add`. Keep the API key out of these.
@@ -138,13 +140,18 @@ async def one_turn(path: str) -> str:
                 while chunk := w.readframes(1600):
                     await conn.send_raw(chunk)
                     await asyncio.sleep(0.1)
+            silence = b"\x00" * 3200
+            for _ in range(30):
+                await conn.send_raw(silence)
+                await asyncio.sleep(0.1)
 
         sender = asyncio.create_task(send_audio())
         try:
-            while True:
-                ev = await conn.recv()
-                if ev.type == "turn.end" and ev.transcript.strip():
-                    return ev.transcript.strip()
+            async with asyncio.timeout(60):
+                while True:
+                    ev = await conn.recv()
+                    if ev.type == "turn.end" and ev.transcript.strip():
+                        return ev.transcript.strip()
         finally:
             sender.cancel()
             await client.close()
@@ -152,20 +159,20 @@ async def one_turn(path: str) -> str:
 print(asyncio.run(one_turn(sys.argv[1])))
 ```
 
-Run it with `uv run python turn.py question.wav` from this folder.
+After the file it sends 3 seconds of silence so Ink 2 can end the turn, and it gives up after 60 seconds. Run it with `uv run python turn.py question.wav` from this folder.
 
 ## Change it
 
 - Voice and speed: set `CARTESIA_VOICE_ID` and `CARTESIA_SPEED` in the client's env block.
 - Turn length: raise `CARTESIA_TURN_END_TIMEOUT_MS` if Ink 2 ends your turn while you are still thinking.
-- How the agent uses voice: edit `src/cartesia_voice_mode/skill/SKILL.md` and the tool description in `server.py`. Keep the result strings (`[spoken]`, `[no speech heard]`, `[error: ...]`) as they are; the skill depends on them.
+- How the agent uses voice: edit `src/cartesia_voice_mode/skill/SKILL.md` and the tool description in `server.py`. Keep the result strings (`[spoken]`, `[no speech heard]`, `[partial, ...]`, `[error: ...]`) as they are; the skill depends on them.
 - Client configs: `src/cartesia_voice_mode/install.py` writes them for Claude Code, Cursor and Codex.
 
 ## Before you deploy
 
 This runs on your machine over stdio, so there is no server to secure. The key stays in your shell or the 0600 key file and never goes into a client config, a log line or an error message.
 
-Cost: every `converse` call bills Sonic characters for the message and Ink 2 seconds while the microphone is open. `CARTESIA_MAX_MESSAGE_CHARS` and `CARTESIA_MAX_LISTEN_S` cap both. See https://docs.cartesia.ai/pricing.
+Cost: every `converse` call bills Sonic characters for the message and Ink 2 seconds while the microphone is open. `CARTESIA_MAX_MESSAGE_CHARS` caps the first. `CARTESIA_MAX_LISTEN_S` caps the second per call, including any `listen_duration_max` the agent passes. See https://docs.cartesia.ai/pricing.
 
 ## FAQ
 
@@ -184,10 +191,6 @@ Ink 2 transcribes English, Spanish, French, Hindi and Japanese and detects which
 ### How is this different from voicemode?
 
 [mbailey/voicemode](https://github.com/mbailey/voicemode) supports local models, several providers and multi-agent voice channels. This server uses Cartesia only and keeps voicemode's `converse` tool name and parameters, so switching between the two needs no change in how the agent calls it.
-
-### Why did the comments in my Codex config disappear?
-
-`install codex` rewrites `~/.codex/config.toml` through a TOML parser, which drops comments. The first run keeps the original as `config.toml.bak` next to it.
 
 ## Tests
 

@@ -5,7 +5,7 @@ Article to two-host podcast: Next.js 16 App Router. The AI SDK writes the script
 ## Commands (run in this folder)
 
 - Install and run: `npm install` (or `pnpm install`), `cp .env.example .env.local`, `npm run dev`
-- Check: `pnpm test && pnpm typecheck && pnpm build`. Tests mock the Cartesia SDK module and use `MockLanguageModelV4`, so they need no keys and no network.
+- Check: `npm test && npm run typecheck && npm run build` (pnpm works too). Tests mock the Cartesia SDK module and use `MockLanguageModelV4`, so they need no keys and no network.
 
 ## Files
 
@@ -46,6 +46,6 @@ tests/                    vitest, no keys and no network
 
 ## Verify a change
 
-1. `pnpm test && pnpm typecheck && pnpm build`.
-2. `pnpm dev`, paste a paragraph, keep Length on Short, press Make podcast, and check that the episode plays and the highlighted line follows the audio.
+1. `npm test && npm run typecheck && npm run build` (pnpm works too).
+2. `npm run dev`, paste a paragraph, set Length to Short, press Make podcast, and check that the episode plays and the highlighted line follows the audio.
 3. Docs: https://docs.cartesia.ai/llms.txt, TTS bytes https://docs.cartesia.ai/api-reference/tts/bytes.md.

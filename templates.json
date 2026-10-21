@@ -1,5 +1,5 @@
 {
-  "$comment": "Machine-readable list of the runnable templates in examples/. Feeds the cartesia.ai cookbook gallery and agent tooling. Model ids must match facts.json; tools/check-catalog checks this file against the repo.",
+  "$comment": "Machine-readable list of the runnable templates in examples/. Is meant to feed the cartesia.ai cookbook gallery and agent tooling. Model ids must match facts.json; tools/check-catalog checks this file against the repo.",
   "version": 1,
   "updated": "2026-10-16",
   "repository": "https://github.com/cartesia-ai/cookbook",
@@ -115,9 +115,9 @@
       "models": ["ink-2", "sonic-3.6"],
       "features": ["turn-detection", "barge-in", "client-tools", "multilingual"],
       "env": {
-        "required": ["CARTESIA_API_KEY", "CARTESIA_AGENT_ID", "CARTESIA_TOOL_IDS"],
+        "required": ["CARTESIA_API_KEY", "CARTESIA_AGENT_ID"],
         "oneOf": [],
-        "optional": ["OPENAI_API_KEY", "ALLOWED_ORIGINS", "PUBLIC_URL", "TRUST_PROXY", "PORT", "MAX_SESSION_SECS", "WIDGET_TITLE", "DEMO_SITE", "AGENT_MODEL_ID", "CARTESIA_VOICE_ID", "AGENT_LANGUAGE"]
+        "optional": ["CARTESIA_TOOL_IDS", "OPENAI_API_KEY", "ALLOWED_ORIGINS", "PUBLIC_URL", "TRUST_PROXY", "PORT", "MAX_SESSION_SECS", "WIDGET_TITLE", "DEMO_SITE", "AGENT_MODEL_ID", "CARTESIA_VOICE_ID", "AGENT_LANGUAGE"]
       },
       "path": "examples/docs-voice-widget",
       "readme": "examples/docs-voice-widget/README.md",
@@ -132,13 +132,13 @@
       },
       "deploy": {
         "vercel": null,
-        "note": "A long-running Node server with a local JSON vector store. Deploy to any host that runs Node 22."
+        "note": "A long-running Node server with a local JSON vector store. Deploy to any host that runs Node 22.22 or newer."
       },
       "license": "Apache-2.0"
     },
     {
       "slug": "coding-voice-mode",
-      "title": "Voice mode for coding agents",
+      "title": "Coding voice mode",
       "description": "Talk to Claude Code, Cursor or Codex through one MCP tool: Sonic 3.6 speaks the agent's message and Ink 2 turn detection hears your reply.",
       "category": "voice-agents",
       "searchPhrases": ["talk to Claude Code with my voice", "voice mode MCP server for Cursor", "speech to text and text to speech MCP tool", "hands-free coding agent", "voice input for Codex CLI"],

@@ -130,7 +130,7 @@ async def listen_for_turn(
         except AudioError as exc:
             raise ListenError(str(exc)) from None
         t0 = loop.time()
-        hard = t0 + (max_listen_s or s.max_listen_s)
+        hard = t0 + min(max_listen_s or s.max_listen_s, s.max_listen_s)
         start_by = t0 + s.no_speech_timeout_s
         try:
             for attempt in range(2):

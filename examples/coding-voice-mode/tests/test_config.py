@@ -20,11 +20,12 @@ def test_stt_model_must_be_ink_2(monkeypatch):
     with pytest.raises(ConfigError):
         load_settings()
 
-def test_aliases(monkeypatch):
-    monkeypatch.setenv("VOICEMODE_CARTESIA_VOICE_ID", "voice-a")
-    monkeypatch.setenv("VOICEMODE_CARTESIA_MODEL", "sonic-3.6")
+def test_voice_and_sample_rates_from_env(monkeypatch):
+    monkeypatch.setenv("CARTESIA_VOICE_ID", "voice-a")
+    monkeypatch.setenv("CARTESIA_SAMPLE_RATE_IN", "24000")
+    monkeypatch.setenv("CARTESIA_SAMPLE_RATE_OUT", "44100")
     s = load_settings()
-    assert s.voice_id == "voice-a"
+    assert (s.voice_id, s.sample_rate_in, s.sample_rate_out) == ("voice-a", 24000, 44100)
 
 def test_speed_clamped(monkeypatch):
     monkeypatch.setenv("CARTESIA_SPEED", "9")

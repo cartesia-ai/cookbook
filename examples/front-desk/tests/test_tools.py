@@ -74,3 +74,15 @@ def test_unknown_tool_and_result_size(tools):
     t, _ = tools
     assert "error" in run(t, "drop_tables")
     assert len(t.run("check_availability", {}).encode()) < 4096
+
+
+def test_store_file_is_owner_only(tmp_path):
+    import stat
+
+    path = tmp_path / "fresh" / "front-desk.db"
+    Store(path)
+    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    path.chmod(0o644)
+    Store(path)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600

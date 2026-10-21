@@ -95,3 +95,13 @@ async def test_mic_starts_after_playback(settings):
     after = asyncio.create_task(playback())
     await listen_for_turn(FakeCartesia(conns=[FakeConn(FULL)]), settings, mic, after=after)
     assert log.index("playback_done") < log.index("mic_start")
+
+async def test_tool_listen_limit_cannot_exceed_the_env_cap(settings):
+    import dataclasses
+
+    s = dataclasses.replace(settings, no_speech_timeout_s=10.0, max_listen_s=0.3)
+    script = [ev("turn.start"), ev("turn.update", transcript="still talking")]
+    t = time.monotonic()
+    res = await listen_for_turn(FakeCartesia(conns=[FakeConn(script)]), s, FakeMic(), max_listen_s=60)
+    assert time.monotonic() - t < 1.5
+    assert res.ended_by == "max_listen" and res.text == "still talking"

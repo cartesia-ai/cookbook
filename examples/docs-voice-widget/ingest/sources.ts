@@ -125,8 +125,9 @@ export async function sitemapPages(
       }
       const page = await fetchOnHost(f, url, host);
       if (!page.ok) {
+        const transient = page.status >= 500 || page.status === 429;
         opts.log?.(`skip ${url} (${page.status})`);
-        failed.push(url);
+        if (transient) failed.push(url);
         continue;
       }
       const { markdown, anchors } = htmlToMarkdown(await page.text());

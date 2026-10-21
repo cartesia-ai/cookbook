@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
@@ -9,6 +10,8 @@ import httpx
 
 from .config import Settings
 from .store import Store
+
+log = logging.getLogger("front_desk.calendars")
 
 CALCOM_BASE_URL = "https://api.cal.com"
 CALCOM_SLOTS_VERSION = "2024-09-04"
@@ -39,16 +42,19 @@ def close_calcom_client() -> None:
             _shared_client = None
 
 
-def _json_data(r: httpx.Response) -> dict[str, Any]:
+UNREADABLE = "The calendar sent a reply we could not read."
+
+
+def _json_data(r: httpx.Response, path: str) -> dict[str, Any]:
     try:
         body = r.json()
     except ValueError as e:
-        raise CalendarError("The calendar sent a reply we could not read.") from e
-    if not isinstance(body, dict):
-        raise CalendarError("The calendar sent a reply we could not read.")
-    data = body.get("data") or {}
+        log.warning("Cal.com %s: unreadable reply, status %s", path, r.status_code)
+        raise CalendarError(UNREADABLE) from e
+    data = (body.get("data") or {}) if isinstance(body, dict) else None
     if not isinstance(data, dict):
-        raise CalendarError("The calendar sent a reply we could not read.")
+        log.warning("Cal.com %s: unexpected reply shape, status %s", path, r.status_code)
+        raise CalendarError(UNREADABLE)
     return data
 
 
@@ -133,30 +139,44 @@ class CalComCalendar:
         return {"Authorization": f"Bearer {self.s.calcom_api_key}", "cal-api-version": version}
 
     def open_slots(self, day: date) -> list[datetime]:
+        return self.open_slots_range(day, day).get(day, [])
+
+    def open_slots_range(self, start: date, end: date) -> dict[date, list[datetime]]:
+        """Open times from start to end inclusive, in one Cal.com request, grouped by local date."""
+        path = "/v2/slots"
         try:
             r = self.client.get(
-                "/v2/slots",
+                path,
                 params={
                     "eventTypeId": self.s.calcom_event_type_id,
-                    "start": day.isoformat(),
-                    "end": day.isoformat(),
+                    "start": start.isoformat(),
+                    "end": end.isoformat(),
                     "timeZone": self.s.timezone,
                 },
                 headers=self._headers(CALCOM_SLOTS_VERSION),
             )
         except httpx.HTTPError as e:
+            log.warning("Cal.com %s: request failed (%s)", path, type(e).__name__)
             raise CalendarError("The calendar did not answer.") from e
         if r.status_code != 200:
+            log.warning("Cal.com %s: status %s", path, r.status_code)
             raise CalendarError("The calendar did not answer.")
-        data = _json_data(r)
-        items = data.get(day.isoformat())
-        out = []
-        for item in items if isinstance(items, list) else []:
-            raw = item.get("start") if isinstance(item, dict) else item
+        out: dict[date, list[datetime]] = {}
+        for key, items in _json_data(r, path).items():
             try:
-                out.append(datetime.fromisoformat(str(raw).replace("Z", "+00:00")).astimezone(self.s.tz))
+                day = date.fromisoformat(str(key))
             except ValueError:
                 continue
+            if not start <= day <= end:
+                continue
+            for item in items if isinstance(items, list) else []:
+                raw = item.get("start") if isinstance(item, dict) else item
+                try:
+                    out.setdefault(day, []).append(
+                        datetime.fromisoformat(str(raw).replace("Z", "+00:00")).astimezone(self.s.tz)
+                    )
+                except ValueError:
+                    continue
         return out
 
     def book(self, *, start: datetime, name: str, phone: str, service: str, call_id: str) -> Booking:
@@ -169,14 +189,17 @@ class CalComCalendar:
             "attendee": attendee,
             "metadata": {"source": "front-desk", "call_id": call_id[:100], "service": service[:100]},
         }
+        path = "/v2/bookings"
         try:
-            r = self.client.post("/v2/bookings", json=body, headers=self._headers(CALCOM_BOOKINGS_VERSION))
+            r = self.client.post(path, json=body, headers=self._headers(CALCOM_BOOKINGS_VERSION))
         except httpx.HTTPError as e:
+            log.warning("Cal.com %s: request failed (%s)", path, type(e).__name__)
             raise CalendarError("The calendar did not answer.") from e
         if r.status_code not in (200, 201):
+            log.warning("Cal.com %s: status %s", path, r.status_code)
             return Booking(ok=False, reason="The calendar would not take that booking.")
         try:
-            data = _json_data(r)
+            data = _json_data(r, path)
         except CalendarError:
             data = {}
         uid = str(data.get("uid") or data.get("id") or "")

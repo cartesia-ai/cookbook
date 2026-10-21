@@ -18,7 +18,7 @@ dependencies = [
   "sounddevice>=0.5",
   "numpy>=1.26",
   "click>=8.1",
-  "tomli-w>=1.0",
+  "tomlkit>=0.13",
 ]
 
 [project.urls]

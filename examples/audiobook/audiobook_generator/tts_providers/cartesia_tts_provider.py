@@ -1,6 +1,8 @@
 import logging
 import os
 import re
+import subprocess
+import tempfile
 import time
 import typing
 from typing import List, Optional, Tuple
@@ -12,6 +14,7 @@ from cartesia import (
     RateLimitError,
 )
 from cartesia.types import Emotion, SupportedLanguage
+import pydub.audio_segment
 from pydub import AudioSegment
 
 from audiobook_generator.config.general_config import GeneralConfig
@@ -240,17 +243,54 @@ class CartesiaTTSProvider:
         audio = AudioSegment(data=pcm, sample_width=2, frame_rate=SAMPLE_RATE, channels=1)
         fmt = self.config.output_format
         export_args = {"bitrate": "64k"} if fmt == "mp3" else {}
-        audio.export(output_file, format=fmt, **export_args)
-        if fmt == "mp3":
-            set_audio_tags(output_file, audio_tags)
-        else:
-            logger.debug("ID3 tags are only written for mp3 output.")
+        part = output_file + ".part"
+        try:
+            _export(audio, part, fmt, export_args)
+            if fmt == "mp3":
+                set_audio_tags(part, audio_tags)
+            else:
+                logger.debug("ID3 tags are only written for mp3 output.")
+            os.replace(part, output_file)
+        except BaseException:
+            try:
+                os.remove(part)
+            except FileNotFoundError:
+                pass
+            raise
         if self.config.write_timings:
             timings = readalong.build_timings(
                 audio_tags.idx, audio_tags.title, self.config.model_name, SAMPLE_RATE, len(audio) / 1000, words
             )
             readalong.write_sidecars(output_file, timings)
         return words
+
+class _TrackedSubprocess:
+    def __init__(self):
+        self.procs: List[subprocess.Popen] = []
+
+    def __getattr__(self, name):
+        return getattr(subprocess, name)
+
+    def Popen(self, *args, **kwargs):
+        proc = subprocess.Popen(*args, **kwargs)
+        self.procs.append(proc)
+        return proc
+
+def _export(audio: AudioSegment, path: str, fmt: str, export_args: dict) -> None:
+    tracker = _TrackedSubprocess()
+    saved_tempdir, saved_subprocess = tempfile.tempdir, pydub.audio_segment.subprocess
+    with tempfile.TemporaryDirectory(prefix="audiobook-export-") as tmp:
+        tempfile.tempdir = tmp
+        pydub.audio_segment.subprocess = tracker
+        try:
+            audio.export(path, format=fmt, **export_args)
+        finally:
+            pydub.audio_segment.subprocess = saved_subprocess
+            tempfile.tempdir = saved_tempdir
+            for proc in tracker.procs:
+                if proc.poll() is None:
+                    proc.kill()
+                    proc.wait()
 
 def get_supported_tts_providers() -> List[str]:
     return [TTS_CARTESIA]

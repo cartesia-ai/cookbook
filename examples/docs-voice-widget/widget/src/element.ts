@@ -77,8 +77,9 @@ export class DocsAgentElement extends HTMLElement {
     this.root = this.attachShadow({ mode: 'open' });
     this.tools = new DocsTools({
       search: async (q) => {
+        const gen = this.gen;
         const res = await this.search(q);
-        this.uncited = Object.keys(res.sources)[0] ?? null;
+        if (gen === this.gen) this.uncited = Object.keys(res.sources)[0] ?? null;
         return res;
       },
       cite: (id, s) => {
@@ -156,6 +157,7 @@ export class DocsAgentElement extends HTMLElement {
     this.messages = [];
     this.cited = [];
     this.activeCite = '';
+    this.uncited = null;
     this.tools.known.clear();
     this.phase = 'connecting';
     this.render();
@@ -181,19 +183,25 @@ export class DocsAgentElement extends HTMLElement {
       },
     });
     this.client = client;
-    client.on('transcript', (e) => this.onTranscript(e));
+    client.on('transcript', (e) => {
+      if (this.client !== client) return;
+      this.onTranscript(e);
+    });
     client.on('turn_ended', (e) => {
+      if (this.client !== client) return;
       if (e.role === 'user' && this.phase === 'listening') this.setPhase('thinking');
     });
     client.on('speaking', ({ who }) => {
+      if (this.client !== client) return;
       this.userSpeaking = who === 'user';
       if (who === 'agent') this.setPhase('speaking');
       else if (this.phase === 'speaking') this.setPhase('listening');
       else this.render();
     });
     client.on('client_tool_call', async (call) => {
+      if (this.client !== client) return;
       const out = await this.tools.run(call.toolName, call.parameters);
-      if (out) call.respond(out.result, out.isError ? { isError: true, errorType: 'tool_failed' } : undefined);
+      if (out && this.client === client) call.respond(out.result, out.isError ? { isError: true, errorType: 'tool_failed' } : undefined);
     });
     client.on('close', () => {
       if (this.client !== client) return;

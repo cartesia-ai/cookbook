@@ -1,4 +1,5 @@
 export const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+export const MAX_JSON_BYTES = 64 * 1024;
 export const MAX_RECORDING_SECONDS = 4 * 60;
 export const MAX_TRANSCRIPT_CHARS = 12_000;
 export const MAX_RECAP_ENTRIES = 30;

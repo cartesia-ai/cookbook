@@ -13,6 +13,7 @@ You speak and listen with the `converse` tool.
 - After long work, report with `converse(message="<short summary>", wait_for_response=false)` and keep going, or ask the next question with the default.
 - Leave `voice`, `speed` and `listen_duration_max` unset unless the user asks.
 - If the result is `[no speech heard]`, stop asking and wait for typed input.
+- If the result starts with `[partial, ...]`, the user got cut off. The text after the bracket is what they said so far. Ask them to finish or confirm before acting on it.
 - If the result starts with `[error:`, tell the user the text in the brackets and stop using voice.
 - Headphones are recommended. The microphone is closed while you speak, so the user cannot interrupt.
 - No emoji.

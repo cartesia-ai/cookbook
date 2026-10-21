@@ -2,7 +2,7 @@
 
 A small TypeScript client for talking to a Cartesia Managed Agent from the browser. It opens the agents WebSocket with a short-lived token your server mints, captures the microphone with an AudioWorklet, plays the agent's audio through a jitter buffer, and drops that audio the moment the agent is interrupted.
 
-It is private to this repo and source-exported, like `packages/kit`: there is no build step and no npm release. In a Next.js app add it to `transpilePackages`.
+It is private to this repo, with no build step and no npm release. Templates do not depend on it by name. Each one copies `src/` into its own `lib/agents-web/` and imports from `@/lib/agents-web/...`. docs-voice-widget keeps its copy in `widget/src/agents-web/`. `pnpm check:copies` at the repo root fails when a copy drifts from `src/`. To use it in your app, copy `src/` the same way.
 
 The protocol is Cartesia's. This package is original code and copies nothing from a third party.
 
@@ -13,7 +13,7 @@ Three parts: a token route on your server, the hook in a client component, or th
 ### 1. Token route (server)
 
 ```ts
-import { createAgentTokenHandler } from '@cartesia-cookbook/agents-web/server';
+import { createAgentTokenHandler } from '@/lib/agents-web/server';
 
 export const POST = createAgentTokenHandler({
   authorize: async (req) => isSignedIn(req),
@@ -26,7 +26,7 @@ The helper reads `CARTESIA_API_KEY`, mints a token with `client.accessToken.crea
 
 ```tsx
 'use client';
-import { useCartesiaAgent } from '@cartesia-cookbook/agents-web/react';
+import { useCartesiaAgent } from '@/lib/agents-web/react';
 
 export function Talk({ agentId }: { agentId: string }) {
   const agent = useCartesiaAgent({
@@ -50,7 +50,7 @@ Call `start` from a click. The hook never starts on its own, and unmounting stop
 ### 3. Without React
 
 ```ts
-import { CartesiaAgentClient } from '@cartesia-cookbook/agents-web';
+import { CartesiaAgentClient } from '@/lib/agents-web';
 
 const client = new CartesiaAgentClient({ agentId, getToken });
 client.on('transcript', (e) => console.log(e.role, e.text, e.final));

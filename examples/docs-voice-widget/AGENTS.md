@@ -4,12 +4,12 @@ Docs voice widget: a framework-free web component (`widget/src`, bundled by esbu
 
 ## Commands
 
-Run from this directory. Node 22.22 or newer; inside the monorepo use pnpm.
+Run from this directory. npm (pnpm works too), Node 22.22 or newer.
 
-- `pnpm dev` serves the demo docs site and the widget on http://localhost:4512, rebuilding `widget.js` on every request.
-- `pnpm test`, `pnpm typecheck`, `pnpm build` (writes `dist/`, delete it after checking).
-- `pnpm ingest [folder]` or `pnpm ingest --sitemap <url>` writes `data/index.json`. Sitemap ingest only fetches the sitemap's own host.
-- `pnpm setup:agent` creates the agent and tools and writes ids to `.env.local`. Delete any agent you create for testing.
+- `npm run dev` serves the demo docs site and the widget on http://localhost:4512, rebuilding `widget.js` on every request.
+- `npm test`, `npm run typecheck`, `npm run build` (writes `dist/`, delete it after checking).
+- `npm run ingest -- [folder]` or `npm run ingest -- --sitemap <url>` writes `data/index.json`. Sitemap ingest only fetches the sitemap's own host.
+- `npm run setup:agent` creates the agent and tools and writes ids to `.env.local`. Delete any agent and tools you create for testing.
 
 ## Rules
 
