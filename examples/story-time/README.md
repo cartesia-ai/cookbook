@@ -20,18 +20,18 @@ Node 22.22 or newer. pnpm works too.
 
 Before `npm run dev`, add `CARTESIA_API_KEY`, `LLM_MODEL` and the matching provider key to `.env.local`.
 
-Open [localhost:3000](http://localhost:3000), pick a theme and a tone, optionally name the hero, and press Start the story. When the narrator asks what to do, tap a choice, or press Answer out loud and say "the first one" or "the rocket". If a key is missing, the page says which one.
+Open http://localhost:3000, pick a theme and a tone, optionally name the hero, and press Start the story. When the narrator asks what to do, tap a choice, or press Answer out loud and say "the first one" or "the rocket". If a key is missing, the page says which one.
 
 ## Environment variables
 
-| Name | Required | Where to get it |
+| Name | Required | What it does |
 | --- | --- | --- |
-| `CARTESIA_API_KEY` | yes | [play.cartesia.ai/keys](https://play.cartesia.ai/keys) |
-| `LLM_MODEL` | yes | `provider/model`, for example `openai/gpt-5.4-mini` |
-| `OPENAI_API_KEY` | if `LLM_MODEL` starts with `openai/`; recommended for any model | [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Also turns on scene moderation, whatever model writes the story. |
-| `ANTHROPIC_API_KEY` | if `LLM_MODEL` starts with `anthropic/` | [console.anthropic.com](https://console.anthropic.com) |
-| `AI_GATEWAY_API_KEY` | for any other provider | [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) |
-| `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
+| `CARTESIA_API_KEY` | yes | Mints browser tokens for Sonic and Ink 2. Get one at https://play.cartesia.ai/keys |
+| `LLM_MODEL` | yes | The model that writes each scene, as `provider/model`, for example `openai/gpt-5.4-mini` |
+| `OPENAI_API_KEY` | if `LLM_MODEL` starts with `openai/`; recommended for any model | https://platform.openai.com/api-keys. Also turns on scene moderation, whatever model writes the story. |
+| `ANTHROPIC_API_KEY` | if `LLM_MODEL` starts with `anthropic/` | https://console.anthropic.com |
+| `AI_GATEWAY_API_KEY` | for any other provider | Routes the model through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). Not needed on a Vercel deployment |
+| `APP_PASSWORD` | in production | Optional for `next dev`. Required for a production build (`next start` or Vercel): a password for the whole app, or `none` to make it public. |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
 The model ids above are examples. Providers retire models, so check the provider's model page before you pick one.
@@ -84,7 +84,7 @@ Uses `sonic-3.6` for narration, `ink-2` for the spoken choice, and `Cartesia-Ver
 
 ## Change it
 
-- Use different voices: edit `VOICES`, `NARRATORS` and `CHARACTER_POOL` in `lib/story.ts`. Pick ids from the [voice library](https://play.cartesia.ai/voices).
+- Use different voices: edit `VOICES`, `NARRATORS` and `CHARACTER_POOL` in `lib/story.ts`. Pick ids from https://play.cartesia.ai/voices.
 - Make longer stories: change `TOTAL_SCENES` in `lib/story.ts`. Each scene costs one LLM call and its narration in Sonic.
 - Tell stories in Spanish, French, Hindi or Japanese: Ink 2 and Sonic both speak them. Set `language` in `lib/narrate.ts`, add the language to the prompt, translate the ordinals and stopwords in `lib/match-choice.ts` and the word list in `lib/safety.ts`, and drop `generation_config.emotion`, which is English only. Ink 2 takes no language setting, so `lib/listen.ts` stays as it is.
 - Swap the LLM: set `LLM_MODEL`. `lib/llm.ts` is the whole switch.
@@ -96,6 +96,7 @@ Uses `sonic-3.6` for narration, `ink-2` for the spoken choice, and `Cartesia-Ver
 - Your story settings, any character name and your choices go to the LLM provider in `LLM_MODEL` to write each scene, and to OpenAI's moderation endpoint when `OPENAI_API_KEY` is set.
 - When you answer out loud, your voice streams to Cartesia Ink 2 for transcription. The transcript stays in the browser.
 - The app saves stories and their narration in the browser (IndexedDB). Its server stores no audio and no stories. Cartesia's and your LLM provider's own data retention policies apply.
+- If you aim this at children under 13, COPPA treats voice recordings as personal information. Get verifiable parental consent, or turn off voice answers.
 
 Say this in your own privacy notice if you put the app in front of other people.
 
@@ -108,11 +109,13 @@ Say this in your own privacy notice if you put the app in front of other people.
 
 Moderation and a word list lower the risk; they do not remove it. Test the app with your own prompts before you ship it, and check that your use fits the [Cartesia acceptable use policy](https://www.cartesia.ai/legal/acceptable-use).
 
+There is no Deploy with Vercel button, because the app should not go live without moderation. Add `OPENAI_API_KEY` and set `APP_PASSWORD` when you deploy it yourself.
+
 ### Auth, limits and cost
 
-Set `APP_PASSWORD` before you deploy. `proxy.ts` then asks for that password (HTTP Basic auth, any username) on every page and API route. On Vercel (production and preview) the app returns 503 until `APP_PASSWORD` is set, or set to `none` to make the app public. On hosts other than Vercel, set `APP_PASSWORD` yourself, because the gate only enforces it on Vercel. `/api/token` and `/api/scene` also have an in-memory rate limit of 10 requests a minute per client IP. It is per process and only slows casual abuse; the password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
+Set `APP_PASSWORD` before you deploy. `proxy.ts` then asks for that password (HTTP Basic auth, any username) on every page and API route. A production build (`next start`, or any Vercel deployment) answers 503 until `APP_PASSWORD` is set, or set to `none` to make the app public. `next dev` stays open. `/api/token` and `/api/scene` also have an in-memory rate limit of 10 requests a minute per client IP. It is per process and only slows casual abuse; the password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
 
-Each scene costs one LLM call plus Sonic characters for its narration, and each spoken answer costs Ink 2 streaming time. See [docs.cartesia.ai/pricing](https://docs.cartesia.ai/pricing) for current rates.
+Each scene costs one LLM call plus Sonic characters for its narration, and each spoken answer costs Ink 2 streaming time. See https://docs.cartesia.ai/pricing for current rates.
 
 ## FAQ
 
@@ -151,4 +154,6 @@ npm test
 
 ## License
 
-Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE). Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE).
+
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

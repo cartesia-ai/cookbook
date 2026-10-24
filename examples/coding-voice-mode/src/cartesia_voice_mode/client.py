@@ -4,7 +4,7 @@ from cartesia import AsyncCartesia
 
 from .config import Settings
 
-MISSING_KEY = "CARTESIA_API_KEY is not set, run cartesia-voice-mode doctor"
+MISSING_KEY = "CARTESIA_API_KEY is not set. Export it, or save it with ./setup.sh <client> --save-key"
 
 def make_client(s: Settings) -> AsyncCartesia:
     return AsyncCartesia(

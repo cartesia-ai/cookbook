@@ -1,7 +1,7 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
   "projectTitle": "Cartesia Cookbook",
-  "description": "Templates and recipes for Cartesia speech and voice agents: Sonic text to speech, Ink speech to text and Managed Agents in Next.js, Node, Python and Expo.",
+  "description": "Templates and recipes for Cartesia speech and voice agents: Sonic text to speech, Ink speech to text and Managed Agents in Next.js, Python, Node and Expo.",
   "branch": "main",
   "folders": [],
   "excludeFolders": [

@@ -11,7 +11,7 @@ Browser voice chat with a Cartesia Managed Agent: Next.js 16 App Router, shadcn/
 ## Files
 
 ```
-proxy.ts                    optional APP_PASSWORD gate (401, or 503 on Vercel (production or preview) when unset)
+proxy.ts                    APP_PASSWORD gate (401, or 503 in a production build when unset)
 app/api/token/route.ts      POST, calls createTokenRoute()
 lib/token-handler.ts        60 second agent-only token, rate limit (10/min/address, in memory), 503 and 429 messages
 lib/env.ts                  reads CARTESIA_API_KEY and CARTESIA_AGENT_ID at request time

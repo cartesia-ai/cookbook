@@ -19,7 +19,7 @@ uv run scripts/setup_agent.py         # creates the agent and its tools, writes 
 uv run uvicorn front_desk.main:app --port 8000
 ```
 
-`pnpm dlx degit` works too.
+pnpm works too (`pnpm dlx degit`).
 
 Open http://localhost:8000/try, press Start call and say "I'd like to book a haircut tomorrow afternoon." When you hang up, the call shows up under Calls with its transcript, recording and latency, and the booking shows up under Inbox. Use headphones, or the agent hears itself.
 
@@ -113,6 +113,7 @@ Two more checks stop other web pages from using a logged-in or local dashboard. 
 This is not legal advice. Check the rules where you and your callers are.
 
 - Tell callers they are talking to an AI. The default greeting does.
+- The prompt tells callers with an emergency to hang up and call 911. Change the number in `front_desk/prompt.py` for your country, and adapt the rule for your business.
 - Cartesia records the audio and transcript of every agent call by default ([observability](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings)). Tell your users, and delete calls you don't need with `DELETE /agents/calls/{call_id}`.
 - Some US states, such as California, Florida, Illinois and Washington, require every party's consent to record. The default greeting says the call may be recorded.
 - Calls, transcripts and caller numbers stay in `data/front-desk.db` and in Cartesia until you delete them. Pick a retention period.

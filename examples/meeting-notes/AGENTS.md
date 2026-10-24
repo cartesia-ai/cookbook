@@ -30,7 +30,7 @@ proxy.ts                      APP_PASSWORD Basic auth gate
 - Never hardcode an LLM id in code. `LLM_MODEL` is the only switch; new providers get a branch in `lib/llm.ts`.
 - Error bodies are short fixed strings, plus env var names from `LlmConfigError`. The transcribe route maps a Cartesia `APIError` status to a fixed message; don't add LLM error text, stack traces or request details to any response.
 - Audio is never stored. Only the transcript and notes go to IndexedDB.
-- Both routes that spend money check `createRateLimiter` first. `proxy.ts` gates the whole app when `APP_PASSWORD` is set and refuses to serve on Vercel (production or preview) without it.
+- Both routes that spend money check `createRateLimiter` first. `proxy.ts` gates the whole app when `APP_PASSWORD` is set and refuses to serve a production build (`next start` or any Vercel deployment) without it.
 - `lib/use-recorder.ts` creates and resumes the `AudioContext` inside the Start click, because Safari leaves a context made outside a user gesture suspended. It closes the context on stop and unmount. `components/level-meter.tsx` only reads from it.
 - UI is shadcn/ui with the Cartesia Verdant theme in `app/globals.css`, copied byte for byte from `packages/kit`. Change behavior in a new file, not in a copy. No other component library.
 - `next.config.ts` sets `agentRules: false` so `next dev` leaves this file alone.

@@ -299,6 +299,7 @@ export default function Page() {
   return (
     <div>
       <button onClick={recording ? stop : start}>{recording ? 'Stop' : 'Record'}</button>
+      <p>Get everyone&apos;s consent before recording. Some places require it from all participants.</p>
       <pre>{JSON.stringify(notes, null, 2)}</pre>
     </div>
   );
@@ -319,9 +320,10 @@ The speech-to-text endpoint returns no speaker labels. An action item's owner is
 
 ## Limits
 
+- Get everyone's consent before recording. Some places require it from all participants, and the recorder says so under the record button. The audio goes to Cartesia for transcription and the transcript goes to your LLM provider for the notes. Tell participants that.
 - Vercel serverless functions reject request bodies over 4.5 MB. That cap comes from the host, not from the Cartesia API. The template stays under it: uploads stop at 4 MB, and the recorder stops at 3.6 MB or 20 minutes, whichever comes first (`lib/limits.ts`). For longer meetings, run the route somewhere without that limit.
 - The summarize route sends the whole transcript in one call. A very long transcript needs chunking, which this recipe does not do.
-- Both routes spend your credits for anyone who can reach them. The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and route when it is set, and on Vercel the app returns 503 until you set it, or set it to `none` to make the app public. The rate limit only slows casual abuse; the password is the real guard.
+- Both routes spend your credits for anyone who can reach them. The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and route when it is set, and a production build (`next start`, or any Vercel deployment) returns 503 until you set it, or set it to `none` to make the app public. The rate limit only slows casual abuse; the password is the real guard.
 
 ## Next steps
 

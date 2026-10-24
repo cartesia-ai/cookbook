@@ -13,8 +13,8 @@ function passwordMatches(header: string | null, password: string): boolean {
 export function proxy(req: NextRequest) {
   const password = process.env.APP_PASSWORD?.trim();
   if (!password) {
-    if (process.env.VERCEL_ENV) {
-      return new NextResponse("Set APP_PASSWORD in your project settings, or set it to none to make this app public.", { status: 503 });
+    if (process.env.VERCEL_ENV || process.env.NODE_ENV === "production") {
+      return new NextResponse("Set APP_PASSWORD, or set it to none to make this app public.", { status: 503 });
     }
     return NextResponse.next();
   }

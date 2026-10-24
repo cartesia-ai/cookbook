@@ -90,6 +90,8 @@ A public button that starts paid voice calls will be found. The token route chec
 
 The Origin check stops other websites, not scripts, which can send any header, so the rate limit is the real guard. The limiter is in memory and per process, so it only slows casual abuse. Put it in Redis or your edge if you run more than one process.
 
+The access token's `agent` grant opens every agent on your Cartesia account, not just this one. For a public deployment, use a separate Cartesia organization, with its own API key, that holds only this agent.
+
 Cartesia records the audio and transcript of every agent call by default ([observability](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings)). Tell your users, and delete calls you don't need with `DELETE /agents/calls/{call_id}`.
 
 Cost: each call bills Managed Agents minutes on your Cartesia account, see https://docs.cartesia.ai/pricing. With `OPENAI_API_KEY` set, every search also embeds the question once.

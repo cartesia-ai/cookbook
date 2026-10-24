@@ -11,7 +11,7 @@ Each folder in [`examples/`](examples) installs and runs on its own, with a READ
 | Template | What you get | Stack | Setup |
 | --- | --- | --- | --- |
 | [voice-chat](examples/voice-chat) | Talk to an agent in the browser and interrupt it mid-sentence, with a live transcript | Next.js | Cartesia key |
-| [front-desk](examples/front-desk) | An AI receptionist that answers calls, books appointments and logs every call with transcript and latency | Python, FastAPI | Cartesia key, phone number, ngrok (browser calls need only the key) |
+| [front-desk](examples/front-desk) | An AI receptionist that answers calls, books appointments and logs every call with transcript and latency | Python, FastAPI | Cartesia key, phone number, public HTTPS URL (browser calls need only the key) |
 | [coding-voice-mode](examples/coding-voice-mode) | Talk to Claude Code, Cursor or Codex through one MCP tool | Python, MCP | Cartesia key, microphone, headphones |
 | [pocket-interpreter](examples/pocket-interpreter) | Real-time voice translation between two people on one phone | Next.js, AI SDK | Cartesia + LLM key |
 | [audiobook](examples/audiobook) | Turn an EPUB into narrated MP3 chapters, a voice per speaker, with word timestamps | Python, Gradio | Cartesia key, ffmpeg |
@@ -128,7 +128,7 @@ Two templates also send text to OpenAI when `OPENAI_API_KEY` is set. story-time 
 Several templates started from ideas in these open source projects:
 
 | Template | Builds on |
-|-|-|
+| --- | --- |
 | [audiobook](examples/audiobook) | [p0n1/epub_to_audiobook](https://github.com/p0n1/epub_to_audiobook) (forked) |
 | [article-to-podcast](examples/article-to-podcast) | [souzatharsis/podcastfy](https://github.com/souzatharsis/podcastfy) |
 | [coding-voice-mode](examples/coding-voice-mode) | [mbailey/voicemode](https://github.com/mbailey/voicemode) |
@@ -147,7 +147,7 @@ The UI is [shadcn/ui](https://ui.shadcn.com), the icons are [Lucide](https://luc
 
 These templates are examples, not production software. They are provided as is under Apache-2.0. You are responsible for privacy, consent, recording and AI-disclosure laws where you deploy.
 
-Apache-2.0, see [LICENSE](LICENSE). Two exceptions keep their upstream MIT license: [`examples/audiobook`](examples/audiobook) is a fork of [p0n1/epub_to_audiobook](https://github.com/p0n1/epub_to_audiobook), and the UI components in `components/ui` and `packages/kit/components/ui` come from [shadcn/ui](https://ui.shadcn.com) (MIT, Copyright (c) 2023 shadcn).
+This repository is licensed under Apache-2.0 (see [LICENSE](LICENSE)), except [`examples/audiobook`](examples/audiobook), which is an MIT fork of [p0n1/epub_to_audiobook](https://github.com/p0n1/epub_to_audiobook). It includes MIT-licensed code from [shadcn/ui](https://ui.shadcn.com) in `packages/kit/components/ui` and the templates' `components/ui` folders, with its notice in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

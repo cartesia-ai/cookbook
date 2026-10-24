@@ -310,6 +310,8 @@ React.useEffect(() => {
 - The transcribe route rejects files over 4 MB, and the recorder stops at four minutes (`lib/limits.ts`). The speak route reads at most 2,000 characters in one request.
 - Every route that calls Cartesia or the LLM has a per-IP rate limit, kept in memory per process, which only slows casual abuse. The routes have no login, so anyone who finds the URL can spend your Cartesia credits. Put them behind your own auth before you deploy.
 - The web build was checked in headless Chrome. The iOS and Android paths compile but were not run on a device.
+- Recordings go to Cartesia for transcription, and the transcripts go to your LLM provider. Tell your users that.
+- Before you ship to the App Store, check [guideline 5.1.2(i)](https://developer.apple.com/app-store/review/guidelines/). It requires you to say that recordings go to third-party AI services, ask the user's permission first, and link a privacy policy. Washington's [My Health My Data Act](https://app.leg.wa.gov/RCW/default.aspx?cite=19.373.010) can treat inferred mood labels as consumer health data. If you have users there, get their consent and publish a health data privacy policy.
 - This is batch transcription of a finished recording. For words on screen while you talk, you need Ink 2 over the streaming WebSocket with raw PCM chunks. `expo-audio` 58 has `useAudioStream` for that on iOS and Android, but not on the web.
 
 ## Next steps

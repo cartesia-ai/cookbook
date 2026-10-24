@@ -97,7 +97,7 @@ export function VoiceChatView(props: VoiceChatViewProps) {
           starting={false}
           retry={Boolean(error)}
           startLabel={ended ? "Start a new call" : "Start call"}
-          hint="Headphones work best. Speakers can make the agent hear itself."
+          hint="Headphones work best. Speakers can make the agent hear itself. Audio is processed and recorded by Cartesia."
           onStart={props.onStart}
           onStop={props.onStop}
           onToggleMute={props.onToggleMute}

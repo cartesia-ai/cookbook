@@ -31,7 +31,7 @@ lib/rate-limit.ts      in-memory per-IP limiter
 - Ink 2 detects the language but `turn.end` has no language field (checked against the 2026-08-14 AsyncAPI). The speaker is decided by the first line of the `/api/translate` reply. `lib/translation.ts` parses it; the prompt in `lib/prompt.ts` and that parser change together.
 - The mic must send silence while Sonic plays (`speaker.busy()` in `lib/audio/mic.ts`), or the app translates its own voice in a loop. Keep that gate if you touch audio.
 - `turn.eager_end` starts a speculative translation that `turn.end` reuses when the text matches. Latency is measured from `turn.end` in `lib/interpreter.ts`.
-- `proxy.ts` gates every page and API route behind HTTP Basic auth when `APP_PASSWORD` is set, and returns 503 on Vercel (production or preview) when it is unset. `APP_PASSWORD=none` makes the app public. `/api/token` and `/api/translate` are rate limited per IP with `lib/rate-limit.ts`.
+- `proxy.ts` gates every page and API route behind HTTP Basic auth when `APP_PASSWORD` is set, and returns 503 in a production build (`next start` or any Vercel deployment) when it is unset. `APP_PASSWORD=none` makes the app public. `/api/token` and `/api/translate` are rate limited per IP with `lib/rate-limit.ts`.
 - `startInterpreter` owns the `AudioContext` and must close it on every failure path; Safari caps live contexts. `tests/interpreter.test.ts` covers this.
 - LLM ids are never hardcoded. `LLM_MODEL` is `provider/model`, resolved in `lib/llm.ts`. Don't pass `temperature`. Reasoning models ignore temperature, and some providers reject it.
 - UI rules: `packages/kit/DESIGN.md`. One primary button per screen, End is the soft red outline, no other hues.

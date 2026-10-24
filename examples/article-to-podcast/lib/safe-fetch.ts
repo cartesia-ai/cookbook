@@ -79,10 +79,14 @@ export function isBlockedAddress(raw: string): boolean {
   if (!net.isIPv6(ip)) return true;
   const g = expandV6(ip);
   if (!g) return true;
+  const v4 = (hi: number, lo: number) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
   if (g.slice(0, 5).every((x) => x === 0) && (g[5] === 0xffff || g[5] === 0)) {
-    const v4 = `${g[6] >> 8}.${g[6] & 255}.${g[7] >> 8}.${g[7] & 255}`;
-    if (g[5] === 0xffff || g.slice(6).some((x) => x !== 0)) return blockedV4(v4);
+    if (g[5] === 0xffff || g.slice(6).some((x) => x !== 0)) return blockedV4(v4(g[6], g[7]));
   }
+  // NAT64 (64:ff9b::/96) and 6to4 (2002::/16) carry an IPv4 address inside.
+  if (g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)) return blockedV4(v4(g[6], g[7]));
+  if (g[0] === 0x64 && g[1] === 0xff9b && g[2] === 1) return true;
+  if (g[0] === 0x2002) return blockedV4(v4(g[1], g[2]));
   if (g.every((x) => x === 0)) return true;
   if (g.slice(0, 7).every((x) => x === 0) && g[7] === 1) return true;
   if ((g[0] & 0xfe00) === 0xfc00) return true;
