@@ -1,12 +1,12 @@
 # Ebook to audiobook
 
-Turns an EPUB into one mp3 per chapter with a voice per speaker and read-along word timestamps, using Cartesia Sonic 3.6 streamed over `/tts/sse`.
+Turns an EPUB into one MP3 per chapter with a voice per speaker and read-along word timestamps, using Cartesia Sonic 3.6 streamed over `/tts/sse`.
 
 ![The Audiobook web app after a preview run of alice_sample.epub: Preview only is ticked, cast mode is Per speaker with Archie as narrator and English as the language, and the log reports about 15065 Cartesia credits, voices Alice = Maya and Mouse = Leo, and both chapters processed](./docs/screenshot.png)
 
 ## Run it
 
-You need Python 3.10 to 3.12, [uv](https://docs.astral.sh/uv/) and `ffmpeg` (`brew install ffmpeg` or `apt install ffmpeg`). The API returns raw PCM and ffmpeg encodes it to mp3.
+You need Python 3.10 to 3.12, [uv](https://docs.astral.sh/uv/) and `ffmpeg` (`brew install ffmpeg` or `apt install ffmpeg`). The API returns raw PCM and ffmpeg encodes it to MP3.
 
 ```sh
 npx degit cartesia-ai/cookbook/examples/audiobook audiobook
@@ -46,7 +46,7 @@ Open `audiobook_generator/tts_providers/cartesia_tts_provider.py` first. It is t
 2. In `--cast_mode dialogue` (the default), `core/cast.py` splits each chapter on quotation marks, works out who speaks from tags such as "said Alice" or "the Mouse cried", and gives each speaker a voice from a pool of Cartesia library voices. A quote with no tag goes to the previous speaker. Voices are fixed once, before any chapter is converted, so parallel workers and reruns agree.
 3. In English dialogue, a cue such as "whispered", "shouted" or "sobbed" next to a quote sets `generation_config.emotion` for that quote, and "laughed" adds a `[laughter]` tag.
 4. `tts_providers/cartesia_tts_provider.py` sends text in requests of at most 1,500 characters, split on sentence boundaries and never across a paragraph. It streams each one from `/tts/sse` with `add_timestamps`, because the streaming endpoints are the ones that return word timestamps. A stream that drops halfway is retried twice for that chunk only.
-5. The PCM is joined with 600 ms of silence between paragraphs and encoded to mp3 with ID3 tags. Timestamps are shifted to positions in the final file and written as `.timings.json` and `.vtt`.
+5. The PCM is joined with 600 ms of silence between paragraphs and encoded to MP3 with ID3 tags. Timestamps are shifted to positions in the final file and written as `.timings.json` and `.vtt`.
 
 This is the core call, as a standalone script:
 
@@ -86,7 +86,7 @@ audiobook_generator/core/cast.py             speaker detection, voice pool, emot
 audiobook_generator/core/readalong.py        timings.json and WebVTT
 audiobook_generator/tts_providers/cartesia_tts_provider.py   Sonic requests, chunking, retries
 audiobook_generator/ui/                      web app and its theme
-readalong.html                               open an mp3 and its timings to follow the words
+readalong.html                               open an MP3 and its timings to follow the words
 samples/alice_sample.epub                    two public-domain chapters for testing
 ```
 
@@ -120,11 +120,11 @@ It is a heuristic over English dialogue tags, and plenty of real novels defeat i
 
 ### How do I follow along with the text?
 
-Open `readalong.html` in a browser and pick a chapter's mp3 and its `.timings.json`. The current word is highlighted, and clicking a word jumps to it. The `.vtt` file works as subtitles in most players. `--no_timings` skips both files.
+Open `readalong.html` in a browser and pick a chapter's MP3 and its `.timings.json`. The current word is highlighted, and clicking a word jumps to it. The `.vtt` file works as subtitles in most players. `--no_timings` skips both files.
 
 ### Can I put the result in an audiobook server?
 
-The mp3 files carry ID3 title, author, album and track tags, so servers such as Audiobookshelf can sort them into one book. ID3 tags are written only for mp3, not `wav` or `flac`.
+The MP3 files carry ID3 title, author, album and track tags, so servers such as Audiobookshelf can sort them into one book. ID3 tags are written only for MP3, not `wav` or `flac`.
 
 ### Why not `/tts/bytes`?
 
@@ -149,6 +149,7 @@ The tests use a fake client, unset `CARTESIA_API_KEY` before they run and never 
 ## License
 
 MIT, unlike the rest of the cookbook. This folder is a fork of [p0n1/epub_to_audiobook](https://github.com/p0n1/epub_to_audiobook), which supplies the EPUB parsing, chapter handling, preview mode, search-and-replace and the Gradio app, and `LICENSE` keeps its copyright notice. `samples/alice_ch1_2.txt` holds two excerpts of *Alice's Adventures in Wonderland* (Lewis Carroll, 1865), public domain in the United States.
+`tests/long_text.txt` is Lu Xun's "A Madman's Diary" (1918), public domain, from Project Gutenberg.
 
 The tool depends on EbookLib (AGPL-3.0) and mutagen (GPL-2.0-or-later). They are not bundled here, but anyone who redistributes or hosts the app should check those licenses.
 

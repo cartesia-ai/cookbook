@@ -14,7 +14,7 @@ from audiobook_generator.tts_providers.cartesia_tts_provider import (
     get_cartesia_supported_output_formats,
 )
 from audiobook_generator.utils.log_handler import generate_unique_log_path
-from main import main
+from main import MISSING_KEY, main
 
 running_process: Optional[Process] = None
 webui_log_file = None
@@ -33,6 +33,9 @@ def process_ui_form(input_file, output_dir, worker_count, log_level, output_text
                     remove_endnotes, remove_reference_numbers,
                     model, voice, speed, volume, output_format, language, max_chars,
                     cast_mode, expressive, write_timings, cast_file):
+
+    if not preview and not os.environ.get("CARTESIA_API_KEY"):
+        raise gr.Error(MISSING_KEY)
 
     config = GeneralConfig(None)
     config.input_file = input_file.name if hasattr(input_file, 'name') else input_file

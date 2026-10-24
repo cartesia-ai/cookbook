@@ -36,7 +36,7 @@ Without `LLM_MODEL` and a matching key everything works except the corrections p
 | `AGENT_MODEL_ID` | no | The partner's LLM, from `GET /v1/agents/models`. Defaults to `claude-haiku-4.5` |
 | `VOICE_ID_EN`, `VOICE_ID_ES`, `VOICE_ID_FR`, `VOICE_ID_HI`, `VOICE_ID_JA` | no | Pin a voice per language. Ids from https://play.cartesia.ai/voices |
 | `CARTESIA_TOOL_ID_COMPLETE` | no | Id of an existing `complete_mission` tool. Otherwise the server finds or creates one |
-| `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
+| `APP_PASSWORD` | in production | Optional for `next dev`. Required for a production build (`next start` or Vercel): a password for the whole app, or `none` to make it public. |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
 The model ids are examples. Providers retire models, so check the provider's model page before you pick one. On Vercel, a model with no matching direct key goes through the AI Gateway without `AI_GATEWAY_API_KEY`, because the deployment authenticates to it for you.
@@ -83,7 +83,9 @@ The Managed Agent runs Ink 2 (`ink-2`) for your speech and Sonic 3.6 (`sonic-3.6
 
 ## Before you deploy
 
-Set `APP_PASSWORD`. On Vercel (production and preview) the app answers 503 until you set it to a password or to `none`. On hosts other than Vercel, set `APP_PASSWORD` yourself, because the gate only enforces it on Vercel. `/api/session` creates agents on your account, and a token carries the `agent` grant for your whole account, not one agent.
+Set `APP_PASSWORD`. A production build (`next start`, or any Vercel deployment) answers 503 until `APP_PASSWORD` is set, or set to `none` to make the app public. `next dev` stays open. `/api/session` creates agents on your account.
+
+The access token's `agent` grant opens every agent on your Cartesia account, not just this one. For a public deployment, use a separate Cartesia organization, with its own API key, that holds only this app's session agents.
 
 Each route has an in-memory limit per address: 10 sessions, 10 tokens, 10 corrections and 20 session ends a minute. The limiter is per process, resets on restart and is not shared across instances, so it only slows casual abuse. The password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`. On top of that, `/api/session` refuses new sessions while 10 session agents are live or the same address already has 2 open. The page ends each session after 3 minutes.
 
@@ -130,6 +132,6 @@ Browser audio and the quality of the conversation are not covered by tests. Ink 
 
 Apache-2.0, like the rest of the [Cartesia cookbook](https://github.com/cartesia-ai/cookbook/blob/main/LICENSE).
 
-The missions and the two teaching modes come from [ZackAkil/immersive-language-learning-with-live-api](https://github.com/ZackAkil/immersive-language-learning-with-live-api) (Apache-2.0).
+The missions and the two teaching modes come from [ZackAkil/immersive-language-learning-with-live-api](https://github.com/ZackAkil/immersive-language-learning-with-live-api) (Apache-2.0, notice in THIRD_PARTY_NOTICES.md).
 
 Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

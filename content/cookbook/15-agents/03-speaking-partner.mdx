@@ -154,6 +154,8 @@ The voice list says which accents each voice speaks natively. The server keeps t
 
 The agent half was run against the live API in all five languages, with Sonic-generated speech standing in for a microphone. A real microphone, the spoken quality of the partner, and the corrections model were not tested live.
 
+Cartesia records the audio and transcript of every agent call by default ([observability](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings)). Tell your users, and delete calls you don't need with `DELETE /agents/calls/{call_id}`.
+
 ## What to try next
 
 - Add more missions in `data/missions.json`. The routes take a mission id, so the browser cannot send free text into the prompt.

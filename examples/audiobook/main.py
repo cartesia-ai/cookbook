@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -177,9 +178,17 @@ def handle_args():
     args = parser.parse_args()
     return GeneralConfig(args)
 
+MISSING_KEY = (
+    "CARTESIA_API_KEY is not set. Export it or load your .env file "
+    "(set -a; . .env; set +a) before converting."
+)
+
 def main(config=None, log_file=None):
     if not config:
         config = handle_args()
+        if not config.preview and not os.environ.get("CARTESIA_API_KEY"):
+            print(MISSING_KEY, file=sys.stderr)
+            return 1
 
     if log_file:
         effective_log_file = Path(log_file)

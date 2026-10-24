@@ -35,7 +35,7 @@ lib/safety.ts, lib/story.ts, lib/prompt.ts, lib/moderation.ts   content safety
 - Saved scenes hold Float32 PCM at 24 kHz plus word timings, so replay needs no API calls.
 - One TTS context per line is deliberate: each line has its own voice and `generation_config.emotion` (beta, English only, must match the words). Lines are generated in order. Don't open contexts for all lines at once; it can hit concurrency limits.
 - Sonic returns `[laughter]` as a timestamped word. `lib/align.ts` skips it when mapping words to the text on screen.
-- `proxy.ts` gates every page and API route behind HTTP Basic auth when `APP_PASSWORD` is set, and returns 503 on Vercel (production or preview) when it is unset. `APP_PASSWORD=none` makes the app public. `/api/token` and `/api/scene` are rate limited per IP with `lib/rate-limit.ts`.
+- `proxy.ts` gates every page and API route behind HTTP Basic auth when `APP_PASSWORD` is set, and returns 503 in a production build (`next start` or any Vercel deployment) when it is unset. `APP_PASSWORD=none` makes the app public. `/api/token` and `/api/scene` are rate limited per IP with `lib/rate-limit.ts`.
 - `next.config.ts` sets `agentRules: false` so `next dev` does not overwrite this file.
 
 ## Docs

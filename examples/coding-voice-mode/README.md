@@ -6,7 +6,7 @@ The agent calls one tool, `converse`. Your words come back as the tool result, s
 
 ## Run it
 
-You need [uv](https://docs.astral.sh/uv/), a Cartesia API key from https://play.cartesia.ai/keys, a microphone and headphones.
+You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), a Cartesia API key from https://play.cartesia.ai/keys, a microphone and headphones.
 
 ```sh
 npx degit cartesia-ai/cookbook/examples/coding-voice-mode coding-voice-mode
@@ -15,7 +15,7 @@ export CARTESIA_API_KEY=your-key
 ./setup.sh claude --save-key     # or cursor, codex, all
 ```
 
-`pnpm dlx degit` works too. Restart the agent and say, or type, "let's talk" or "voice mode".
+pnpm works too (`pnpm dlx degit`). Restart the agent and say, or type, "let's talk" or "voice mode".
 
 `setup.sh` runs `uv sync` and `uv run cartesia-voice-mode install`. Add `--dry-run` to print what would change without changing anything, and run `uv run cartesia-voice-mode uninstall <client>` to remove only this server's entry.
 
@@ -171,6 +171,8 @@ After the file it sends 3 seconds of silence so Ink 2 can end the turn, and it g
 ## Before you deploy
 
 This runs on your machine over stdio, so there is no server to secure. The key stays in your shell or the 0600 key file and never goes into a client config, a log line or an error message.
+
+The agent can open your microphone itself by calling the `converse` tool, and that audio goes to Cartesia for transcription.
 
 Cost: every `converse` call bills Sonic characters for the message and Ink 2 seconds while the microphone is open. `CARTESIA_MAX_MESSAGE_CHARS` caps the first. `CARTESIA_MAX_LISTEN_S` caps the second per call, including any `listen_duration_max` the agent passes. See https://docs.cartesia.ai/pricing.
 

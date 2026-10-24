@@ -117,7 +117,7 @@
       "env": {
         "required": ["CARTESIA_API_KEY", "CARTESIA_AGENT_ID"],
         "oneOf": [],
-        "optional": ["CARTESIA_TOOL_IDS", "OPENAI_API_KEY", "ALLOWED_ORIGINS", "PUBLIC_URL", "TRUST_PROXY", "PORT", "MAX_SESSION_SECS", "WIDGET_TITLE", "DEMO_SITE", "AGENT_MODEL_ID", "CARTESIA_VOICE_ID", "AGENT_LANGUAGE"]
+        "optional": ["CARTESIA_TOOL_IDS", "OPENAI_API_KEY", "ALLOWED_ORIGINS", "PUBLIC_URL", "TRUST_PROXY", "PORT", "MAX_SESSION_SECS", "WIDGET_TITLE", "INDEX_PATH", "DEMO_SITE", "AGENT_NAME", "AGENT_MODEL_ID", "CARTESIA_VOICE_ID", "AGENT_LANGUAGE"]
       },
       "path": "examples/docs-voice-widget",
       "readme": "examples/docs-voice-widget/README.md",
@@ -404,7 +404,8 @@
           "CARTESIA_VOICE_ID",
           "DATABASE_PATH",
           "DASHBOARD_PASSWORD",
-          "TRUST_PROXY"
+          "TRUST_PROXY",
+          "UVICORN_HOST"
         ]
       },
       "path": "examples/front-desk",

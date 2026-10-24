@@ -320,7 +320,7 @@ The player tries to match on `turn.eager_end`, before the end-of-turn silence ha
 
 ## Limits
 
-- The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and API route when it is set, and on Vercel the app returns 503 until you set it, or set it to `none` to make the app public. The in-memory rate limits on `/api/token` and `/api/scene` (10 a minute per client IP) are per process and only slow casual abuse. The password is the real guard.
+- The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and API route when it is set, and a production build (`next start`, or any Vercel deployment) returns 503 until you set it, or set it to `none` to make the app public. The in-memory rate limits on `/api/token` and `/api/scene` (10 a minute per client IP) are per process and only slow casual abuse. The password is the real guard.
 - Emotion control is English only. For another language, change `language` in the Sonic context, add the language to the prompt, translate the ordinals and stopwords in `lib/match-choice.ts` and the word list in `lib/safety.ts`, and drop `generation_config.emotion`. The Ink 2 socket takes no language, so it needs no change.
 - The Sonic loop was run from Node with a token client. The microphone path and the read-along UI were not tested against the live API.
 

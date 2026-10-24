@@ -95,7 +95,7 @@ class CartesiaTTSProvider:
             )
         if _RETIRED_MODELS.match(c.model_name):
             raise ValueError(
-                f"Model '{c.model_name}' is retired or about to be (sonic-3-2025-10-27 stops "  # allow-model-id
+                f"Model '{c.model_name}' is retired (sonic-3-2025-10-27 stopped "  # allow-model-id
                 f"working on 2026-10-20). Use {DEFAULT_MODEL}."
             )
         if not (c.model_name in get_cartesia_supported_models() or c.model_name.startswith(DEFAULT_MODEL)):

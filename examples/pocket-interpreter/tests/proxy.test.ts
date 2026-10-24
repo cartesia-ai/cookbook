@@ -36,6 +36,13 @@ describe("proxy", () => {
     expect(await res.text()).toMatch(/Set APP_PASSWORD/);
   });
 
+  it("refuses to serve a production build anywhere without APP_PASSWORD", () => {
+    vi.stubEnv("APP_PASSWORD", "");
+    vi.stubEnv("VERCEL_ENV", "");
+    vi.stubEnv("NODE_ENV", "production");
+    expect(proxy(req()).status).toBe(503);
+  });
+
   it.each(["production", "preview"])("makes the app public on Vercel %s when APP_PASSWORD is none", (env) => {
     vi.stubEnv("APP_PASSWORD", "none");
     vi.stubEnv("VERCEL_ENV", env);

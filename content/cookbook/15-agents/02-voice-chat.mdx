@@ -261,6 +261,8 @@ The trade is plain. The managed agent is one token route, and the service owns t
 
 The managed path was run against the live API: agent creation, the token route, and a session with a spoken question, a reply and an interruption. The browser microphone path was not tested on a real device. The own-LLM snippets typecheck against `@cartesia/cartesia-js` 4.2.0 but were not run against the live API, so test them before you rely on them.
 
+Cartesia records the audio and transcript of every agent call by default ([observability](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings)). Tell your users, and delete calls you don't need with `DELETE /agents/calls/{call_id}`.
+
 ## Next steps
 
 - Give the agent a client tool with the `tools` option of the hook, as in the [package README](../../../packages/agents-web/README.md).

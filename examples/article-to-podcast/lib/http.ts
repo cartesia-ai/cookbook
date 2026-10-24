@@ -22,7 +22,10 @@ export function errorResponse(err: unknown): Response {
     message = "The request was cancelled.";
   } else if (err instanceof APIError) {
     status = 502;
-    message = `The Cartesia request failed${err.status ? ` (HTTP ${err.status})` : ""}.`;
+    message =
+      err.status === 401 || err.status === 403
+        ? "The Cartesia API key was rejected. Check CARTESIA_API_KEY."
+        : `The Cartesia request failed${err.status ? ` (HTTP ${err.status})` : ""}.`;
   } else if (APICallError.isInstance(err)) {
     status = 502;
     message = `The language model request failed${err.statusCode ? ` (HTTP ${err.statusCode})` : ""}.`;

@@ -8,8 +8,6 @@ Turns a link or pasted text into a two-host podcast episode, with Cartesia Sonic
 
 ## Run it
 
-Node 22.22 or newer.
-
 ```sh
 npx degit cartesia-ai/cookbook/examples/article-to-podcast article-to-podcast
 cd article-to-podcast
@@ -18,7 +16,7 @@ npm install
 npm run dev
 ```
 
-pnpm works too (`pnpm install`, `pnpm dev`).
+Node 22.22 or newer. pnpm works too (`pnpm install`, `pnpm dev`).
 
 Open http://localhost:3000, paste a link to an article (or switch to Paste text), set Length to Short and press Make podcast. Without keys the page still loads and shows a Finish setup notice naming what is missing. `GET /api/health` reports the same thing as booleans, never values.
 
@@ -32,7 +30,7 @@ Open http://localhost:3000, paste a link to an article (or switch to Paste text)
 | `ANTHROPIC_API_KEY` | if `LLM_MODEL` starts with `anthropic/` | https://console.anthropic.com |
 | `AI_GATEWAY_API_KEY` | for any other provider | Routes the model through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). Not needed on a Vercel deployment |
 | `CARTESIA_VOICE_HOST_A`, `CARTESIA_VOICE_HOST_B` | no | Voice ids for the two hosts. Defaults are Skylar and Daniel |
-| `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
+| `APP_PASSWORD` | in production | Optional for `next dev`. Required for a production build (`next start` or Vercel): a password for the whole app, or `none` to make it public. |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
 A direct key for the `LLM_MODEL` prefix wins. Any other prefix, or a prefix with no direct key, goes through the AI Gateway. The model ids are examples. Providers retire models, so check the provider's model page before you pick one. On Vercel, a model with no matching direct key goes through the AI Gateway without `AI_GATEWAY_API_KEY`, because the deployment authenticates to it for you.
@@ -88,7 +86,7 @@ if (provider === "google" && env.GOOGLE_GENERATIVE_AI_API_KEY) {
 ## Before you deploy
 
 - Only convert articles you own or have permission to adapt. Label published audio as AI-generated.
-- Set `APP_PASSWORD`. `proxy.ts` asks every visitor for it with HTTP Basic auth, and on Vercel (production and preview) the app refuses to serve until it is set (use `none` to make the app public on purpose). On hosts other than Vercel, set `APP_PASSWORD` yourself, because the gate only enforces it on Vercel.
+- Set `APP_PASSWORD`. `proxy.ts` asks every visitor for it with HTTP Basic auth, and a production build (`next start`, or any Vercel deployment) answers 503 until it is set, or set to `none` to make the app public. `next dev` stays open.
 - Both routes spend money (LLM tokens and Cartesia credits). Each has an in-memory rate limit per IP address (10 scripts and 5 recordings a minute). The limiter lives in one server process, so it only slows casual abuse. The password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
 - Sonic bills per character of script, see https://docs.cartesia.ai/pricing. The audio route rejects scripts over 30,000 characters, which caps the cost of one episode, plus the LLM tokens.
 - Both routes set `maxDuration = 300`. A script can have up to 120 lines, so a plan with a shorter function limit can cut a long episode off.

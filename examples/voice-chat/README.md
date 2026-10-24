@@ -35,7 +35,7 @@ Open http://localhost:3000, press Start call, wait for the greeting and ask a qu
 | `CARTESIA_AGENT_ID` | yes | Written by `npm run setup:agent`. You can also paste the id of an agent you already have |
 | `AGENT_MODEL_ID` | no | LLM for the agent, read by `npm run setup:agent`. Default `claude-haiku-4.5`. `GET /v1/agents/models` lists the others |
 | `CARTESIA_VOICE_ID` | no | Agent voice, read by `npm run setup:agent`. Pick one at https://play.cartesia.ai/voices |
-| `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
+| `APP_PASSWORD` | in production | Optional for `next dev`. Required for a production build (`next start` or Vercel): a password for the whole app, or `none` to make it public. |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 | `CARTESIA_BASE_URL` | no | API base URL for `npm run setup:agent`. Leave unset to use `https://api.cartesia.ai`. Not in `.env.example` |
 
@@ -126,15 +126,17 @@ A Managed Agent runs Ink 2, the LLM you pick and Sonic 3.6 as one stack, so ther
 
 ## Before you deploy
 
-Anyone who can reach the app can start calls on your account. Set `APP_PASSWORD` to put the whole app behind HTTP Basic auth. On Vercel (production and preview) the app answers 503 until you set it, or set it to `none` to make the app public on purpose. On hosts other than Vercel, set `APP_PASSWORD` yourself, because the gate only enforces it on Vercel.
+Anyone who can reach the app can start calls on your account. Set `APP_PASSWORD` to put the whole app behind HTTP Basic auth. A production build (`next start`, or any Vercel deployment) answers 503 until `APP_PASSWORD` is set, or set to `none` to make the app public. `next dev` stays open.
 
 The token route allows 10 tokens a minute per address. The limiter is in memory and per process. It only slows casual abuse; the password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`. For a real product, put the route behind your own session check. See [Browser auth with access tokens](https://github.com/cartesia-ai/cookbook/blob/main/content/cookbook/00-guides/01-browser-auth-with-access-tokens.mdx).
 
 Cartesia checks the token only when the socket opens, so a call does not end when its token expires.
 
+The access token's `agent` grant opens every agent on your Cartesia account, not just this one. For a public deployment, use a separate Cartesia organization, with its own API key, that holds only this agent.
+
 Cartesia records the audio and transcript of every agent call by default ([observability](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings)). Tell your users, and delete calls you don't need with `DELETE /agents/calls/{call_id}`.
 
-Managed Agent calls cost $0.06 a minute plus the LLM tokens, billed in dollars separately from credits. See https://docs.cartesia.ai/pricing. `GET /v1/agents/models` returns the token price of each model.
+Managed Agent calls bill per minute plus the LLM tokens, separately from credits. See https://docs.cartesia.ai/pricing for current rates. `GET /v1/agents/models` returns the token price of each model.
 
 ## FAQ
 

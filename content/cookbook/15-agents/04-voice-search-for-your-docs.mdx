@@ -200,6 +200,8 @@ Models sometimes answer without calling `show_source`. Once the assistant's tran
 
 The tool loop depends on the model calling `search_docs` before it answers. The prompt asks for that, but a model can still answer from memory, so check answers against your docs before you put the widget on a public site.
 
+Cartesia records the audio and transcript of every agent call by default ([observability](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings)). Tell your users, and delete calls you don't need with `DELETE /agents/calls/{call_id}`.
+
 ## Next steps
 
 - Run the full template from [`examples/docs-voice-widget`](../../../examples/docs-voice-widget/README.md), including the widget UI, the ingest CLI and the tests.

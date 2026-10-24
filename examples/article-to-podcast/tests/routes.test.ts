@@ -156,7 +156,14 @@ describe("POST /api/audio", () => {
     const res = await postAudio(json({ script }));
     const text = await res.text();
     expect(res.status).toBe(502);
-    expect(text).toMatch(/Cartesia request failed \(HTTP 401\)/);
+    expect(text).toMatch(/Check CARTESIA_API_KEY/);
+    expect(text).not.toContain(SENTINEL);
+  });
+
+  it("reports other Cartesia failures by status", async () => {
+    renderEpisode.mockRejectedValue(new APIError(500, undefined, `upstream ${SENTINEL}`, new Headers()));
+    const text = await (await postAudio(json({ script }))).text();
+    expect(text).toMatch(/Cartesia request failed \(HTTP 500\)/);
     expect(text).not.toContain(SENTINEL);
   });
 

@@ -2,9 +2,9 @@
 
 > Templates and recipes for Cartesia speech and voice agents: Sonic text to speech, Ink speech to text and Managed Agents in Next.js, Python, Node and Expo. Each template is a standalone folder in examples/ with a README, an AGENTS.md for coding agents and an .env.example.
 
-Current facts (from facts.json): text to speech model `sonic-3.6`, streaming speech to text with turn detection `ink-2` (en, es, fr, hi, ja), file speech to text `ink-whisper`, API version header `Cartesia-Version: 2026-08-14`. Any other Sonic model id is sunset, about to be sunset, or a deprecated alias. The API key stays on the server; browsers and apps get a 60 second access token from a server route (`client.accessToken.create({ grants, expires_in: 60 })`). SDKs: `@cartesia/cartesia-js` (TypeScript) and `cartesia` (Python).
+Current facts (from facts.json): text to speech model `sonic-3.6`, streaming speech to text with turn detection `ink-2` (en, es, fr, hi, ja), file speech to text `ink-whisper`, API version header `Cartesia-Version: 2026-08-14`. Any other Sonic model id is sunset (the last ones stopped working on 2026-10-20) or a deprecated alias. The API key stays on the server; browsers and apps get a 60 second access token from a server route (`client.accessToken.create({ grants, expires_in: 60 })`). SDKs: `@cartesia/cartesia-js` (TypeScript) and `cartesia` (Python).
 
-Clone one template: `npx degit cartesia-ai/cookbook/examples/<name> <name>`. Template READMEs give npm commands; pnpm works too. Feature tags: word-timestamps, turn-detection, barge-in, multilingual, telephony, client-tools, batch-stt, voice-cloning.
+Clone one template: `npx degit cartesia-ai/cookbook/examples/<name> <name>`. Node template READMEs give npm commands; pnpm works too. Python templates use uv. Feature tags: word-timestamps, turn-detection, barge-in, multilingual, telephony, client-tools, batch-stt, voice-cloning.
 
 ## Templates
 

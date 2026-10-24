@@ -24,13 +24,13 @@ Press `w` to open the web app at http://localhost:8081, or scan the QR code with
 
 ## Environment variables
 
-| Name | Required | Where to get it |
+| Name | Required | What it does |
 | --- | --- | --- |
-| `CARTESIA_API_KEY` | yes | https://play.cartesia.ai/keys |
-| `LLM_MODEL` | yes | `provider/model`, for example `openai/gpt-5.4-mini` |
+| `CARTESIA_API_KEY` | yes | Transcribes entries and voices the recap. Get one at https://play.cartesia.ai/keys |
+| `LLM_MODEL` | yes | The model that writes each reflection and recap, as `provider/model`, for example `openai/gpt-5.4-mini` |
 | `OPENAI_API_KEY` | if `LLM_MODEL` starts with `openai/` | https://platform.openai.com/api-keys |
 | `ANTHROPIC_API_KEY` | if `LLM_MODEL` starts with `anthropic/` | https://console.anthropic.com |
-| `AI_GATEWAY_API_KEY` | for any other provider | https://vercel.com/docs/ai-gateway |
+| `AI_GATEWAY_API_KEY` | for any other provider | Routes the model through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). Not needed on a Vercel deployment |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
 None of these have an `EXPO_PUBLIC_` prefix, so Expo never puts them in the app bundle. Only the API routes in `app/api` read them. Model ids are examples; providers retire models, so check the provider's model page first. On Vercel, a model with no matching direct key goes through the AI Gateway without `AI_GATEWAY_API_KEY`.

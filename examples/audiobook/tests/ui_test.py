@@ -1,6 +1,7 @@
 import inspect
 import unittest
 from types import SimpleNamespace
+import os
 from unittest.mock import patch
 
 from audiobook_generator.ui import web_ui
@@ -39,7 +40,8 @@ class TestWebUi(unittest.TestCase):
         self.assertEqual(components["language"].value, "en")
 
     def test_process_ui_form_builds_the_config(self):
-        with patch.object(web_ui, "launch_audiobook_generator") as launch:
+        with patch.object(web_ui, "launch_audiobook_generator") as launch, \
+                patch.dict(os.environ, {"CARTESIA_API_KEY": "sk_car_test"}):
             web_ui.process_ui_form(**FORM)
         config = launch.call_args.args[0]
         expected = {
@@ -53,6 +55,15 @@ class TestWebUi(unittest.TestCase):
         }
         for key, value in expected.items():
             self.assertEqual(getattr(config, key), value, key)
+
+    def test_process_ui_form_refuses_to_start_without_a_key(self):
+        import gradio as gr
+        env = {k: v for k, v in os.environ.items() if k != "CARTESIA_API_KEY"}
+        with patch.object(web_ui, "launch_audiobook_generator") as launch, patch.dict(os.environ, env, clear=True):
+            with self.assertRaises(gr.Error):
+                web_ui.process_ui_form(**FORM)
+            web_ui.process_ui_form(**{**FORM, "preview": True})
+        self.assertEqual(launch.call_count, 1)
 
     def test_log_timer_starts_inactive_and_follows_the_run(self):
         ui, _ = web_ui.build_ui("out")

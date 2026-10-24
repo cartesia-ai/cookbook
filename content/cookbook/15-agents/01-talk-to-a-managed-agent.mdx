@@ -115,6 +115,8 @@ export function Talk({ agentId }: { agentId: string }) {
 
 Call `start` from a click, because browsers only allow the microphone and audio playback after a user gesture. See the [package README](../../../packages/agents-web/README.md) for events, tool calls and error handling.
 
+Cartesia records the audio and transcript of every agent call by default ([observability](https://docs.cartesia.ai/line/infrastructure/observability#call-recordings)). Tell your users, and delete calls you don't need with `DELETE /agents/calls/{call_id}`.
+
 ## Next steps
 
 - [Browser auth with access tokens](../00-guides/01-browser-auth-with-access-tokens.mdx)

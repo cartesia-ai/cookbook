@@ -330,8 +330,9 @@ Because the clock starts at `turn.end` and not at `turn.eager_end`, the time sav
 ## Limits
 
 - One microphone, one turn at a time. The microphone is muted for Ink 2 while a translation plays, so the other person waits for it to finish.
+- Both people's speech goes to Cartesia, and the text of each turn goes to your LLM provider for translation. Tell the other person before you start.
 - In a loud room, background voices can start a stray turn.
-- Both routes spend money. The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and route when it is set, and on Vercel the app returns 503 until you set it, or set it to `none` to make the app public.
+- Both routes spend money. The template's `proxy.ts` asks for `APP_PASSWORD` (HTTP Basic auth) on every page and route when it is set, and a production build (`next start`, or any Vercel deployment) returns 503 until you set it, or set it to `none` to make the app public.
 - Each route also has an in-memory rate limit per client IP (10 tokens and 60 translations a minute). It lives in one server process and only slows casual abuse; the password is the real guard. `clientIp` in `lib/rate-limit.ts` reads `x-forwarded-for` only on Vercel or with `TRUST_PROXY=1`, so elsewhere every caller shares one bucket.
 
 ## Next steps

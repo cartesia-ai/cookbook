@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FetchBlockedError, safeFetch, type RequestFn, type Resolver } from "@/lib/safe-fetch";
+import { FetchBlockedError, isBlockedAddress, safeFetch, type RequestFn, type Resolver } from "@/lib/safe-fetch";
 
 const publicResolver: Resolver = async () => [{ address: "93.184.216.34", family: 4 }];
 
@@ -41,6 +41,9 @@ describe("safeFetch blocks", () => {
     "http://2130706433/",
     "http://[fe80::1]/",
     "http://[fd00::1]/",
+    "http://[64:ff9b::a9fe:a9fe]/",
+    "http://[64:ff9b::127.0.0.1]/",
+    "http://[2002:a00:1::]/",
   ];
   for (const url of blocked) {
     it(url, async () => {
@@ -49,6 +52,11 @@ describe("safeFetch blocks", () => {
       expect(urls).toEqual([]);
     });
   }
+
+  it("allows NAT64 and 6to4 forms of a public address", () => {
+    expect(isBlockedAddress("64:ff9b::5db8:d822")).toBe(false);
+    expect(isBlockedAddress("2002:5db8:d822::1")).toBe(false);
+  });
 
   it("a hostname that resolves to a private address", async () => {
     const { request } = fakeRequest([]);

@@ -26,14 +26,14 @@ Open http://localhost:3000, pick the two languages, press Start talking and say 
 
 ## Environment variables
 
-| Name | Required | Where to get it |
+| Name | Required | What it does |
 | --- | --- | --- |
-| `CARTESIA_API_KEY` | yes | https://play.cartesia.ai/keys |
-| `LLM_MODEL` | yes | `provider/model`, for example `openai/gpt-5.4-mini` or `anthropic/claude-haiku-4-5` |
+| `CARTESIA_API_KEY` | yes | Mints browser tokens for Ink 2 and Sonic. Get one at https://play.cartesia.ai/keys |
+| `LLM_MODEL` | yes | The model that translates each turn, as `provider/model`, for example `openai/gpt-5.4-mini` or `anthropic/claude-haiku-4-5` |
 | `OPENAI_API_KEY` | if `LLM_MODEL` starts with `openai/` | https://platform.openai.com/api-keys |
 | `ANTHROPIC_API_KEY` | if `LLM_MODEL` starts with `anthropic/` | https://console.anthropic.com |
-| `AI_GATEWAY_API_KEY` | for any other provider | https://vercel.com/docs/ai-gateway |
-| `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
+| `AI_GATEWAY_API_KEY` | for any other provider | Routes the model through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). Not needed on a Vercel deployment |
+| `APP_PASSWORD` | in production | Optional for `next dev`. Required for a production build (`next start` or Vercel): a password for the whole app, or `none` to make it public. |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
 Those model ids are examples. Providers retire models, so check the provider's model page first. On Vercel, a model with no matching direct key goes through the AI Gateway without `AI_GATEWAY_API_KEY`, because the deployment authenticates to it for you.
@@ -112,11 +112,13 @@ Uses `ink-2` for streaming speech to text, `sonic-3.6` for speech, and `Cartesia
 
 ## Before you deploy
 
-Set `APP_PASSWORD`. `proxy.ts` then asks for that password (HTTP Basic auth, any username) on every page and API route. On Vercel (production and preview) the app returns 503 until `APP_PASSWORD` is set, or set to `none` to make the app public. On hosts other than Vercel, set `APP_PASSWORD` yourself, because the gate only enforces it on Vercel.
+Set `APP_PASSWORD`. `proxy.ts` then asks for that password (HTTP Basic auth, any username) on every page and API route. A production build (`next start`, or any Vercel deployment) answers 503 until `APP_PASSWORD` is set, or set to `none` to make the app public. `next dev` stays open.
 
 `/api/token` allows 10 requests a minute and `/api/translate` 60 a minute per client IP, with an in-memory rate limit. It is per process and only slows casual abuse; the password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
 
 Both people's speech goes to Cartesia, and the text of each turn goes to your LLM provider for translation. Tell the other person before you start.
+
+Translations can be wrong. Don't rely on this for medical, legal or emergency conversations; use a qualified interpreter.
 
 A session costs Ink 2 time while the microphone is open, one LLM call per turn, and Sonic characters for each translation. See https://docs.cartesia.ai/pricing and your LLM provider's pricing page.
 

@@ -187,7 +187,7 @@ export function SessionView({
             </Alert>
           ) : null}
           <p className="text-xs text-muted-foreground">
-            {started ? "M mutes, Escape ends." : "Headphones work best, so your partner does not hear itself."}
+            {started ? "M mutes, Escape ends." : "Headphones work best, so your partner does not hear itself. Audio is processed and recorded by Cartesia."}
           </p>
         </section>
 

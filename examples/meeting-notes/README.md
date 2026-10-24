@@ -26,14 +26,14 @@ Meetings are saved in your browser's IndexedDB, so there is no database to set u
 
 ## Environment variables
 
-| Name | Required | Where to get it |
+| Name | Required | What it does |
 | --- | --- | --- |
-| `CARTESIA_API_KEY` | yes | https://play.cartesia.ai/keys |
-| `LLM_MODEL` | yes | `provider/model`, for example `openai/gpt-5.4-mini` or `anthropic/claude-haiku-4-5` |
+| `CARTESIA_API_KEY` | yes | Transcribes the audio. Get one at https://play.cartesia.ai/keys |
+| `LLM_MODEL` | yes | The model that writes the notes, as `provider/model`, for example `openai/gpt-5.4-mini` or `anthropic/claude-haiku-4-5` |
 | `OPENAI_API_KEY` | if `LLM_MODEL` starts with `openai/` | https://platform.openai.com/api-keys |
 | `ANTHROPIC_API_KEY` | if `LLM_MODEL` starts with `anthropic/` | https://console.anthropic.com |
-| `AI_GATEWAY_API_KEY` | for any other provider | https://vercel.com/docs/ai-gateway |
-| `APP_PASSWORD` | on Vercel | Optional locally. Required on Vercel (production and preview): a password for the whole app, or `none` to make it public. |
+| `AI_GATEWAY_API_KEY` | for any other provider | Routes the model through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). Not needed on a Vercel deployment |
+| `APP_PASSWORD` | in production | Optional for `next dev`. Required for a production build (`next start` or Vercel): a password for the whole app, or `none` to make it public. |
 | `TRUST_PROXY` | no | Set to `1` behind your own reverse proxy so rate limits use the last `X-Forwarded-For` entry. Leave empty on Vercel. |
 
 The model ids are examples. Providers retire models, so check the provider's model page before you pick one. On Vercel, a model with no matching direct key goes through the AI Gateway without `AI_GATEWAY_API_KEY`, because the deployment authenticates to it for you.
@@ -68,7 +68,7 @@ console.log(res.text, res.duration);
 ## Before you deploy
 
 - Get everyone's consent before recording. Some places require it from all participants, and the recorder says so under the record button. The audio goes to Cartesia for transcription and the transcript goes to your LLM provider for the notes. Tell participants that.
-- Set `APP_PASSWORD`. `proxy.ts` asks every visitor for it with HTTP Basic auth, and on Vercel (production and preview) the app refuses to serve until it is set (use `none` to make the app public on purpose). On hosts other than Vercel, set `APP_PASSWORD` yourself, because the gate only enforces it on Vercel.
+- Set `APP_PASSWORD`. `proxy.ts` asks every visitor for it with HTTP Basic auth, and a production build (`next start`, or any Vercel deployment) answers 503 until it is set, or set to `none` to make the app public. `next dev` stays open.
 - Both routes spend money. Each has an in-memory rate limit of 10 requests a minute per IP address. The limiter lives in one server process, so it only slows casual abuse. The password is the real guard. On Vercel the limiter keys on the client IP. On other hosts every caller shares one bucket, unless the app runs behind a proxy that appends the client IP to `x-forwarded-for` and you set `TRUST_PROXY=1`.
 - Batch `ink-whisper` bills per second of audio, silence included, plus one LLM call per meeting. See https://docs.cartesia.ai/pricing.
 - Uploads are capped at 4 MB, because Vercel rejects request bodies over 4.5 MB. The recorder stops at 3.6 MB or 20 minutes. On a host without that limit you can raise `MAX_AUDIO_BYTES` in `lib/limits.ts`.
